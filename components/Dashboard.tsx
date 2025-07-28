@@ -355,242 +355,244 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* 대시보드 헤더 */}
-      <div className="neu-card rounded-3xl px-6 py-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
-            <BarChart3 className="h-7 w-7 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-4xl font-bold text-primary">대시보드</h1>
-            <p className="text-muted-foreground text-lg mt-1">
-              웹사이트 테스트 현황 및 통계를 확인하세요
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 연결 상태 배너 */}
-      {renderConnectionBanner()}
-
-      {/* 주요 통계 카드 */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <div className="neu-card rounded-3xl px-6 py-8">
+    <div className="w-full flex flex-col items-center">
+      <div className="max-w-5xl w-full space-y-6 mx-auto">
+        {/* 대시보드 헤더 */}
+        <div className="neu-card rounded-3xl px-8 py-6 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
           <div className="flex items-center space-x-4">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
-              <Activity className="h-6 w-6 text-primary-foreground" />
+              <BarChart3 className="h-7 w-7 text-primary-foreground" />
             </div>
             <div>
-              <p className="text-muted-foreground font-medium">총 테스트</p>
-              <p className="text-4xl font-bold text-primary">{totalTests}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="neu-card rounded-3xl px-6 py-8">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-secondary">
-              <CheckCircle className="h-6 w-6 text-secondary-foreground" />
-            </div>
-            <div>
-              <p className="text-muted-foreground font-medium">성공률</p>
-              <p className="text-4xl font-bold text-primary">{passRate}%</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="neu-card rounded-3xl px-6 py-8">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: '#9BA8E8' }}>
-              <TrendingUp className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="text-muted-foreground font-medium">평균 점수</p>
-              <p className="text-4xl font-bold text-primary">{avgScore}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="neu-card rounded-3xl px-6 py-8">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: '#6773C0' }}>
-              <Globe className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="text-muted-foreground font-medium">이번 주</p>
-              <p className="text-4xl font-bold text-primary">
-                {isDemoModeActive || isOfflineMode ? 83 : mockData.weeklyStats.reduce((sum, day) => sum + day.tests, 0)}
+              <h1 className="text-4xl font-bold text-primary">대시보드</h1>
+              <p className="text-muted-foreground text-lg mt-1">
+                웹사이트 테스트 현황 및 통계를 확인하세요
               </p>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 차트 섹션 */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* 주간 테스트 추이 */}
-        <div className="neu-card rounded-3xl px-6 py-8">
-          <div className="mb-8">
-            <h3 className="text-2xl font-semibold text-primary mb-2">주간 테스트 추이</h3>
-            <p className="text-muted-foreground">
-              지난 7일간의 테스트 실행 현황 
-              {(isDemoModeActive || isOfflineMode) && <span className="text-purple-600">(시뮬레이션 데이터)</span>}
-            </p>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockData.weeklyStats}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5DBE8" />
-                <XAxis dataKey="name" stroke="#5A6082" />
-                <YAxis stroke="#5A6082" />
-                <Tooltip 
-                  contentStyle={{ 
-                    background: '#F8F1F7',
-                    border: '1px solid #E5DBE8',
-                    borderRadius: '12px',
-                    boxShadow: '4px 4px 8px rgba(232, 213, 229, 0.5)'
-                  }}
-                />
-                <Bar dataKey="tests" fill="#7886C7" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="passed" fill="#A9B5DF" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        {/* 연결 상태 배너 */}
+        {renderConnectionBanner()}
 
-        {/* 테스트 유형 분포 */}
-        <div className="neu-card rounded-3xl px-6 py-8">
-          <div className="mb-8">
-            <h3 className="text-2xl font-semibold text-primary mb-2">테스트 유형 분포</h3>
-            <p className="text-muted-foreground">
-              각 테스트 유형별 실행 비율
-              {(isDemoModeActive || isOfflineMode) && <span className="text-purple-600">(시뮬레이션 데이터)</span>}
-            </p>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={mockData.testTypeDistribution}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  fill="#7886C7"
-                >
-                  {mockData.testTypeDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    background: '#F8F1F7',
-                    border: '1px solid #E5DBE8',
-                    borderRadius: '12px'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-6 space-y-3">
-            {mockData.testTypeDistribution.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div 
-                    className="w-4 h-4 rounded-full" 
-                    style={{ backgroundColor: item.color }}
-                  ></div>
-                  <span className="font-medium text-foreground">{item.name}</span>
-                </div>
-                <span className="text-muted-foreground">{item.value}%</span>
+        {/* 주요 통계 카드 */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="neu-card rounded-3xl px-8 py-8">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
+                <Activity className="h-6 w-6 text-primary-foreground" />
               </div>
-            ))}
+              <div>
+                <p className="text-muted-foreground font-medium">총 테스트</p>
+                <p className="text-4xl font-bold text-primary">{totalTests}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="neu-card rounded-3xl px-8 py-8">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-secondary">
+                <CheckCircle className="h-6 w-6 text-secondary-foreground" />
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium">성공률</p>
+                <p className="text-4xl font-bold text-primary">{passRate}%</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="neu-card rounded-3xl px-8 py-8">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: '#9BA8E8' }}>
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium">평균 점수</p>
+                <p className="text-4xl font-bold text-primary">{avgScore}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="neu-card rounded-3xl px-8 py-8">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: '#6773C0' }}>
+                <Globe className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium">이번 주</p>
+                <p className="text-4xl font-bold text-primary">
+                  {isDemoModeActive || isOfflineMode ? 83 : mockData.weeklyStats.reduce((sum, day) => sum + day.tests, 0)}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 최근 테스트 결과 */}
-      <div className="neu-card rounded-3xl px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h3 className="text-2xl font-semibold text-primary mb-2">최근 테스트 결과</h3>
-            <p className="text-muted-foreground">
-              최신 테스트 실행 결과를 확인하세요
-              {(isDemoModeActive || isOfflineMode) && <span className="text-purple-600"> (시뮬레이션 결과)</span>}
-            </p>
+        {/* 차트 섹션 */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* 주간 테스트 추이 */}
+          <div className="neu-card rounded-3xl px-6 py-8">
+            <div className="mb-8">
+              <h3 className="text-2xl font-semibold text-primary mb-2">주간 테스트 추이</h3>
+              <p className="text-muted-foreground">
+                지난 7일간의 테스트 실행 현황 
+                {(isDemoModeActive || isOfflineMode) && <span className="text-purple-600">(시뮬레이션 데이터)</span>}
+              </p>
+            </div>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mockData.weeklyStats}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5DBE8" />
+                  <XAxis dataKey="name" stroke="#5A6082" />
+                  <YAxis stroke="#5A6082" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      background: '#F8F1F7',
+                      border: '1px solid #E5DBE8',
+                      borderRadius: '12px',
+                      boxShadow: '4px 4px 8px rgba(232, 213, 229, 0.5)'
+                    }}
+                  />
+                  <Bar dataKey="tests" fill="#7886C7" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="passed" fill="#A9B5DF" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <Button className="neu-button rounded-xl">
-            <Play className="h-4 w-4 mr-2" />
-            새 테스트 실행
-          </Button>
+
+          {/* 테스트 유형 분포 */}
+          <div className="neu-card rounded-3xl px-6 py-8">
+            <div className="mb-8">
+              <h3 className="text-2xl font-semibold text-primary mb-2">테스트 유형 분포</h3>
+              <p className="text-muted-foreground">
+                각 테스트 유형별 실행 비율
+                {(isDemoModeActive || isOfflineMode) && <span className="text-purple-600">(시뮬레이션 데이터)</span>}
+              </p>
+            </div>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={mockData.testTypeDistribution}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    fill="#7886C7"
+                  >
+                    {mockData.testTypeDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      background: '#F8F1F7',
+                      border: '1px solid #E5DBE8',
+                      borderRadius: '12px'
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-6 space-y-3">
+              {mockData.testTypeDistribution.map((item, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div 
+                      className="w-4 h-4 rounded-full" 
+                      style={{ backgroundColor: item.color }}
+                    ></div>
+                    <span className="font-medium text-foreground">{item.name}</span>
+                  </div>
+                  <span className="text-muted-foreground">{item.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          {(testResults.length > 0 ? testResults.slice(0, 5) : mockData.recentTests).map((test, index) => {
-            const StatusIcon = getStatusIcon(test.status);
-            return (
-              <div key={test.id || index} className="neu-flat rounded-2xl px-6 py-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      test.status === 'completed' ? 'neu-accent' : 'neu-secondary'
-                    }`}>
-                      <StatusIcon className={`h-6 w-6 ${
-                        test.status === 'completed' ? 'text-primary-foreground' : 'text-secondary-foreground'
-                      }`} />
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className="font-semibold text-foreground text-lg">{test.url}</h4>
-                        <div className="neu-pressed rounded-full px-3 py-1">
-                          <span className="text-sm font-medium text-primary">
-                            {getTestTypeLabel(test.testType)}
-                          </span>
-                        </div>
-                        {(isDemoModeActive || isOfflineMode) && (
-                          <div className="neu-pressed rounded-full px-3 py-1 bg-purple-500/10">
-                            <span className="text-xs font-medium text-purple-600">시뮬레이션</span>
+        {/* 최근 테스트 결과 */}
+        <div className="neu-card rounded-3xl px-6 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-2xl font-semibold text-primary mb-2">최근 테스트 결과</h3>
+              <p className="text-muted-foreground">
+                최신 테스트 실행 결과를 확인하세요
+                {(isDemoModeActive || isOfflineMode) && <span className="text-purple-600"> (시뮬레이션 결과)</span>}
+              </p>
+            </div>
+            <Button className="neu-button rounded-xl">
+              <Play className="h-4 w-4 mr-2" />
+              새 테스트 실행
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {(testResults.length > 0 ? testResults.slice(0, 5) : mockData.recentTests).map((test, index) => {
+              const StatusIcon = getStatusIcon(test.status);
+              return (
+                <div key={test.id || index} className="neu-flat rounded-2xl px-6 py-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                        test.status === 'completed' ? 'neu-accent' : 'neu-secondary'
+                      }`}>
+                        <StatusIcon className={`h-6 w-6 ${
+                          test.status === 'completed' ? 'text-primary-foreground' : 'text-secondary-foreground'
+                        }`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h4 className="font-semibold text-foreground text-lg">{test.url}</h4>
+                          <div className="neu-pressed rounded-full px-3 py-1">
+                            <span className="text-sm font-medium text-primary">
+                              {getTestTypeLabel(test.testType)}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>{new Date(test.startTime).toLocaleString()}</span>
-                        <span>•</span>
-                        <span>소요시간: {test.duration || '2m 30s'}</span>
+                          {(isDemoModeActive || isOfflineMode) && (
+                            <div className="neu-pressed rounded-full px-3 py-1 bg-purple-500/10">
+                              <span className="text-xs font-medium text-purple-600">시뮬레이션</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                          <span>{new Date(test.startTime).toLocaleString()}</span>
+                          <span>•</span>
+                          <span>소요시간: {test.duration || '2m 30s'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    {test.score && (
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">점수</p>
-                        <p className="text-2xl font-bold text-primary">{test.score}</p>
+                    
+                    <div className="flex items-center space-x-4">
+                      {test.score && (
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">점수</p>
+                          <p className="text-2xl font-bold text-primary">{test.score}</p>
+                        </div>
+                      )}
+                      <div className={`neu-pressed rounded-full px-4 py-2 ${getStatusColor(test.status)}`}>
+                        <span className="font-semibold">
+                          {test.status === 'completed' ? '완료' : 
+                           test.status === 'running' ? '실행중' : 
+                           test.status === 'failed' ? '실패' : '대기중'}
+                        </span>
                       </div>
-                    )}
-                    <div className={`neu-pressed rounded-full px-4 py-2 ${getStatusColor(test.status)}`}>
-                      <span className="font-semibold">
-                        {test.status === 'completed' ? '완료' : 
-                         test.status === 'running' ? '실행중' : 
-                         test.status === 'failed' ? '실패' : '대기중'}
-                      </span>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {testResults.length === 0 && !isOfflineMode && !isDemoModeActive && (
-          <div className="text-center py-12 text-muted-foreground">
-            <Activity className="h-16 w-16 mx-auto mb-6 opacity-50" />
-            <p className="font-semibold text-lg mb-2">아직 실행된 테스트가 없습니다</p>
-            <p className="text-base">첫 번째 테스트를 실행해보세요</p>
+              );
+            })}
           </div>
-        )}
+
+          {testResults.length === 0 && !isOfflineMode && !isDemoModeActive && (
+            <div className="text-center py-12 text-muted-foreground">
+              <Activity className="h-16 w-16 mx-auto mb-6 opacity-50" />
+              <p className="font-semibold text-lg mb-2">아직 실행된 테스트가 없습니다</p>
+              <p className="text-base">첫 번째 테스트를 실행해보세요</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

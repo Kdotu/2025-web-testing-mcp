@@ -157,9 +157,9 @@ function AppContent() {
       />
 
       {/* 메인 콘텐츠 영역 */}
-      <div className={`flex flex-col min-h-screen flex-1 ${open ? 'ml-[var(--sidebar-width)]' : 'ml-0'} transition-all duration-300 ease-in-out`}>
+      <div className="flex flex-col min-h-screen flex-1 transition-all duration-300 ease-in-out">
         {/* 헤더 */}
-        <header className="neu-flat border-b border-white/10 w-full">
+        <header className="neu-flat border-b border-white/10 w-full shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
           <div className="flex items-center justify-between px-4 py-4 w-full">
             <div className="flex items-center space-x-4">
               <div className="neu-button rounded-lg p-2">

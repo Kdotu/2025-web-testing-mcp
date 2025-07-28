@@ -210,9 +210,10 @@ export function TestResults({ onNavigate }: TestResultsProps) {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="w-full flex flex-col items-center">
+      <div className="max-w-5xl w-full space-y-8 mx-auto">
       {/* 페이지 헤더 */}
-      <div className="neu-card rounded-3xl px-8 py-6">
+      <div className="neu-card rounded-3xl px-8 py-6 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
         <div className="flex items-center space-x-4 mb-4">
           <FileText className="h-10 w-10 text-primary" />
           <div>
@@ -504,6 +505,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

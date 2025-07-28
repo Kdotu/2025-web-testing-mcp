@@ -1586,9 +1586,10 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full flex flex-col items-center">
+      <div className="max-w-5xl w-full space-y-8 mx-auto">
       {/* 헤더 */}
-      <div className="neu-card rounded-3xl px-6 py-6">
+      <div className="neu-card rounded-3xl px-8 py-6 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
         <h1 className="text-4xl font-bold text-primary mb-4">
           테스트 실행
         </h1>
@@ -1598,7 +1599,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
       </div>
 
       {/* 메인 설정 영역: 기본 설정 + 상세 설정 */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* 기본 테스트 설정 (좌측) */}
         <div className="neu-card rounded-3xl px-6 py-8">
           <div className="mb-8">
@@ -1940,6 +1941,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
