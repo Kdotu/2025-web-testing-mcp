@@ -10,13 +10,9 @@
 
 ## 🌟 주요 기능
 
-- **🚀 성능 테스트**: 웹페이지 로딩 속도 및 성능 지표 측정
-- **💡 Lighthouse 분석**: 종합적인 웹사이트 품질 평가
-- **⚡ 부하 테스트**: k6 기반 고성능 부하 테스트
-- **📊 실시간 모니터링**: 테스트 진행 상황 실시간 추적
-- **📈 상세 리포트**: 시각적 차트와 상세 분석 결과
-- **🔄 자동화**: 반복 테스트 및 스케줄링 지원
-- **📱 반응형 디자인**: 데스크톱 및 모바일 최적화
+- **🚀 (구현 예정) 성능 테스트**: 웹페이지 로딩 속도 및 성능 지표 측정
+- **💡 (구현 예정) Lighthouse 분석**: 종합적인 웹사이트 품질 평가 
+- **⚡ (진행중) 부하 테스트**: k6 기반 고성능 부하 테스트
 
 ## 🎨 디자인 시스템
 
@@ -197,59 +193,6 @@ mcp-website-tester/
 - **최대 VU**: 1-2000
 - **단계별 설정**: 지속시간과 목표값 설정
 
-## 🔐 보안
-
-- **환경 변수**: 민감한 정보는 환경 변수로 관리
-- **API 키 보안**: Supabase RLS (Row Level Security) 적용
-- **CORS 설정**: 적절한 CORS 정책 적용
-- **Input 검증**: URL 및 사용자 입력 검증
-
-## 🌐 배포
-
-### 정적 호스팅
-- **Netlify**: `npm run build` 후 dist 폴더 배포
-- **Vercel**: `vercel --prod` 명령어 사용
-- **GitHub Pages**: gh-pages 브랜치 활용
-
-### 서버 배포
-- **Docker**: Dockerfile 및 nginx.conf 제공
-- **PM2**: Node.js 프로세스 관리
-- **클라우드**: AWS, GCP, Azure 지원
-
-자세한 배포 가이드는 [deploy-guide.md](./deploy-guide.md)를 참조하세요.
-
-## 🤝 기여하기
-
-1. 이 저장소를 포크합니다
-2. 새로운 기능 브랜치를 생성합니다 (`git checkout -b feature/amazing-feature`)
-3. 변경사항을 커밋합니다 (`git commit -m 'Add some amazing feature'`)
-4. 브랜치에 푸시합니다 (`git push origin feature/amazing-feature`)
-5. Pull Request를 생성합니다
-
-### 개발 가이드라인
-- TypeScript 사용 필수
-- ESLint 규칙 준수
-- 컴포넌트는 단일 책임 원칙 적용
-- 테스트 코드 작성 권장
-
-## 📝 라이선스
-
-이 프로젝트는 [MIT 라이선스](./LICENSE) 하에 배포됩니다.
-
-## 🆘 지원 및 문의
-
-- **이슈 리포트**: [GitHub Issues](https://github.com/your-org/mcp-website-tester/issues)
-- **기능 요청**: [Feature Requests](https://github.com/your-org/mcp-website-tester/discussions)
-- **문서**: [Wiki](https://github.com/your-org/mcp-website-tester/wiki)
-- **이메일**: support@your-domain.com
-
-## 🙏 감사 인사
-
-- [Supabase](https://supabase.com/) - 백엔드 인프라
-- [k6](https://k6.io/) - 부하 테스트 도구
-- [Google Lighthouse](https://developers.google.com/web/tools/lighthouse) - 웹사이트 품질 분석
-- [Radix UI](https://www.radix-ui.com/) - 접근성 우선 컴포넌트
-- [Tailwind CSS](https://tailwindcss.com/) - 유틸리티 우선 CSS 프레임워크
 
 ## 🔄 버전 히스토리
 
@@ -259,7 +202,3 @@ mcp-website-tester/
 - 라벤더/네이비 디자인 시스템 적용
 - Supabase 통합
 - k6 부하 테스트 지원
-
----
-
-**Made with ❤️ by MCP Website Tester Team**
