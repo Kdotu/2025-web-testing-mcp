@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 웹사이트 테스터</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237886C7'><path d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'/></svg>">
+    <meta name="description" content="MCP 기반 웹사이트 성능 테스트 및 분석 플랫폼">
+    <meta name="keywords" content="MCP, 웹사이트 테스트, 성능 분석, Lighthouse, 부하 테스트">
+    <meta name="author" content="MCP Website Tester Team">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://mcp-website-tester.com/">
+    <meta property="og:title" content="MCP 웹사이트 테스터">
+    <meta property="og:description" content="MCP 기반 웹사이트 성능 테스트 및 분석 플랫폼">
+    <meta property="og:image" content="/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://mcp-website-tester.com/">
+    <meta property="twitter:title" content="MCP 웹사이트 테스터">
+    <meta property="twitter:description" content="MCP 기반 웹사이트 성능 테스트 및 분석 플랫폼">
+    <meta property="twitter:image" content="/og-image.png">
+    
+    <style>
+        /* 초기 로딩 스타일 */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #FFF2F2 0%, #FAF0F9 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease-out;
+        }
+        
+        #loading-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #A9B5DF;
+            border-top: 4px solid #7886C7;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            margin-top: 1rem;
+            font-family: "Pretendard Variable", sans-serif;
+            color: #7886C7;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 로딩 중에는 root 숨김 */
+        #root {
+            opacity: 0;
+            transition: opacity 0.3s ease-in;
+        }
+        
+        #root.loaded {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- 로딩 화면 -->
+    <div id="loading-screen">
+        <div style="text-align: center;align-items: center;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">MCP 웹사이트 테스터 로딩 중...</div>
+        </div>
+    </div>
+    
+    <!-- React 앱 루트 -->
+    <div id="root"></div>
+    
+    <script type="module" src="/main.tsx"></script>
+    
+    <script>
+        // 로딩 화면 제거 로직
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                const loadingScreen = document.getElementById('loading-screen');
+                const root = document.getElementById('root');
+                
+                if (loadingScreen && root) {
+                    root.classList.add('loaded');
+                    loadingScreen.classList.add('fade-out');
+                    
+                    setTimeout(function() {
+                        if (loadingScreen.parentNode) {
+                            loadingScreen.parentNode.removeChild(loadingScreen);
+                        }
+                    }, 500);
+                }
+            }, 1000); // 최소 1초 로딩 화면 표시
+        });
+        
+        // 오류 발생 시 로딩 화면 제거
+        window.addEventListener('error', function() {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 웹사이트 테스터 - 테스트 결과 (예시)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../static/common.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237886C7'><path d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'/></svg>">
+    <style>
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .result-card {
+            background: var(--card);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 8px 8px 16px var(--neu-shadow-dark), -8px -8px 16px var(--neu-shadow-light);
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .result-url {
+            font-weight: 600;
+            color: var(--foreground);
+            font-size: 0.95rem;
+        }
+        .result-date {
+            font-size: 0.875rem;
+            color: var(--muted-foreground);
+        }
+        .result-type {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.75rem;
+        }
+        .result-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+        .metric-item {
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+            margin-bottom: 0.25rem;
+        }
+        .metric-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .score-excellent { color: #10b981; }
+        .score-good { color: #8b5cf6; }
+        .score-average { color: #f59e0b; }
+        .score-poor { color: #ef4444; }
+        .filter-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        .filter-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .filter-tab.active {
+            background: var(--primary);
+            color: var(--primary-foreground);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="neu-flat rounded-xl px-4 py-3">
+                    <h1 class="text-lg font-bold text-primary truncate">MCP 테스터</h1>
+                    <p class="text-xs text-muted-foreground mt-1">웹사이트 성능 분석 도구</p>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="sidebar-menu-btn" data-page="dashboard">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                    </svg>
+                    <span>메인</span>
+                </button>
+                
+                <button class="sidebar-menu-btn" data-page="test-execution">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1a4 4 0 014 4v2m-6-6V9a2 2 0 012-2h2a2 2 0 012 2v1"/>
+                    </svg>
+                    <span>테스트 실행</span>
+                </button>
+                
+                <button class="sidebar-menu-btn active" data-page="test-results">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <span>테스트 결과</span>
+                </button>
+                
+                <button class="sidebar-menu-btn" data-page="settings">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span>설정</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- 메인 콘텐츠 -->
+        <div class="main-layout">
+            <!-- 헤더 -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="neu-button mobile-menu-btn" id="mobile-menu-btn">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+                    <h2 class="page-title">테스트 결과</h2>
+                </div>
+                
+                <div class="header-right">
+                    <div class="connection-status">
+                        <div class="status-indicator connected"></div>
+                        <span class="status-text">연결됨</span>
+                        <span class="version">v1.0.0</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 메인 콘텐츠 영역 -->
+            <main class="content">
+                <div class="content-wrapper">
+                    <!-- 헤더 -->
+                    <div class="neu-card welcome-card">
+                        <div class="welcome-content">
+                            <h1 class="welcome-title">테스트 결과</h1>
+                            <p class="welcome-subtitle">실행된 테스트들의 상세한 결과를 확인하세요</p>
+                        </div>
+                        <div class="welcome-icon">
+                            <svg class="icon-xl" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 필터 탭 -->
+                    <div class="neu-flat" style="padding: 1.5rem; border-radius: 1rem;">
+                        <div class="filter-tabs">
+                            <button class="neu-button filter-tab active">전체</button>
+                            <button class="neu-button filter-tab">성능 테스트</button>
+                            <button class="neu-button filter-tab">Lighthouse</button>
+                            <button class="neu-button filter-tab">부하 테스트</button>
+                            <button class="neu-button filter-tab">보안 테스트</button>
+                        </div>
+                    </div>
+
+                    <!-- 테스트 결과 목록 -->
+                    <div class="results-grid">
+                        <!-- 성능 테스트 결과 -->
+                        <div class="neu-flat result-card">
+                            <div class="result-header">
+                                <div>
+                                    <div class="result-url">https://example.com</div>
+                                    <div class="result-date">2025년 1월 28일 15:30</div>
+                                </div>
+                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                            <div class="neu-pressed result-type">성능 테스트</div>
+                            <div class="result-metrics">
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">로딩 시간</div>
+                                    <div class="metric-value score-excellent">1.2초</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">FCP</div>
+                                    <div class="metric-value score-good">0.8초</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">LCP</div>
+                                    <div class="metric-value score-excellent">1.1초</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">CLS</div>
+                                    <div class="metric-value score-excellent">0.05</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lighthouse 결과 -->
+                        <div class="neu-flat result-card">
+                            <div class="result-header">
+                                <div>
+                                    <div class="result-url">https://testsite.org</div>
+                                    <div class="result-date">2025년 1월 28일 14:45</div>
+                                </div>
+                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                            <div class="neu-pressed result-type">Lighthouse</div>
+                            <div class="result-metrics">
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">성능</div>
+                                    <div class="metric-value score-good">89</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">접근성</div>
+                                    <div class="metric-value score-excellent">94</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">모범사례</div>
+                                    <div class="metric-value score-excellent">96</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">SEO</div>
+                                    <div class="metric-value score-good">91</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 부하 테스트 결과 -->
+                        <div class="neu-flat result-card">
+                            <div class="result-header">
+                                <div>
+                                    <div class="result-url">https://mywebsite.com</div>
+                                    <div class="result-date">2025년 1월 28일 13:20</div>
+                                </div>
+                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                            <div class="neu-pressed result-type">부하 테스트</div>
+                            <div class="result-metrics">
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">최대 RPS</div>
+                                    <div class="metric-value score-excellent">1,247</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">평균 응답시간</div>
+                                    <div class="metric-value score-good">156ms</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">에러율</div>
+                                    <div class="metric-value score-excellent">0.02%</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">가용성</div>
+                                    <div class="metric-value score-excellent">99.98%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 보안 테스트 결과 -->
+                        <div class="neu-flat result-card">
+                            <div class="result-header">
+                                <div>
+                                    <div class="result-url">https://securesite.com</div>
+                                    <div class="result-date">2025년 1월 28일 12:10</div>
+                                </div>
+                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                            <div class="neu-pressed result-type">보안 테스트</div>
+                            <div class="result-metrics">
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">SSL 등급</div>
+                                    <div class="metric-value score-excellent">A+</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">보안 헤더</div>
+                                    <div class="metric-value score-good">B</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">취약점</div>
+                                    <div class="metric-value score-excellent">0</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">위험도</div>
+                                    <div class="metric-value score-excellent">낮음</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 추가 결과 카드들... -->
+                        <div class="neu-flat result-card">
+                            <div class="result-header">
+                                <div>
+                                    <div class="result-url">https://blog.example.com</div>
+                                    <div class="result-date">2025년 1월 28일 11:30</div>
+                                </div>
+                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                            <div class="neu-pressed result-type">접근성 테스트</div>
+                            <div class="result-metrics">
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">WCAG 준수</div>
+                                    <div class="metric-value score-good">87%</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">색상 대비</div>
+                                    <div class="metric-value score-excellent">AAA</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">키보드 접근</div>
+                                    <div class="metric-value score-good">양호</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">스크린리더</div>
+                                    <div class="metric-value score-average">보통</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="neu-flat result-card">
+                            <div class="result-header">
+                                <div>
+                                    <div class="result-url">https://shop.example.com</div>
+                                    <div class="result-date">2025년 1월 28일 10:15</div>
+                                </div>
+                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                            <div class="neu-pressed result-type">성능 테스트</div>
+                            <div class="result-metrics">
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">로딩 시간</div>
+                                    <div class="metric-value score-average">2.8초</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">FCP</div>
+                                    <div class="metric-value score-average">1.9초</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">LCP</div>
+                                    <div class="metric-value score-poor">3.2초</div>
+                                </div>
+                                <div class="neu-pressed metric-item">
+                                    <div class="metric-label">CLS</div>
+                                    <div class="metric-value score-good">0.08</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- 푸터 -->
+            <footer class="footer">
+                <div class="footer-content">
+                    <span>© 2025 MCP 웹사이트 테스터 (예시)</span>
+                    <div class="footer-right">
+                        <span>버전 1.0.0</span>
+                        <div class="status-indicator connected"></div>
+                        <span>연결됨</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="../static/common.js"></script>
+    <script>
+        // 테스트 결과 카드 클릭 이벤트
+        document.querySelectorAll('.result-card').forEach(card => {
+            card.addEventListener('click', () => {
+                showNotification('실제 앱에서는 상세한 테스트 결과를 표시합니다.', 'info');
+            });
+        });
+
+        // 필터 탭 클릭 이벤트
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                showNotification(`'${e.target.textContent}' 필터가 적용되었습니다.`, 'info');
+            });
+        });
+    </script>
+</body>
+</html>

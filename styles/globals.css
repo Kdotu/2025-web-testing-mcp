@@ -1,0 +1,492 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 14px;
+  --background: #FFF2F2;
+  --foreground: #2D336B;
+  --card: #F8F1F7;
+  --card-foreground: #2D336B;
+  --popover: #F8F1F7;
+  --popover-foreground: #2D336B;
+  --primary: #7886C7;
+  --primary-foreground: #FFFFFF;
+  --secondary: #A9B5DF;
+  --secondary-foreground: #2D336B;
+  --muted: #F0E8F4;
+  --muted-foreground: #5A6082;
+  --accent: #7886C7;
+  --accent-foreground: #FFFFFF;
+  --destructive: #dc2626;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(45, 51, 107, 0.08);
+  --input: #F8F1F7;
+  --input-background: #F8F1F7;
+  --switch-background: #E5DBE8;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #7886C7;
+  --chart-1: #7886C7;
+  --chart-2: #A9B5DF;
+  --chart-3: #9BA8E8;
+  --chart-4: #6773C0;
+  --chart-5: #4F5BA3;
+  --radius: 1.25rem;
+  --sidebar: #FAF0F9;
+  --sidebar-foreground: #2D336B;
+  --sidebar-primary: #7886C7;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #A9B5DF;
+  --sidebar-accent-foreground: #2D336B;
+  --sidebar-border: rgba(45, 51, 107, 0.05);
+  --sidebar-ring: #7886C7;
+  --sidebar-width: 18rem;
+  
+  /* Custom colors for the testing platform */
+  --testing-primary: #7886C7;
+  --testing-secondary: #A9B5DF;
+  --testing-neutral: #E5DBE8;
+  --testing-accent: #9BA8E8;
+  
+  /* Light Neumorphism shadows */
+  --neu-shadow-light: #FFFFFF;
+  --neu-shadow-dark: #E8D5E5;
+  --neu-inset-shadow-light: #FFFFFF;
+  --neu-inset-shadow-dark: #E8D5E5;
+  
+  /* Padding system */
+  --padding-xs: 0.5rem;    /* 8px */
+  --padding-sm: 0.75rem;   /* 12px */
+  --padding-md: 1rem;      /* 16px */
+  --padding-lg: 1.5rem;    /* 24px */
+  --padding-xl: 2rem;      /* 32px */
+  --padding-2xl: 3rem;     /* 48px */
+  --padding-3xl: 4rem;     /* 64px */
+}
+
+.dark {
+  --background: #1A1E3A;
+  --foreground: #F8F1F7;
+  --card: #2D336B;
+  --card-foreground: #F8F1F7;
+  --popover: #2D336B;
+  --popover-foreground: #F8F1F7;
+  --primary: #7886C7;
+  --primary-foreground: #F8F1F7;
+  --secondary: #2D336B;
+  --secondary-foreground: #F8F1F7;
+  --muted: #242A4A;
+  --muted-foreground: #A9B5DF;
+  --accent: #7886C7;
+  --accent-foreground: #F8F1F7;
+  --destructive: #ef4444;
+  --destructive-foreground: #F8F1F7;
+  --border: rgba(248, 241, 247, 0.08);
+  --input: #2D336B;
+  --ring: #7886C7;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: #7886C7;
+  --chart-2: #A9B5DF;
+  --chart-3: #9BA8E8;
+  --chart-4: #F8F1F7;
+  --chart-5: #E5DBE8;
+  --sidebar: #1F2340;
+  --sidebar-foreground: #F8F1F7;
+  --sidebar-primary: #7886C7;
+  --sidebar-primary-foreground: #F8F1F7;
+  --sidebar-accent: #2D336B;
+  --sidebar-accent-foreground: #F8F1F7;
+  --sidebar-border: rgba(248, 241, 247, 0.05);
+  --sidebar-ring: #7886C7;
+  --sidebar-width: 18rem;
+  
+  /* Dark mode neumorphism shadows */
+  --neu-shadow-light: #373F70;
+  --neu-shadow-dark: #0F1225;
+  --neu-inset-shadow-light: #373F70;
+  --neu-inset-shadow-dark: #0F1225;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --sidebar-width-custom: var(--sidebar-width);
+  
+  /* Custom colors */
+  --color-testing-primary: var(--testing-primary);
+  --color-testing-secondary: var(--testing-secondary);
+  --color-testing-neutral: var(--testing-neutral);
+  --color-testing-accent: var(--testing-accent);
+  
+  /* Neumorphism shadows */
+  --color-neu-shadow-light: var(--neu-shadow-light);
+  --color-neu-shadow-dark: var(--neu-shadow-dark);
+  --color-neu-inset-shadow-light: var(--neu-inset-shadow-light);
+  --color-neu-inset-shadow-dark: var(--neu-inset-shadow-dark);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    background: linear-gradient(135deg, #FFF2F2 0%, #FAF0F9 100%);
+    min-height: 100vh;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  }
+}
+
+/* Light Neumorphism utility classes */
+@layer utilities {
+  .neu-raised {
+    background: var(--card);
+    box-shadow: 
+      8px 8px 16px var(--neu-shadow-dark),
+      -8px -8px 16px var(--neu-shadow-light);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+  }
+  
+  .neu-pressed {
+    background: var(--background);
+    box-shadow: 
+      inset 4px 4px 8px var(--neu-inset-shadow-dark),
+      inset -4px -4px 8px var(--neu-inset-shadow-light);
+    border: 1px solid rgba(45, 51, 107, 0.05);
+  }
+  
+  .neu-flat {
+    background: var(--card);
+    box-shadow: 
+      4px 4px 8px var(--neu-shadow-dark),
+      -4px -4px 8px var(--neu-shadow-light);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+  
+  .neu-button {
+    background: var(--card);
+    box-shadow: 
+      6px 6px 12px var(--neu-shadow-dark),
+      -6px -6px 12px var(--neu-shadow-light);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    transition: all 0.2s ease;
+  }
+  
+  .neu-button:hover {
+    box-shadow: 
+      8px 8px 16px var(--neu-shadow-dark),
+      -8px -8px 16px var(--neu-shadow-light);
+    transform: translateY(-1px);
+  }
+  
+  .neu-button:active,
+  .neu-button-active {
+    background: var(--primary);
+    box-shadow: 
+      inset 3px 3px 6px rgba(0, 0, 0, 0.15),
+      inset -3px -3px 6px rgba(255, 255, 255, 0.8);
+    transform: translateY(0);
+  }
+  
+  .neu-input {
+    background: var(--background);
+    box-shadow: 
+      inset 3px 3px 6px var(--neu-inset-shadow-dark),
+      inset -3px -3px 6px var(--neu-inset-shadow-light);
+    border: 1px solid rgba(45, 51, 107, 0.05);
+  }
+  
+  .neu-card {
+    background: var(--card);
+    box-shadow: 
+      12px 12px 24px var(--neu-shadow-dark),
+      -12px -12px 24px var(--neu-shadow-light);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+  }
+  
+  .neu-subtle {
+    background: var(--card);
+    box-shadow: 
+      2px 2px 4px var(--neu-shadow-dark),
+      -2px -2px 4px var(--neu-shadow-light);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  
+  .neu-accent {
+    background: var(--primary);
+    box-shadow: 
+      6px 6px 12px rgba(232, 213, 229, 0.8),
+      -6px -6px 12px rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  .neu-accent:hover {
+    background: #8B98D1;
+    box-shadow: 
+      8px 8px 16px rgba(232, 213, 229, 0.8),
+      -8px -8px 16px rgba(255, 255, 255, 0.9);
+  }
+  
+  .neu-secondary {
+    background: var(--secondary);
+    box-shadow: 
+      4px 4px 8px var(--neu-shadow-dark),
+      -4px -4px 8px var(--neu-shadow-light);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+  
+  .neu-secondary:hover {
+    background: #B5C2E5;
+    box-shadow: 
+      6px 6px 12px var(--neu-shadow-dark),
+      -6px -6px 12px var(--neu-shadow-light);
+  }
+  
+  /* Purple action button for important actions */
+  .neu-button-primary {
+    background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+    color: #FFFFFF;
+    box-shadow: 
+      6px 6px 12px rgba(139, 92, 246, 0.3),
+      -6px -6px 12px rgba(255, 255, 255, 0.9),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    transition: all 0.2s ease;
+  }
+  
+  .neu-button-primary:hover {
+    background: linear-gradient(135deg, #9333EA 0%, #8B5CF6 100%);
+    box-shadow: 
+      8px 8px 16px rgba(139, 92, 246, 0.4),
+      -8px -8px 16px rgba(255, 255, 255, 0.9),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px) scale(1.02);
+  }
+  
+  .neu-button-primary:active {
+    background: linear-gradient(135deg, #7C3AED 0%, #6B46C1 100%);
+    box-shadow: 
+      inset 3px 3px 6px rgba(107, 70, 193, 0.3),
+      inset -3px -3px 6px rgba(139, 92, 246, 0.1);
+    transform: translateY(0) scale(1);
+  }
+  
+  /* Dialog/Popup white effect styles */
+  .neu-dialog {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 241, 247, 0.95) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 
+      0 25px 50px -12px rgba(45, 51, 107, 0.15),
+      0 0 0 1px rgba(255, 255, 255, 0.8),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+  }
+  
+  .neu-dialog-overlay {
+    background: linear-gradient(135deg, rgba(45, 51, 107, 0.25) 0%, rgba(169, 181, 223, 0.15) 100%);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  
+  .neu-dialog-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(248, 241, 247, 0.05) 100%);
+    margin: -1.5rem -1.5rem 1rem -1.5rem;
+    padding: 1.5rem;
+    border-radius: 0.75rem 0.75rem 0 0;
+  }
+  
+  .neu-dialog-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(248, 241, 247, 0.1) 100%);
+    margin: 1rem -1.5rem -1.5rem -1.5rem;
+    padding: 1.5rem;
+    border-radius: 0 0 0.75rem 0.75rem;
+  }
+  
+  /* Close button enhancement for white dialogs */
+  .neu-dialog-close {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 
+      2px 2px 4px rgba(45, 51, 107, 0.1),
+      -1px -1px 2px rgba(255, 255, 255, 0.8);
+    transition: all 0.2s ease;
+  }
+  
+  .neu-dialog-close:hover {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 
+      3px 3px 6px rgba(45, 51, 107, 0.15),
+      -2px -2px 4px rgba(255, 255, 255, 0.9);
+    transform: translateY(-1px);
+  }
+
+  /* Clean sidebar styles */
+  [data-sidebar="sidebar"] {
+    background: var(--sidebar) !important;
+    border: none !important;
+    box-shadow: 
+      12px 0 24px rgba(45, 51, 107, 0.08),
+      inset -1px 0 0 rgba(255, 255, 255, 0.5) !important;
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width) !important;
+  }
+  
+  /* Sidebar menu button clean styles */
+  [data-sidebar="menu-button"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease !important;
+    border-radius: 0.75rem !important;
+  }
+  
+  [data-sidebar="menu-button"]:hover:not([data-active="true"]) {
+    background: rgba(255, 255, 255, 0.5) !important;
+    color: var(--primary) !important;
+    transform: translateX(4px) !important;
+  }
+  
+  [data-sidebar="menu-button"][data-active="true"] {
+    background: var(--primary) !important;
+    color: var(--primary-foreground) !important;
+    box-shadow: 
+      6px 6px 12px rgba(232, 213, 229, 0.8),
+      -2px -2px 4px rgba(255, 255, 255, 0.9) !important;
+    transform: translateX(8px) !important;
+  }
+  
+  /* Sidebar header clean style */
+  [data-sidebar="header"] {
+    background: var(--sidebar) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  }
+  
+  [data-sidebar="content"] {
+    background: var(--sidebar) !important;
+  }
+  
+  /* Sidebar container styles */
+  [data-slot="sidebar-container"] {
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width) !important;
+    max-width: var(--sidebar-width) !important;
+  }
+  
+  /* Sidebar inner styles */
+  [data-slot="sidebar-inner"] {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      color: var(--foreground);
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      color: var(--foreground);
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      color: var(--foreground);
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      color: var(--foreground);
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+      color: var(--foreground);
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      color: var(--foreground);
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+      color: var(--foreground);
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+}

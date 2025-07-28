@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 웹사이트 테스터 - 테스트 실행 (예시)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../static/common.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237886C7'><path d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'/></svg>">
+    <style>
+        .test-form {
+            display: grid;
+            gap: 1.5rem;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .form-label {
+            font-weight: 600;
+            color: var(--foreground);
+        }
+        .form-input {
+            background: var(--background);
+            box-shadow: inset 3px 3px 6px var(--neu-inset-shadow-dark), inset -3px -3px 6px var(--neu-inset-shadow-light);
+            border: 1px solid rgba(45, 51, 107, 0.05);
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: var(--foreground);
+            font-family: inherit;
+        }
+        .form-input:focus {
+            outline: none;
+            box-shadow: inset 3px 3px 6px var(--neu-inset-shadow-dark), inset -3px -3px 6px var(--neu-inset-shadow-light), 0 0 0 2px var(--ring);
+        }
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        .preset-btn {
+            padding: 1rem;
+            text-align: left;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .preset-btn.active {
+            background: var(--primary);
+            color: var(--primary-foreground);
+        }
+        .current-settings {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        .setting-item {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+        .setting-label {
+            font-size: 0.875rem;
+            color: #000000;
+            margin-bottom: 0.25rem;
+        }
+        .setting-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        @media (max-width: 1024px) {
+            .test-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="neu-flat rounded-xl px-4 py-3">
+                    <h1 class="text-lg font-bold text-primary truncate">MCP 테스터</h1>
+                    <p class="text-xs text-muted-foreground mt-1">웹사이트 성능 분석 도구</p>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="sidebar-menu-btn" data-page="dashboard">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                    </svg>
+                    <span>메인</span>
+                </button>
+                
+                <button class="sidebar-menu-btn active" data-page="test-execution">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1a4 4 0 014 4v2m-6-6V9a2 2 0 012-2h2a2 2 0 012 2v1"/>
+                    </svg>
+                    <span>테스트 실행</span>
+                </button>
+                
+                <button class="sidebar-menu-btn" data-page="test-results">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <span>테스트 결과</span>
+                </button>
+                
+                <button class="sidebar-menu-btn" data-page="settings">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span>설정</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- 메인 콘텐츠 -->
+        <div class="main-layout">
+            <!-- 헤더 -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="neu-button mobile-menu-btn" id="mobile-menu-btn">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+                    <h2 class="page-title">테스트 실행</h2>
+                </div>
+                
+                <div class="header-right">
+                    <div class="connection-status">
+                        <div class="status-indicator connected"></div>
+                        <span class="status-text">연결됨</span>
+                        <span class="version">v1.0.0</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 메인 콘텐츠 영역 -->
+            <main class="content">
+                <div class="content-wrapper">
+                    <!-- 헤더 -->
+                    <div class="neu-card welcome-card">
+                        <div class="welcome-content">
+                            <h1 class="welcome-title">테스트 실행</h1>
+                            <p class="welcome-subtitle">웹사이트에 대한 다양한 테스트를 실행하세요</p>
+                        </div>
+                        <div class="welcome-icon">
+                            <svg class="icon-xl" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 테스트 설정 -->
+                    <div class="test-grid">
+                        <!-- 기본 테스트 설정 -->
+                        <div class="neu-card">
+                            <div class="section-header" style="margin-bottom: 2rem;">
+                                <div class="section-header-content">
+                                    <svg class="icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    </svg>
+                                    <div>
+                                        <h3 class="section-title">기본 테스트 설정</h3>
+                                        <p class="section-subtitle">테스트할 웹사이트와 테스트 유형을 선택하세요</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- MCP 도구 표시 -->
+                            <div class="neu-flat" style="padding: 1.5rem; border-radius: 0.75rem; margin-bottom: 1.5rem;">
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                                    <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    <h4 class="text-lg font-semibold">활용 MCP 도구</h4>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <div class="neu-pressed" style="padding: 0.5rem 0.75rem; border-radius: 0.5rem;">
+                                        <span style="font-size: 0.875rem; font-weight: 600; color: var(--muted-foreground);">k6</span>
+                                    </div>
+                                    <div class="neu-pressed" style="padding: 0.5rem 0.75rem; border-radius: 0.5rem;">
+                                        <span style="font-size: 0.875rem; font-weight: 600; color: var(--muted-foreground);">Artillery</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="test-form">
+                                <div class="form-group">
+                                    <label class="form-label">테스트 URL</label>
+                                    <input type="url" class="form-input" placeholder="https://example.com" value="https://example.com">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">테스트 유형</label>
+                                    <select class="form-input">
+                                        <option>테스트 유형을 선택하세요</option>
+                                        <option>성능 테스트</option>
+                                        <option>Lighthouse</option>
+                                        <option selected>부하 테스트</option>
+                                        <option>보안 테스트</option>
+                                        <option>접근성 테스트</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">테스트 설명 (선택사항)</label>
+                                    <textarea class="form-input" rows="3" placeholder="이 테스트에 대한 간단한 설명을 입력하세요" style="resize: vertical; min-height: 4rem;"></textarea>
+                                </div>
+
+                                <div class="neu-pressed" style="padding: 1.5rem; border-radius: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 1rem;">
+                                        <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.232 13.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                        </svg>
+                                        <p class="text-muted-foreground">k6 기반 동시 접속자 부하 처리 능력 측정</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 부하테스트 설정 -->
+                        <div class="neu-card">
+                            <div class="section-header" style="margin-bottom: 2rem;">
+                                <div class="section-header-content">
+                                    <svg class="icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                                    </svg>
+                                    <div>
+                                        <h3 class="section-title">부하테스트 설정 (k6 기반)</h3>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: 2rem;">
+                                <!-- 프리셋 선택 -->
+                                <div class="neu-flat" style="padding: 1.5rem; border-radius: 0.75rem;">
+                                    <h4 class="text-lg font-semibold" style="margin-bottom: 1rem;">테스트 프리셋 선택</h4>
+                                    <div class="preset-grid">
+                                        <button class="neu-button preset-btn">
+                                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                                </svg>
+                                                <span class="font-semibold text-primary">Low</span>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground">가벼운 부하 테스트</p>
+                                        </button>
+
+                                        <button class="neu-button preset-btn active">
+                                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                                </svg>
+                                                <span class="font-semibold">Medium</span>
+                                            </div>
+                                            <p class="text-sm" style="opacity: 0.8;">중간 규모 부하 테스트</p>
+                                        </button>
+
+                                        <button class="neu-button preset-btn">
+                                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                                </svg>
+                                                <span class="font-semibold text-primary">High</span>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground">고강도 부하 테스트</p>
+                                        </button>
+
+                                        <button class="neu-button preset-btn">
+                                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                                <svg class="icon text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                </svg>
+                                                <span class="font-semibold text-primary">Custom</span>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground">사용자 정의 설정</p>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- 현재 기본 설정 -->
+                                <div class="neu-flat" style="padding: 1.5rem; border-radius: 0.75rem;">
+                                    <h4 class="text-lg font-semibold" style="margin-bottom: 1rem;">현재 기본 설정</h4>
+                                    <div class="current-settings">
+                                        <div class="neu-pressed setting-item">
+                                            <div class="setting-label">Start Rate</div>
+                                            <div class="setting-value">100 iterations per 20s</div>
+                                        </div>
+                                        <div class="neu-pressed setting-item">
+                                            <div class="setting-label">Time Unit</div>
+                                            <div class="setting-value">20s</div>
+                                        </div>
+                                        <div class="neu-pressed setting-item">
+                                            <div class="setting-label">Pre-allocated VUs</div>
+                                            <div class="setting-value">10</div>
+                                        </div>
+                                        <div class="neu-pressed setting-item">
+                                            <div class="setting-label">Max VUs</div>
+                                            <div class="setting-value">500</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 상세 설정 -->
+                                <div class="neu-flat" style="padding: 1.5rem; border-radius: 0.75rem;">
+                                    <h3 class="text-xl font-semibold text-primary" style="margin-bottom: 1rem;">상세 설정</h3>
+                                    <p class="text-sm text-muted-foreground" style="margin-bottom: 1.5rem;">Medium 프리셋 기반 설정</p>
+                                    
+                                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                        <div class="neu-input" style="padding: 1rem; border-radius: 0.75rem;">
+                                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: center;">
+                                                <div style="text-align: center;">
+                                                    <div class="text-sm text-muted-foreground" style="margin-bottom: 0.5rem;">목표 TPS</div>
+                                                    <div class="font-semibold">100</div>
+                                                </div>
+                                                <div style="text-align: center;">
+                                                    <div class="text-sm text-muted-foreground" style="margin-bottom: 0.5rem;">지속 시간</div>
+                                                    <div class="neu-pressed" style="padding: 0.5rem; border-radius: 0.5rem;">
+                                                        <span class="text-sm text-muted-foreground">20s</span>
+                                                    </div>
+                                                </div>
+                                                <div style="text-align: center;">
+                                                    <div class="text-sm text-muted-foreground" style="margin-bottom: 0.5rem;">설명</div>
+                                                    <div class="neu-pressed" style="padding: 0.5rem; border-radius: 0.5rem;">
+                                                        <span class="text-sm text-muted-foreground">초기 부하 단계</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="neu-input" style="padding: 1rem; border-radius: 0.75rem;">
+                                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: center;">
+                                                <div style="text-align: center;">
+                                                    <div class="text-sm text-muted-foreground" style="margin-bottom: 0.5rem;">목표 TPS</div>
+                                                    <div class="font-semibold">5000</div>
+                                                </div>
+                                                <div style="text-align: center;">
+                                                    <div class="text-sm text-muted-foreground" style="margin-bottom: 0.5rem;">지속 시간</div>
+                                                    <div class="neu-pressed" style="padding: 0.5rem; border-radius: 0.5rem;">
+                                                        <span class="text-sm text-muted-foreground">1m</span>
+                                                    </div>
+                                                </div>
+                                                <div style="text-align: center;">
+                                                    <div class="text-sm text-muted-foreground" style="margin-bottom: 0.5rem;">설명</div>
+                                                    <div class="neu-pressed" style="padding: 0.5rem; border-radius: 0.5rem;">
+                                                        <span class="text-sm text-muted-foreground">최대 부하 단계</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 테스트 시작 버튼 -->
+                    <div style="display: flex; justify-content: center; margin-top: 2rem;">
+                        <button class="neu-button-primary" style="padding: 1rem 2rem; border-radius: 0.75rem; font-size: 1.125rem; font-weight: 600;" onclick="simulateTest()">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1a4 4 0 014 4v2m-6-6V9a2 2 0 012-2h2a2 2 0 012 2v1"/>
+                            </svg>
+                            테스트 시작
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- 푸터 -->
+            <footer class="footer">
+                <div class="footer-content">
+                    <span>© 2025 MCP 웹사이트 테스터 (예시)</span>
+                    <div class="footer-right">
+                        <span>버전 1.0.0</span>
+                        <div class="status-indicator connected"></div>
+                        <span>연결됨</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="../static/common.js"></script>
+</body>
+</html>
