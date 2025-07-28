@@ -157,10 +157,10 @@ function AppContent() {
       />
 
       {/* 메인 콘텐츠 영역 */}
-      <div className={`flex flex-col min-h-screen ${open ? 'ml-[var(--sidebar-width)]' : 'ml-0'} transition-all duration-300 ease-in-out`}>
+      <div className={`flex flex-col min-h-screen flex-1 ${open ? 'ml-[var(--sidebar-width)]' : 'ml-0'} transition-all duration-300 ease-in-out`}>
         {/* 헤더 */}
-        <header className="neu-flat border-b border-white/10">
-          <div className="flex items-center justify-between px-4 py-4">
+        <header className="neu-flat border-b border-white/10 w-full">
+          <div className="flex items-center justify-between px-4 py-4 w-full">
             <div className="flex items-center space-x-4">
               <div className="neu-button rounded-lg p-2">
                 <SidebarTrigger className="text-primary">
@@ -183,15 +183,15 @@ function AppContent() {
         </header>
 
         {/* 메인 콘텐츠 */}
-        <main className="flex-1 overflow-auto px-4 py-6">
-          <div className="w-full">
+        <main className="flex-1 overflow-auto px-12 py-8 w-full">
+          <div className="w-full px-6">
             <ActiveComponent onNavigate={handleTabChange} />
           </div>
         </main>
 
         {/* 푸터 */}
-        <footer className="neu-flat border-t border-white/10">
-          <div className="flex items-center justify-between text-sm text-muted-foreground px-4 py-4">
+        <footer className="neu-flat border-t border-white/10 w-full">
+          <div className="flex items-center justify-between text-sm text-muted-foreground px-4 py-4 w-full">
             <span>© 2025 MCP 웹사이트 테스터</span>
             <div className="flex items-center space-x-3">
               <span>버전 1.0.0</span>
