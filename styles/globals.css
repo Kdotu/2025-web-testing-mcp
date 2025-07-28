@@ -20,7 +20,7 @@
   --secondary-foreground: #3F3F46;
   --muted: #EDE9FE;
   --muted-foreground: #6B7280;
-  --accent: #8B5CF6;
+  --accent: #6366F1;
   --accent-foreground: #FFFFFF;
   --destructive: #dc2626;
   --destructive-foreground: #FFFFFF;
@@ -33,7 +33,7 @@
   --ring: #6366F1;
   --chart-1: #6366F1;
   --chart-2: #A5B4FC;
-  --chart-3: #8B5CF6;
+  --chart-3: #6366F1;
   --chart-4: #C7D2FE;
   --chart-5: #4F46E5;
   --radius: 1.25rem;
@@ -51,7 +51,7 @@
   --testing-primary: #6366F1;
   --testing-secondary: #A5B4FC;
   --testing-neutral: #E0E7FF;
-  --testing-accent: #8B5CF6;
+  --testing-accent: #6366F1;
   
   /* Light Neumorphism shadows - adjusted for softer card color */
   --neu-shadow-light: #FFFFFF;
@@ -82,7 +82,7 @@
   --secondary-foreground: #F8FAFC;
   --muted: #2D1B69;
   --muted-foreground: #A5B4FC;
-  --accent: #8B5CF6;
+  --accent: #6366F1;
   --accent-foreground: #F8FAFC;
   --destructive: #ef4444;
   --destructive-foreground: #F8FAFC;
@@ -93,7 +93,7 @@
   --font-weight-normal: 400;
   --chart-1: #6366F1;
   --chart-2: #A5B4FC;
-  --chart-3: #8B5CF6;
+  --chart-3: #6366F1;
   --chart-4: #F8FAFC;
   --chart-5: #C7D2FE;
   --sidebar: #312E81;
@@ -279,7 +279,7 @@
   }
   
   .neu-secondary:hover {
-    background: #8B5CF6;
+    background: #6366F1;
     box-shadow: 
       6px 6px 12px var(--neu-shadow-dark),
       -6px -6px 12px var(--neu-shadow-light);
@@ -287,7 +287,7 @@
   
   /* Purple action button for important actions */
   .neu-button-primary {
-    background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+    background: linear-gradient(135deg, #6366F1 0%, #7C3AED 100%);
     color: #FFFFFF;
     box-shadow: 
       6px 6px 12px rgba(139, 92, 246, 0.3),
@@ -298,7 +298,7 @@
   }
   
   .neu-button-primary:hover {
-    background: linear-gradient(135deg, #9333EA 0%, #8B5CF6 100%);
+    background: linear-gradient(135deg, #9333EA 0%, #6366F1 100%);
     box-shadow: 
       8px 8px 16px rgba(139, 92, 246, 0.4),
       -8px -8px 16px rgba(255, 255, 255, 0.9),
