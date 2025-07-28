@@ -36,12 +36,10 @@
 - **Supabase** - 백엔드 서비스 (데이터베이스, 인증, Edge Functions)
 - **k6** - 부하 테스트 엔진
 - **Google Lighthouse** - 웹사이트 품질 분석
-- **Deno** - Edge Functions 런타임
 
 ### Development Tools
 - **ESLint** - 코드 품질
 - **Prettier** - 코드 포맷팅
-- **Husky** - Git 훅
 - **Conventional Commits** - 커밋 컨벤션
 
 ## 🚀 빠른 시작
