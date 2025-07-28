@@ -1743,7 +1743,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
             }
             className={`
               px-12 py-6 rounded-2xl text-xl font-semibold
-              transition-all duration-200 flex items-center space-x-4
+              transition-all duration-200 flex items-center space-x-4 w-full justify-center
               ${
                 !testUrl ||
                 !selectedTestType ||
@@ -1761,7 +1761,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
               </>
             ) : (
               <>
-                <Play className="h-6 w-6" />
+                <Play className="h-6 w-6 " />
                 <span>테스트 시작</span>
               </>
             )}
