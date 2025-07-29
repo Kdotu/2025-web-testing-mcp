@@ -48,6 +48,14 @@ import {
   getTestTypes,
   type TestType,
 } from "../utils/api";
+import {
+  createLoadTest,
+  getTestStatus as getBackendTestStatus,
+  cancelTest as cancelBackendTest,
+  checkBackendHealth,
+  type LoadTestConfig,
+  type LoadTestResult,
+} from "../utils/backend-api";
 
 interface RunningTest {
   id: number;
@@ -132,6 +140,29 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [testTypes, setTestTypes] = useState<TestType[]>([]);
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [useBackendApi, setUseBackendApi] = useState(false);
+
+  // 백엔드 API 연결 체크
+  useEffect(() => {
+    const checkBackendConnection = async () => {
+      try {
+        const response = await checkBackendHealth();
+        setBackendConnected(response.success);
+        setBackendError(null);
+        if (response.success) {
+          console.log('백엔드 API 연결 성공');
+        }
+      } catch (error) {
+        console.error('백엔드 API 연결 실패:', error);
+        setBackendConnected(false);
+        setBackendError('백엔드 서버에 연결할 수 없습니다.');
+      }
+    };
+
+    checkBackendConnection();
+  }, []);
 
   // MCP 도구 매핑
   const getMcpTools = (testType: string) => {
@@ -643,6 +674,59 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     }
   };
 
+  // 백엔드 API를 사용한 부하 테스트 실행
+  const handleBackendLoadTest = async () => {
+    if (!testUrl || !selectedTestType) {
+      return;
+    }
+
+    try {
+      setIsExecuting(true);
+
+      // LoadTestConfig 생성
+      const loadTestConfig: LoadTestConfig = {
+        url: testUrl,
+        name: testDescription || `Load Test - ${testUrl}`,
+        description: testDescription,
+        stages: testSettings.load.stages,
+        options: {
+          vus: testSettings.load.maxVUs,
+          duration: testSettings.load.timeUnit,
+        },
+      };
+
+      console.log('백엔드 API로 부하 테스트 실행:', loadTestConfig);
+
+      const response = await createLoadTest(loadTestConfig);
+
+      if (response.success && response.data) {
+        const newTest: RunningTest = {
+          id: Date.now(),
+          url: testUrl,
+          type: selectedTestType,
+          progress: 0,
+          status: 'running',
+          startTime: new Date().toISOString(),
+          currentStep: '테스트 초기화 중...',
+          estimatedTime: '예상 시간 계산 중...',
+          logs: [`백엔드 API로 테스트 시작: ${testUrl}`],
+          settings: testSettings,
+        };
+
+        setRunningTests(prev => [...prev, newTest]);
+        console.log('백엔드 테스트 시작됨:', response.data);
+      } else {
+        console.error('백엔드 테스트 실행 실패:', response.error);
+        alert(`테스트 실행 실패: ${response.error}`);
+      }
+    } catch (error) {
+      console.error('백엔드 테스트 실행 중 오류:', error);
+      alert('테스트 실행 중 오류가 발생했습니다.');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   const handleStartTest = async () => {
     const normalizedUrl = normalizeUrl(testUrl);
     if (
@@ -651,6 +735,12 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
       !validateUrl(normalizedUrl)
     )
       return;
+
+    // 백엔드가 연결되어 있고 부하 테스트인 경우 백엔드 API 사용
+    if (backendConnected && selectedTestType === 'load') {
+      await handleBackendLoadTest();
+      return;
+    }
 
     setIsExecuting(true);
 

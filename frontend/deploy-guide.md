@@ -218,10 +218,10 @@ CREATE TABLE m2_test_results (
 
 -- 인덱스 생성
 CREATE INDEX idx_kv_store_key ON kv_store_96e41890(key);
-CREATE INDEX idx_test_results_type ON m2_test_results(test_type);
-CREATE INDEX idx_test_results_url ON m2_test_results(url);
-CREATE INDEX idx_test_results_status ON m2_test_results(status);
-CREATE INDEX idx_test_results_created_at ON m2_test_results(created_at);
+CREATE INDEX idx_m2_test_results_type ON m2_m2_test_results(test_type);
+CREATE INDEX idx_m2_test_results_url ON m2_m2_test_results(url);
+CREATE INDEX idx_m2_test_results_status ON m2_m2_test_results(status);
+CREATE INDEX idx_m2_test_results_created_at ON m2_m2_test_results(created_at);
 ```
 
 ### 3. RLS (Row Level Security) 설정

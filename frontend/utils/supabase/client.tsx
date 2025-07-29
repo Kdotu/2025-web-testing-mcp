@@ -18,7 +18,7 @@ export const saveTestResult = async (testData: {
 }) => {
   try {
     const { data, error } = await supabase
-      .from('test_results')
+      .from('m2_test_results')
       .insert([
         {
           url: testData.url,
@@ -50,7 +50,7 @@ export const saveTestResult = async (testData: {
 export const getTestResults = async (limit: number = 50) => {
   try {
     const { data, error } = await supabase
-      .from('test_results')
+      .from('m2_test_results')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -71,7 +71,7 @@ export const getTestResults = async (limit: number = 50) => {
 export const deleteTestResult = async (id: number) => {
   try {
     const { error } = await supabase
-      .from('test_results')
+      .from('m2_test_results')
       .delete()
       .eq('id', id);
 

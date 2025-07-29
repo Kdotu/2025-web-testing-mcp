@@ -35,7 +35,7 @@ const DEFAULT_TEST_TYPES: LocalTestType[] = [
 // 로컬 스토리지 키
 const STORAGE_KEYS = {
   TEST_TYPES: 'mcp_tester_test_types',
-  TEST_RESULTS: 'mcp_tester_test_results',
+  m2_test_results: 'mcp_tester_m2_test_results',
   TEST_SETTINGS: 'mcp_tester_test_settings',
 };
 
@@ -93,12 +93,12 @@ export const localTestTypes = {
 // 테스트 결과 관리
 export const localTestResults = {
   getAll: (): LocalTestResult[] => {
-    const stored = localStorage.getItem(STORAGE_KEYS.TEST_RESULTS);
+    const stored = localStorage.getItem(STORAGE_KEYS.m2_test_results);
     return safeJsonParse(stored, []);
   },
 
   setAll: (results: LocalTestResult[]): void => {
-    localStorage.setItem(STORAGE_KEYS.TEST_RESULTS, JSON.stringify(results));
+    localStorage.setItem(STORAGE_KEYS.m2_test_results, JSON.stringify(results));
   },
 
   add: (result: LocalTestResult): void => {
@@ -127,7 +127,7 @@ export const localTestResults = {
   },
 
   deleteAll: (): void => {
-    localStorage.removeItem(STORAGE_KEYS.TEST_RESULTS);
+    localStorage.removeItem(STORAGE_KEYS.m2_test_results);
   },
 };
 
