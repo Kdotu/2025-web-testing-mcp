@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -7,137 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Progress } from "./ui/progress";
 import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3 } from "lucide-react";
-
-const testResults = [
-  {
-    id: 1,
-    url: "https://example.com",
-    type: "성능테스트",
-    score: 85,
-    status: "완료",
-    date: "2025-01-23",
-    time: "14:23:45",
-    duration: "2분 30초",
-    details: {
-      firstContentfulPaint: "1.2s",
-      largestContentfulPaint: "2.4s",
-      cumulativeLayoutShift: "0.1",
-      totalBlockingTime: "150ms"
-    }
-  },
-  {
-    id: 2,
-    url: "https://test.co.kr",
-    type: "Lighthouse",
-    score: 92,
-    status: "완료",
-    date: "2025-01-23",
-    time: "13:45:20",
-    duration: "3분 15초",
-    details: {
-      performance: 92,
-      accessibility: 88,
-      bestPractices: 95,
-      seo: 89
-    }
-  },
-  {
-    id: 3,
-    url: "https://demo.org",
-    type: "부하테스트",
-    score: 78,
-    status: "완료",
-    date: "2025-01-23",
-    time: "12:30:10",
-    duration: "5분 45초",
-    details: {
-      maxConcurrentUsers: 500,
-      averageResponseTime: "450ms",
-      errorRate: "2.1%",
-      throughput: "145 req/sec"
-    }
-  },
-  {
-    id: 4,
-    url: "https://sample.net",
-    type: "성능테스트",
-    score: 88,
-    status: "완료",
-    date: "2025-01-22",
-    time: "16:20:30",
-    duration: "2분 15초",
-    details: {
-      firstContentfulPaint: "0.9s",
-      largestContentfulPaint: "2.1s",
-      cumulativeLayoutShift: "0.05",
-      totalBlockingTime: "120ms"
-    }
-  },
-  {
-    id: 5,
-    url: "https://website.com",
-    type: "보안테스트",
-    score: 95,
-    status: "완료",
-    date: "2025-01-22",
-    time: "15:10:15",
-    duration: "8분 30초",
-    details: {
-      vulnerabilities: 0,
-      securityHeaders: "완전",
-      sslRating: "A+",
-      xssProtection: "활성화"
-    }
-  },
-  {
-    id: 6,
-    url: "https://mysite.org",
-    type: "접근성테스트",
-    score: 76,
-    status: "완료",
-    date: "2025-01-22",
-    time: "11:30:22",
-    duration: "4분 15초",
-    details: {
-      accessibilityScore: 76,
-      colorContrast: "양호",
-      altTexts: "부분적",
-      keyboardNavigation: "완전"
-    }
-  },
-  {
-    id: 7,
-    url: "https://shoptest.com",
-    type: "성능테스트",
-    score: 91,
-    status: "완료",
-    date: "2025-01-21",
-    time: "16:45:12",
-    duration: "3분 10초",
-    details: {
-      firstContentfulPaint: "0.8s",
-      largestContentfulPaint: "1.9s",
-      cumulativeLayoutShift: "0.03",
-      totalBlockingTime: "95ms"
-    }
-  },
-  {
-    id: 8,
-    url: "https://blogsite.net",
-    type: "Lighthouse",
-    score: 89,
-    status: "완료",
-    date: "2025-01-21",
-    time: "14:20:45",
-    duration: "2분 55초",
-    details: {
-      performance: 89,
-      accessibility: 92,
-      bestPractices: 88,
-      seo: 94
-    }
-  }
-];
+import { getTestResults } from "../utils/supabase/client";
 
 interface TestResultsProps {
   onNavigate?: (tabId: string) => void;
@@ -147,6 +17,34 @@ export function TestResults({ onNavigate }: TestResultsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [selectedResult, setSelectedResult] = useState<any>(null);
+  const [testResults, setTestResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Supabase에서 테스트 결과 데이터 가져오기
+  useEffect(() => {
+    const fetchTestResults = async () => {
+      try {
+        setLoading(true);
+        const result = await getTestResults(50);
+        
+        if (result.success) {
+          setTestResults(result.data);
+        } else {
+          const errorMessage = result.error?.message || '테스트 결과를 불러오는데 실패했습니다.';
+          setError(errorMessage);
+          console.error('Failed to fetch test results:', result.error);
+        }
+      } catch (err) {
+        setError('테스트 결과를 불러오는 중 오류가 발생했습니다.');
+        console.error('Error fetching test results:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTestResults();
+  }, []);
 
   const filteredResults = testResults.filter(result => {
     const matchesSearch = result.url.toLowerCase().includes(searchTerm.toLowerCase());
@@ -223,6 +121,33 @@ export function TestResults({ onNavigate }: TestResultsProps) {
         </div>
       </div>
 
+      {/* 로딩 상태 */}
+      {loading && (
+        <div className="neu-card rounded-3xl px-8 py-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-muted-foreground">테스트 결과를 불러오는 중...</p>
+        </div>
+      )}
+
+      {/* 에러 상태 */}
+      {error && (
+        <div className="neu-card rounded-3xl px-8 py-12 text-center">
+          <div className="text-red-500 mb-4">
+            <FileText className="h-12 w-12 mx-auto" />
+          </div>
+          <p className="text-lg text-red-500 mb-4">{error}</p>
+          <button 
+            className="neu-button rounded-xl px-6 py-3 font-medium text-foreground hover:text-primary transition-colors"
+            onClick={() => window.location.reload()}
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+
+      {/* 데이터가 있을 때만 표시 */}
+      {!loading && !error && (
+        <>
       {/* 상단 통계 */}
       <div className="grid gap-6 md:grid-cols-4">
         <div className="neu-accent rounded-3xl px-6 py-8">
@@ -240,7 +165,10 @@ export function TestResults({ onNavigate }: TestResultsProps) {
             <BarChart3 className="h-8 w-8 text-primary" />
           </div>
           <div className="text-4xl font-bold text-primary mb-2">
-            {Math.round(testResults.reduce((acc, r) => acc + r.score, 0) / testResults.length)}
+                {testResults.length > 0 
+                  ? Math.round(testResults.reduce((acc, r) => acc + r.score, 0) / testResults.length)
+                  : 0
+                }
           </div>
           <p className="text-muted-foreground">전체 평균</p>
         </div>
@@ -250,7 +178,12 @@ export function TestResults({ onNavigate }: TestResultsProps) {
             <div className="text-foreground font-semibold text-lg">성공률</div>
             <BarChart3 className="h-8 w-8 text-primary" />
           </div>
-          <div className="text-4xl font-bold text-primary mb-2">100%</div>
+              <div className="text-4xl font-bold text-primary mb-2">
+                {testResults.length > 0 
+                  ? Math.round((testResults.filter(r => r.status === '완료').length / testResults.length) * 100)
+                  : 0
+                }%
+              </div>
           <p className="text-muted-foreground">완료된 테스트</p>
         </div>
         
@@ -259,7 +192,12 @@ export function TestResults({ onNavigate }: TestResultsProps) {
             <div className="text-foreground font-semibold text-lg">오늘 실행</div>
             <Calendar className="h-8 w-8 text-primary" />
           </div>
-          <div className="text-4xl font-bold text-primary mb-2">3</div>
+              <div className="text-4xl font-bold text-primary mb-2">
+                {testResults.filter(r => {
+                  const today = new Date().toISOString().split('T')[0];
+                  return r.date === today;
+                }).length}
+              </div>
           <p className="text-muted-foreground">최근 테스트</p>
         </div>
       </div>
@@ -310,6 +248,14 @@ export function TestResults({ onNavigate }: TestResultsProps) {
           <h3 className="text-2xl font-semibold text-primary mb-2">테스트 결과 ({filteredResults.length}개)</h3>
           <p className="text-muted-foreground text-lg">클릭하여 상세 정보를 확인하거나 결과를 다운로드하세요</p>
         </div>
+            
+            {filteredResults.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg text-muted-foreground mb-2">검색 결과가 없습니다</p>
+                <p className="text-muted-foreground">다른 검색어나 필터를 시도해보세요</p>
+              </div>
+            ) : (
         <div className="neu-pressed rounded-2xl p-2">
           <div className="overflow-x-auto">
             <Table>
@@ -411,6 +357,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
             </Table>
           </div>
         </div>
+            )}
       </div>
 
       {/* 결과 상세 모달 */}
@@ -504,6 +451,8 @@ export function TestResults({ onNavigate }: TestResultsProps) {
             </button>
           </div>
         </div>
+          )}
+        </>
       )}
       </div>
     </div>
