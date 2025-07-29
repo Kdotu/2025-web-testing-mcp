@@ -7,12 +7,17 @@
 [![React](https://img.shields.io/badge/React-18.2-blue.svg)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.1-purple.svg)](https://vitejs.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-2.39-green.svg)](https://supabase.com/)
+[![k6](https://img.shields.io/badge/k6-1.1.0-orange.svg)](https://k6.io/)
+
 
 ## 🌟 주요 기능
 
+- **⚡ (진행중) 부하 테스트**: k6 기반 고성능 부하 테스트
+- **💾 (진행중) 결과 저장**: Supabase 데이터베이스에 테스트 결과 저장
+- **📈 (진행중) 대시보드**: 테스트 통계 및 결과 시각화
 - **🚀 (구현 예정) 성능 테스트**: 웹페이지 로딩 속도 및 성능 지표 측정
 - **💡 (구현 예정) Lighthouse 분석**: 종합적인 웹사이트 품질 평가 
-- **⚡ (진행중) 부하 테스트**: k6 기반 고성능 부하 테스트
+
 
 ## 🎨 디자인 시스템
 
@@ -33,8 +38,9 @@
 - **Recharts** - 데이터 시각화
 
 ### Backend & Infrastructure
-- **Supabase** - 백엔드 서비스 (데이터베이스, 인증, Edge Functions)
 - **k6** - 부하 테스트 엔진
+- **k6 MCP Server** - [QAInsights/k6-mcp-server](https://github.com/QAInsights/k6-mcp-server)
+- **Supabase** - 백엔드 서비스 (데이터베이스, 인증)
 - **Google Lighthouse** - 웹사이트 품질 분석
 
 ### Development Tools
@@ -47,6 +53,8 @@
 ### 시스템 요구사항
 - Node.js 18.0.0 이상
 - npm 8.0.0 이상
+- Python 3.12 이상 (k6 MCP 서버용)
+- k6 1.1.0 이상
 - Git
 
 ### 설치 및 실행
@@ -137,27 +145,16 @@ mcp-website-tester/
 
 ## 🔧 주요 컴포넌트
 
-### Dashboard
-- 테스트 통계 요약
-- 최근 테스트 활동
-- 빠른 테스트 실행
+### Frontend
+- **Dashboard** - 테스트 통계 및 개요
+- **TestExecution** - 부하 테스트 실행 및 설정
+- **TestResults** - 테스트 결과 표시 및 분석
+- **Settings** - 시스템 설정 및 MCP 도구 관리
 
-### TestExecution
-- URL 입력 및 검증
-- 테스트 타입 선택
-- 실시간 진행 상황
-- 세부 설정 옵션
-
-### TestResults
-- 테스트 결과 목록
-- 상세 분석 결과
-- 차트 및 그래프
-- 리포트 다운로드
-
-### Settings
-- 테스트 타입 관리
-- MCP 도구 설정
-- 시스템 설정
+### Backend
+- **K6Service** - k6 MCP 서버와 통신
+- **TestResultService** - Supabase 데이터베이스 관리
+- **WebSocket** - 실시간 테스트 상태 업데이트
 
 ## 🎯 테스트 타입
 
@@ -179,22 +176,27 @@ mcp-website-tester/
 ## 📊 부하 테스트 설정
 
 ### 프리셋 옵션
-- **Low**: 기본적인 부하 테스트
-- **Medium**: 중간 수준의 트래픽 시뮬레이션
-- **High**: 높은 부하 상황 테스트
+- **Low**: 기본적인 부하 테스트 (10 VU, 30초)
+- **Medium**: 중간 수준의 트래픽 시뮬레이션 (50 VU, 60초)
+- **High**: 높은 부하 상황 테스트 (100 VU, 120초)
 - **Custom**: 사용자 정의 설정
 
 ### 주요 설정값
-- **시작 요청 속도**: iterations per timeUnit
-- **시간 단위**: 1s, 5s, 10s, 20s, 30s, 1m
-- **사전 할당 VU**: 1-100
-- **최대 VU**: 1-2000
-- **단계별 설정**: 지속시간과 목표값 설정
+- **Virtual Users (VU)**: 1-2000
+- **Duration**: 10초-30분
+- **Stages**: 단계별 부하 증가 설정
+- **Target URL**: 테스트 대상 웹사이트
 
 
 ## 🔄 버전 히스토리
 
-### v1.0.0 (2025-01-28)
+### v1.1.0 (2025-07-29)
+- k6 MCP 서버 통합
+- 실시간 WebSocket 연결
+- Supabase 데이터베이스 연동
+- 프론트엔드-백엔드 분리 아키텍처
+
+### v1.0.0 (2025-07-28)
 - 초기 릴리스
 - 기본 테스트 기능 구현
 - 라벤더/네이비 디자인 시스템 적용
