@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { getTestResults, checkApiHealth, isDemoMode, setDemoMode } from "../utils/api";
+import { getAllTestResults } from "../utils/backend-api";
 
 // Mock 데이터 (오프라인/데모 모드용)
 const mockData = {
@@ -81,6 +82,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isDemoModeActive, setIsDemoModeActive] = useState(isDemoMode());
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // 경과 시간 계산 함수 (MM:SS 포맷)
+  const calculateElapsedTime = (startTime: string, endTime?: string): string => {
+    const start = new Date(startTime).getTime();
+    const end = endTime ? new Date(endTime).getTime() : currentTime;
+    const elapsedTime = end - start;
+    const elapsedSeconds = Math.floor(elapsedTime / 1000);
+    
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -105,14 +120,45 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         if (healthCheck.success) {
           setConnectionStatus('connected');
           
-          // 실제 테스트 결과 불러오기
-          const results = await getTestResults();
-          if (results.success && results.data) {
-            setTestResults(results.data);
-            setIsOfflineMode(false);
-          } else {
-            setTestResults(mockData.recentTests);
-            setIsOfflineMode(true);
+          try {
+            // Supabase에서 최근 테스트 결과 불러오기
+            const results = await getAllTestResults(1, 10); // 최근 10개 테스트
+            if (results.success && results.data) {
+              // 테스트 결과를 Dashboard 형식에 맞게 변환
+              const formattedResults = results.data.map((test: any) => ({
+                id: test.id,
+                url: test.url,
+                testType: test.config?.stages ? 'load' : 'performance', // 부하테스트 여부로 판단
+                status: test.status,
+                score: test.metrics?.http_req_duration?.avg ? Math.round(100 - (test.metrics.http_req_duration.avg / 20)) : 85, // 응답시간 기반 점수
+                startTime: test.createdAt,
+                endTime: test.updatedAt,
+                duration: calculateElapsedTime(test.createdAt, test.updatedAt)
+              }));
+              setTestResults(formattedResults);
+              setIsOfflineMode(false);
+            } else {
+              // 백엔드 API에서 가져오기 (기존 방식)
+              const apiResults = await getTestResults();
+              if (apiResults.success && apiResults.data) {
+                setTestResults(apiResults.data);
+                setIsOfflineMode(false);
+              } else {
+                setTestResults(mockData.recentTests);
+                setIsOfflineMode(true);
+              }
+            }
+          } catch (error) {
+            console.error('Supabase data loading error:', error);
+            // 백엔드 API로 폴백
+            const apiResults = await getTestResults();
+            if (apiResults.success && apiResults.data) {
+              setTestResults(apiResults.data);
+              setIsOfflineMode(false);
+            } else {
+              setTestResults(mockData.recentTests);
+              setIsOfflineMode(true);
+            }
           }
         } else {
           // 오프라인 모드
@@ -135,6 +181,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     };
 
     loadDashboardData();
+  }, []);
+
+  // 실시간 경과 시간 업데이트 (실행 중인 테스트용)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
   // 통계 계산
@@ -547,7 +602,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           <h4 className="font-semibold text-foreground text-lg">{test.url}</h4>
                           <div className="neu-pressed rounded-full px-3 py-1">
                             <span className="text-sm font-medium text-primary">
-                              {getTestTypeLabel(test.testType)}
+                              {getTestTypeLabel(test.testType || 'load')}
                             </span>
                           </div>
                           {(isDemoModeActive || isOfflineMode) && (
@@ -559,7 +614,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                           <span>{new Date(test.startTime).toLocaleString()}</span>
                           <span>•</span>
-                          <span>소요시간: {test.duration || '2m 30s'}</span>
+                          <span>경과시간: {
+                            test.status === 'running' 
+                              ? calculateElapsedTime(test.startTime) 
+                              : (test.duration || calculateElapsedTime(test.startTime, test.endTime))
+                          }</span>
                         </div>
                       </div>
                     </div>

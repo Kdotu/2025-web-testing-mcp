@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Progress } from "./ui/progress";
 import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3 } from "lucide-react";
-import { getTestResults } from "../utils/supabase/client";
+import { getAllTestResults, getTestResultById } from "../utils/backend-api";
 
 interface TestResultsProps {
   onNavigate?: (tabId: string) => void;
@@ -20,20 +20,38 @@ export function TestResults({ onNavigate }: TestResultsProps) {
   const [testResults, setTestResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
-  // Supabase에서 테스트 결과 데이터 가져오기
+  // 경과 시간 계산 함수 (MM:SS 포맷)
+  const calculateElapsedTime = (startTime: string, endTime?: string): string => {
+    const start = new Date(startTime).getTime();
+    const end = endTime ? new Date(endTime).getTime() : currentTime;
+    const elapsedTime = end - start;
+    const elapsedSeconds = Math.floor(elapsedTime / 1000);
+    
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // 백엔드 API에서 테스트 결과 데이터 가져오기
   useEffect(() => {
     const fetchTestResults = async () => {
       try {
         setLoading(true);
-        const result = await getTestResults(50);
+        const result = await getAllTestResults(1, 50);
         
-        if (result.success) {
-          setTestResults(result.data);
+        if (result.success && result.data) {
+          // data가 배열인지 확인하고 설정
+          const resultsArray = Array.isArray(result.data) ? result.data : [];
+          setTestResults(resultsArray);
+          // console.log('Fetched test results:', resultsArray);
         } else {
-          const errorMessage = result.error?.message || '테스트 결과를 불러오는데 실패했습니다.';
+          const errorMessage = result.error || '테스트 결과를 불러오는데 실패했습니다.';
           setError(errorMessage);
           console.error('Failed to fetch test results:', result.error);
+          setTestResults([]); // 빈 배열로 초기화
         }
       } catch (err) {
         setError('테스트 결과를 불러오는 중 오류가 발생했습니다.');
@@ -46,11 +64,20 @@ export function TestResults({ onNavigate }: TestResultsProps) {
     fetchTestResults();
   }, []);
 
-  const filteredResults = testResults.filter(result => {
+  // 실시간 경과 시간 업데이트 (실행 중인 테스트용)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const filteredResults = Array.isArray(testResults) ? testResults.filter(result => {
     const matchesSearch = result.url.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === "all" || result.type === filterType;
     return matchesSearch && matchesFilter;
-  });
+  }) : [];
 
   const handleDownload = (result: any, format: string) => {
     let content: string;
@@ -294,7 +321,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                           backgroundColor: badgeColor.bg, 
                           color: badgeColor.text
                         }}>
-                          <span className="font-semibold">{result.type}</span>
+                          <span className="font-semibold">{result.testType || result.type || '부하테스트'}</span>
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-6">
@@ -317,7 +344,10 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-6 text-muted-foreground font-medium">
-                        {result.duration}
+                        {result.status === 'running' 
+                          ? calculateElapsedTime(result.createdAt)
+                          : (result.duration || calculateElapsedTime(result.createdAt, result.updatedAt))
+                        }
                       </TableCell>
                       <TableCell className="px-6 py-6">
                         <div className="neu-subtle rounded-full px-4 py-2 inline-block border-2" style={{ 

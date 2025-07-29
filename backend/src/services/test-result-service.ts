@@ -50,6 +50,7 @@ export class TestResultService {
       .insert({
         id: result.id,
         test_id: result.testId,
+        test_type: result.testType || 'load', // 기본값은 load
         url: result.url,
         config: result.config,
         status: result.status,
@@ -246,6 +247,7 @@ export class TestResultService {
     return {
       id: row.id,
       testId: row.test_id,
+      testType: row.test_type,
       url: row.url,
       config: row.config,
       status: row.status,

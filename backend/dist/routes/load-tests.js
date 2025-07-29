@@ -79,4 +79,28 @@ router.delete('/:id', async (req, res, next) => {
         next(error);
     }
 });
+router.post('/k6-mcp', async (req, res, next) => {
+    try {
+        const { url, name, description, script, config } = req.body;
+        if (!url || !name || !script) {
+            throw (0, error_handler_1.createValidationError)('URL, name, and script are required');
+        }
+        const result = await loadTestController.executeK6MCPTest({
+            url,
+            name,
+            description,
+            script,
+            config
+        });
+        res.status(201).json({
+            success: true,
+            data: result,
+            message: 'k6 MCP test executed successfully',
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 //# sourceMappingURL=load-tests.js.map

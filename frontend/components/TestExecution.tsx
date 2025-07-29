@@ -48,6 +48,7 @@ import {
   getTestTypes,
   type TestType,
 } from "../utils/api";
+import { getAllTestResults as getBackendTestResults } from "../utils/backend-api";
 import {
   createLoadTest,
   getTestStatus as getBackendTestStatus,
@@ -59,6 +60,7 @@ import {
 
 interface RunningTest {
   id: number;
+  backendTestId?: string; // 백엔드 testId
   url: string;
   type: string;
   progress: number;
@@ -68,6 +70,7 @@ interface RunningTest {
   estimatedTime: string;
   logs: string[];
   settings: any;
+  testStartTime?: number; // 테스트 시작 시간 (밀리초)
 }
 
 interface LoadTestStage {
@@ -140,9 +143,11 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [testTypes, setTestTypes] = useState<TestType[]>([]);
+  const [recentTestResults, setRecentTestResults] = useState<any[]>([]);
   const [backendConnected, setBackendConnected] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [useBackendApi, setUseBackendApi] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState<{[key: number]: string}>({});
 
   // 백엔드 API 연결 체크
   useEffect(() => {
@@ -152,7 +157,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         setBackendConnected(response.success);
         setBackendError(null);
         if (response.success) {
-          console.log('백엔드 API 연결 성공');
+          // console.log('백엔드 API 연결 성공');
         }
       } catch (error) {
         console.error('백엔드 API 연결 실패:', error);
@@ -164,6 +169,41 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     checkBackendConnection();
   }, []);
 
+  // 실시간 경과 시간 업데이트
+  useEffect(() => {
+    if (runningTests.length === 0) return;
+
+    const timer = setInterval(() => {
+      setElapsedTime(prev => {
+        const newElapsedTime: {[key: number]: string} = {};
+        runningTests.forEach(test => {
+          if (test.testStartTime) {
+            newElapsedTime[test.id] = calculateElapsedTime(test);
+          }
+        });
+        return newElapsedTime;
+      });
+    }, 1000); // 1초마다 업데이트
+
+    return () => clearInterval(timer);
+  }, [runningTests]);
+
+  // 최근 테스트 결과 가져오기
+  useEffect(() => {
+    const fetchRecentTestResults = async () => {
+      try {
+        const result = await getBackendTestResults(1, 3); // 최근 3개 테스트
+        if (result.success && result.data) {
+          setRecentTestResults(result.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch recent test results:', error);
+      }
+    };
+
+    fetchRecentTestResults();
+  }, []);
+
   // MCP 도구 매핑
   const getMcpTools = (testType: string) => {
     switch (testType) {
@@ -172,9 +212,10 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
       case "lighthouse":
         return ["Google Lighthouse", "Lighthouse CI"];
       case "load":
-        return ["k6", "Artillery"];
+        return ["k6"]; // "Artillery"
       case "security":
         return ["OWASP ZAP", "Nmap"];
+        
       case "accessibility":
         return ["axe-core", "Pa11y"];
       default:
@@ -727,6 +768,202 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     }
   };
 
+  // k6 MCP 테스트 실행
+  // 경과 시간 계산 함수 (MM:SS 포맷)
+  const calculateElapsedTime = (test: RunningTest): string => {
+    if (!test.testStartTime) return '00:00';
+    
+    const currentTime = Date.now();
+    const elapsedTime = currentTime - test.testStartTime;
+    const elapsedSeconds = Math.floor(elapsedTime / 1000);
+    
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleK6MCPTest = async () => {
+    if (!testUrl || !selectedTestType) {
+      return;
+    }
+
+    try {
+      setIsExecuting(true);
+
+      // k6 스크립트 생성
+      const k6Script = generateK6Script(testUrl, testSettings.load);
+      
+      // 백엔드에 k6 MCP 테스트 요청
+      const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/load-tests/k6-mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: testUrl,
+          name: testDescription || `k6 MCP Test - ${testUrl}`,
+          description: testDescription,
+          script: k6Script,
+          config: {
+            duration: testSettings.load.timeUnit,
+            vus: testSettings.load.maxVUs,
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('k6 MCP 테스트 시작됨:', result);
+        
+        // 백엔드에서 반환된 testId를 사용
+        const backendTestId = result.data?.testId || result.data?.id;
+        const frontendTestId = Date.now();
+        
+        // 프론트엔드 테스트 객체 생성 (백엔드 testId 포함)
+        const newTest: RunningTest = {
+          id: frontendTestId,
+          backendTestId: backendTestId, // 백엔드 testId 저장
+          url: testUrl,
+          type: selectedTestType,
+          progress: 0,
+          status: 'running',
+          startTime: new Date().toISOString(),
+          currentStep: 'k6 MCP 테스트 초기화 중...',
+          estimatedTime: '예상 시간 계산 중...',
+          logs: [`k6 MCP 테스트 시작: ${testUrl}`],
+          settings: testSettings,
+          testStartTime: Date.now(), // 테스트 시작 시간 (밀리초)
+        };
+
+        setRunningTests(prev => {
+          const updatedTests = [...prev, newTest];
+          // console.log('Running tests updated:', updatedTests);
+          return updatedTests;
+        });
+        
+        // 테스트 상태 폴링 시작 (백엔드 testId 사용)
+        if (backendTestId) {
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusResponse = await fetch(`${backendUrl}/api/load-tests/${backendTestId}`);
+               if (statusResponse.ok) {
+                 const statusData = await statusResponse.json();
+                 
+                 // progress 정보만 로깅
+                 if (statusData.data?.progress !== undefined) {
+                  //  console.log(`Progress update: ${statusData.data.progress}% - ${statusData.data.currentStep}`);
+                 }
+                
+                // 실행 중인 테스트 업데이트 (백엔드 testId로 매칭)
+                  setRunningTests(prev => {
+                   const updatedTests = prev.map(test => {
+                     if (test.backendTestId === backendTestId) {
+                       const newProgress = statusData.data?.progress !== undefined ? statusData.data.progress : test.progress;
+                       const newCurrentStep = statusData.data?.currentStep || test.currentStep;
+                       const newStatus = statusData.data?.status || test.status;
+                       
+                       const updatedTest = {
+                         ...test,
+                         progress: newProgress,
+                         currentStep: newCurrentStep,
+                         status: newStatus
+                       };
+                       
+                      //  console.log(`Test ${backendTestId} updated:`, {
+                      //    oldProgress: test.progress,
+                      //    newProgress: newProgress,
+                      //    oldCurrentStep: test.currentStep,
+                      //    newCurrentStep: newCurrentStep,
+                      //    oldStatus: test.status,
+                      //    newStatus: newStatus
+                      //  });
+                       
+                       return updatedTest;
+                     }
+                     return test;
+                   });
+                   
+                  //  console.log('All running tests after update:', updatedTests);
+                   return updatedTests;
+                 });
+                
+                // 테스트 완료 시 폴링 중지
+                if (statusData.data?.status === 'completed' || statusData.data?.status === 'failed') {
+                  clearInterval(pollInterval);
+                  console.log('테스트 완료:', statusData.data);
+                  
+                  // 완료된 테스트를 실행 중 목록에서 제거
+                  setRunningTests(prev => prev.filter(test => test.backendTestId !== backendTestId));
+                  
+                  // 실행 현황 새로고침
+                  try {
+                    const resultsResult = await getAllTestResults();
+                    if (resultsResult.success && resultsResult.data) {
+                      const resultsArray = Array.isArray(resultsResult.data) ? resultsResult.data : [];
+                      // console.log('Test results refreshed:', resultsArray);
+                    }
+                  } catch (error) {
+                    console.error('Failed to refresh test results:', error);
+                  }
+                }
+              }
+            } catch (error) {
+                  console.error('테스트 상태 확인 중 오류:', error);
+               }
+             }, 3000); // 3초마다 상태 확인 (최적화)
+        }
+      } else {
+        const error = await response.json();
+        console.error('k6 MCP 테스트 실행 실패:', error);
+        alert(`k6 MCP 테스트 실행 실패: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('k6 MCP 테스트 실행 중 오류:', error);
+      alert('k6 MCP 테스트 실행 중 오류가 발생했습니다.');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // k6 스크립트 생성 함수
+  const generateK6Script = (url: string, loadSettings: any): string => {
+    const stages = loadSettings.stages.map((stage: any) => 
+      `{ duration: '${stage.duration}', target: ${stage.target} }`
+    ).join(',\n    ');
+
+    return `
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate } from 'k6/metrics';
+
+const errorRate = new Rate('errors');
+
+export const options = {
+  stages: [
+    ${stages}
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<2000'],
+    errors: ['rate<0.1']
+  }
+};
+
+export default function () {
+  const response = http.get('${url}');
+  
+  check(response, {
+    'status is 200': (r) => r.status === 200,
+    'response time < 2000ms': (r) => r.timings.duration < 2000,
+  });
+  
+  errorRate.add(response.status !== 200);
+  sleep(1);
+}
+`;
+  };
+
   const handleStartTest = async () => {
     const normalizedUrl = normalizeUrl(testUrl);
     if (
@@ -736,9 +973,9 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     )
       return;
 
-    // 백엔드가 연결되어 있고 부하 테스트인 경우 백엔드 API 사용
+    // 백엔드가 연결되어 있고 부하 테스트인 경우 k6 MCP 테스트 사용
     if (backendConnected && selectedTestType === 'load') {
-      await handleBackendLoadTest();
+      await handleK6MCPTest();
       return;
     }
 
@@ -915,8 +1152,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
       );
     }
 
-    const currentSettings =
-      testSettings[selectedTestType as keyof TestSettings];
+    const currentSettings = testSettings[selectedTestType as keyof TestSettings] as any;
 
     // 설정이 없거나 잘못된 경우 기본값 사용
     if (!currentSettings) {
@@ -935,6 +1171,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
 
     switch (selectedTestType) {
       case "performance":
+        const performanceSettings = testSettings.performance;
         return (
           <div className="neu-card rounded-3xl px-6 py-8">
             <div className="flex items-center space-x-4 mb-8">
@@ -952,7 +1189,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                   <div className="neu-input rounded-xl px-4 py-3">
                     <Input
                       type="number"
-                      value={currentSettings.timeout || 30}
+                      value={performanceSettings.timeout || 30}
                       onChange={(e) =>
                         updateTestSetting(
                           "performance",
@@ -973,7 +1210,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                   <div className="neu-input rounded-xl px-4 py-3">
                     <Input
                       type="number"
-                      value={currentSettings.retries || 3}
+                      value={performanceSettings.retries || 3}
                       onChange={(e) =>
                         updateTestSetting(
                           "performance",
@@ -995,7 +1232,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                 </Label>
                 <div className="neu-input rounded-xl px-3 py-2">
                   <Select
-                    value={currentSettings.device || "desktop"}
+                    value={performanceSettings.device || "desktop"}
                     onValueChange={(value) =>
                       updateTestSetting(
                         "performance",
@@ -1041,11 +1278,11 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                     >
                       <Checkbox
                         checked={(
-                          currentSettings.metrics || []
+                          performanceSettings.metrics || []
                         ).includes(metric)}
                         onCheckedChange={(checked) => {
                           const currentMetrics =
-                            currentSettings.metrics || [];
+                            performanceSettings.metrics || [];
                           const newMetrics = checked
                             ? [...currentMetrics, metric]
                             : currentMetrics.filter(
@@ -1071,7 +1308,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                   네트워크 스로틀링 적용
                 </Label>
                 <Switch
-                  checked={currentSettings.throttling ?? true}
+                  checked={performanceSettings.throttling ?? true}
                   onCheckedChange={(checked) =>
                     updateTestSetting(
                       "performance",
@@ -1087,17 +1324,18 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
 
       case "load":
         // 안전한 접근을 위한 현재 설정 검증 및 기본값 제공
+        const loadSettings = testSettings.load;
         const safeLoadSettings = {
           executor:
-            currentSettings.executor || "ramping-arrival-rate",
-          preset: currentSettings.preset || "medium",
-          startRate: currentSettings.startRate || 100,
-          timeUnit: currentSettings.timeUnit || "20s",
+            loadSettings.executor || "ramping-arrival-rate",
+          preset: loadSettings.preset || "medium",
+          startRate: loadSettings.startRate || 100,
+          timeUnit: loadSettings.timeUnit || "20s",
           preAllocatedVUs:
-            currentSettings.preAllocatedVUs || 10,
-          maxVUs: currentSettings.maxVUs || 500,
-          stages: Array.isArray(currentSettings.stages)
-            ? currentSettings.stages
+            loadSettings.preAllocatedVUs || 10,
+          maxVUs: loadSettings.maxVUs || 500,
+          stages: Array.isArray(loadSettings.stages)
+            ? loadSettings.stages
             : getDefaultLoadSettings().stages,
         };
 
@@ -1860,8 +2098,11 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
       )}
 
       {/* 실행중인 테스트 목록 - 단순화된 버전 */}
-      {runningTests.filter((t) => t.status === "실행중")
-        .length > 0 && (
+      {(() => {
+        const runningTestCount = runningTests.filter((t) => t.status === "running" || t.status === "실행중").length;
+        // console.log('Running test count:', runningTestCount, 'Total tests:', runningTests.length);
+        return runningTestCount > 0;
+      })() && (
         <div className="neu-card rounded-3xl px-6 py-8">
           <div className="flex items-center space-x-4 mb-8">
             <Timer className="h-7 w-7 text-primary" />
@@ -1871,7 +2112,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           </div>
           <div className="space-y-6">
             {runningTests
-              .filter((t) => t.status === "실행중")
+              .filter((t) => t.status === "running" || t.status === "실행중")
               .map((test) => (
                 <div
                   key={test.id}
@@ -1906,7 +2147,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
+                    {/* <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
                         진행률
                       </span>
@@ -1924,10 +2165,21 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                             getProgressColor(test.progress),
                         } as any
                       }
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      {test.currentStep}
-                    </p>
+                    /> */}
+                    <div className="flex justify-between text-sm mt-2">
+                      <span className="text-muted-foreground">
+                        경과 시간
+                      </span>
+                      <span className="font-medium text-primary">
+                        {elapsedTime[test.id] || '00:00'}
+                      </span>
+                    </div>
+                    {/* 디버깅용 로그 */}
+                    {/* {process.env.NODE_ENV === 'development' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Debug: {test.backendTestId} - {test.progress}% - {test.currentStep} - {elapsedTime[test.id]}
+                      </p>
+                    )} */}
                   </div>
                 </div>
               ))}
@@ -1953,7 +2205,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
             <div className="text-4xl font-bold text-primary mb-3">
               {
                 runningTests.filter(
-                  (t) => t.status === "실행중",
+                  (t) => t.status === "running" || t.status === "실행중",
                 ).length
               }
             </div>
@@ -1964,7 +2216,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           <div className="neu-pressed rounded-2xl px-6 py-8 text-center">
             <div className="text-4xl font-bold text-primary mb-3">
               {
-                runningTests.filter((t) => t.status === "완료")
+                runningTests.filter((t) => t.status === "completed" || t.status === "완료")
                   .length
               }
             </div>
@@ -1974,7 +2226,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           </div>
         </div>
 
-        {runningTests.length === 0 ? (
+        {runningTests.length === 0 && recentTestResults.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Globe className="h-16 w-16 mx-auto mb-6 opacity-50" />
             <p className="font-semibold text-lg mb-2">
@@ -1989,12 +2241,38 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
             <h4 className="font-semibold text-foreground text-lg">
               최근 활동
             </h4>
-            {runningTests
-              .slice(-3)
-              .reverse()
-              .map((test) => (
+            {(recentTestResults.length > 0 ? recentTestResults : runningTests.slice(-3).reverse()).map((test, index) => {
+              // 경과 시간 계산
+              const calculateTestElapsedTime = (test: any): string => {
+                if (test.testStartTime) {
+                  // 실행 중인 테스트 (실시간)
+                  const currentTime = Date.now();
+                  const elapsedTime = currentTime - test.testStartTime;
+                  const elapsedSeconds = Math.floor(elapsedTime / 1000);
+                  const minutes = Math.floor(elapsedSeconds / 60);
+                  const seconds = elapsedSeconds % 60;
+                  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                } else if (test.createdAt && test.updatedAt) {
+                  // 완료된 테스트 (DB에서 가져온 데이터)
+                  const start = new Date(test.createdAt).getTime();
+                  const end = new Date(test.updatedAt).getTime();
+                  const elapsedTime = end - start;
+                  const elapsedSeconds = Math.floor(elapsedTime / 1000);
+                  const minutes = Math.floor(elapsedSeconds / 60);
+                  const seconds = elapsedSeconds % 60;
+                  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                return '00:00';
+              };
+
+              const testType = test.testType || test.type || '부하테스트';
+              const testStatus = test.status || '완료';
+              const testUrl = test.url || '알 수 없음';
+              const elapsedTime = calculateTestElapsedTime(test);
+
+              return (
                 <div
-                  key={test.id}
+                  key={test.id || index}
                   className="neu-flat rounded-xl px-4 py-4 flex items-center space-x-4 cursor-pointer hover:neu-button transition-all duration-200"
                   onClick={() => onNavigate?.('test-results')}
                 >
@@ -2002,32 +2280,36 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                     className="w-4 h-4 rounded-full flex-shrink-0 shadow-inner"
                     style={{
                       backgroundColor:
-                        test.status === "완료"
+                        testStatus === "완료" || testStatus === "completed"
                           ? "#7886C7"
                           : "#A9B5DF",
                     }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 mb-1">
                       <span className="font-medium text-foreground truncate">
-                        {test.url}
+                        {testUrl}
                       </span>
                       <div className="neu-pressed rounded-lg px-3 py-1">
                         <span className="text-xs font-medium text-primary">
-                          {testTypes.find(
-                            (t) => t.id === test.type,
-                          )?.name || test.type}
+                          {testType}
                         </span>
                       </div>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                      <span>소요시간: {elapsedTime}</span>
                     </div>
                   </div>
                   <div className="neu-pressed rounded-full px-4 py-2">
                     <span className="text-sm font-medium text-primary">
-                      {test.status}
+                      {testStatus === "completed" ? "완료" : 
+                       testStatus === "running" ? "실행중" : 
+                       testStatus === "failed" ? "실패" : testStatus}
                     </span>
                   </div>
                 </div>
-              ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -2,8 +2,10 @@ export interface LoadTestConfig {
     id?: string;
     url: string;
     name: string;
-    description?: string;
+    description?: string | undefined;
     stages: LoadTestStage[];
+    duration?: string;
+    vus?: number;
     options?: {
         vus?: number;
         duration?: string;
@@ -23,14 +25,16 @@ export interface LoadTestResult {
     config: LoadTestConfig;
     status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
     metrics: {
-        avgResponseTime: number;
-        maxResponseTime: number;
-        minResponseTime: number;
-        requestsPerSecond: number;
-        errorRate: number;
-        totalRequests: number;
-        successfulRequests: number;
-        failedRequests: number;
+        http_req_duration: {
+            avg: number;
+            min: number;
+            max: number;
+            p95: number;
+        };
+        http_req_rate: number;
+        http_req_failed: number;
+        vus: number;
+        vus_max: number;
     };
     summary: {
         totalRequests: number;

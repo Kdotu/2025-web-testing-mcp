@@ -102,4 +102,36 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+/**
+ * POST /api/load-tests/k6-mcp
+ * k6 MCP 테스트 실행
+ */
+router.post('/k6-mcp', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { url, name, description, script, config } = req.body;
+    
+    // 기본 검증
+    if (!url || !name || !script) {
+      throw createValidationError('URL, name, and script are required');
+    }
+
+    const result = await loadTestController.executeK6MCPTest({
+      url,
+      name,
+      description,
+      script,
+      config
+    });
+    
+    res.status(201).json({
+      success: true,
+      data: result,
+      message: 'k6 MCP test executed successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as loadTestRoutes }; 

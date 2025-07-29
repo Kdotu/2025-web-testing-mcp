@@ -8,12 +8,12 @@ const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const error_handler_1 = require("./middleware/error-handler");
 const load_tests_1 = require("./routes/load-tests");
-const m2_test_results_1 = require("./routes/test-results");
+const test_results_1 = require("./routes/test-results");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env['PORT'] || 3000;
 app.use((0, cors_1.default)({
-    origin: process.env['CORS_ORIGIN'] || 'http://localhost:5173',
+    origin: process.env['CORS_ORIGIN'] || ['http://localhost:3000', 'http://localhost:5173'],
     credentials: true
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
@@ -30,7 +30,7 @@ app.get('/health', (_req, res) => {
     });
 });
 app.use('/api/load-tests', load_tests_1.loadTestRoutes);
-app.use('/api/test-results', m2_test_results_1.testResultRoutes);
+app.use('/api/test-results', test_results_1.testResultRoutes);
 app.use('*', (_req, res) => {
     res.status(404).json({
         success: false,

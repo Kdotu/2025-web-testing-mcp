@@ -9,5 +9,16 @@ export declare class LoadTestController {
     cancelTest(testId: string): Promise<void>;
     private updateTestStatus;
     updateTestResult(testId: string, result: Partial<LoadTestResult>): Promise<void>;
+    executeK6MCPTest(params: {
+        url: string;
+        name: string;
+        description?: string;
+        script: string;
+        config: {
+            duration: string;
+            vus: number;
+        };
+    }): Promise<LoadTestResult>;
+    private executeK6MCPTestAsync;
 }
 //# sourceMappingURL=load-test-controller.d.ts.map

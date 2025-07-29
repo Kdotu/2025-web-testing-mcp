@@ -19,7 +19,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     
     res.json({
       success: true,
-      data: result,
+      data: result.results, // results 배열만 전달
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
       timestamp: new Date().toISOString()
     });
   } catch (error) {

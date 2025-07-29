@@ -2,10 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.testResultRoutes = void 0;
 const express_1 = require("express");
-const m2_m2_test_results_controller_1 = require("../controllers/test-result-controller");
+const test_result_controller_1 = require("../controllers/test-result-controller");
 const router = (0, express_1.Router)();
 exports.testResultRoutes = router;
-const testResultController = new m2_m2_test_results_controller_1.TestResultController();
+const testResultController = new test_result_controller_1.TestResultController();
 router.get('/', async (req, res, next) => {
     try {
         const { page = '1', limit = '10', status } = req.query;

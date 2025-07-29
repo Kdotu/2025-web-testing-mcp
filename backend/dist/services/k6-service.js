@@ -34,8 +34,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.K6Service = void 0;
-const child_process_1 = require("child_process");
 const path_1 = require("path");
+const child_process_1 = require("child_process");
 class K6Service {
     constructor() {
         this.runningTests = new Map();
@@ -44,52 +44,61 @@ class K6Service {
     async executeTest(testId, config) {
         try {
             const scriptPath = await this.generateK6Script(testId, config);
-            const k6Options = [
-                'run',
-                '--out', 'json=results.json',
-                '--no-usage-report',
-                scriptPath
-            ];
-            const k6Process = (0, child_process_1.spawn)('k6', k6Options, {
-                stdio: ['pipe', 'pipe', 'pipe']
-            });
-            this.runningTests.set(testId, k6Process);
-            let output = '';
-            k6Process.stdout?.on('data', (data) => {
-                output += data.toString();
-                this.parseK6Output(testId, data.toString());
-            });
-            k6Process.stderr?.on('data', (data) => {
-                console.error(`k6 error for test ${testId}:`, data.toString());
-            });
-            k6Process.on('close', (code) => {
-                this.runningTests.delete(testId);
-                if (code === 0) {
-                    this.handleTestCompletion(testId, 'completed');
-                }
-                else {
-                    this.handleTestCompletion(testId, 'failed');
-                }
-            });
-            k6Process.on('error', (error) => {
-                console.error(`k6 process error for test ${testId}:`, error);
-                this.runningTests.delete(testId);
-                this.handleTestCompletion(testId, 'failed');
-            });
+            const result = await this.executeK6ViaMCP(scriptPath, config);
+            this.parseK6Output(testId, result);
+            this.handleTestCompletion(testId, 'completed');
         }
         catch (error) {
-            console.error('Failed to execute k6 test:', error);
+            console.error('Failed to execute k6 test via MCP:', error);
             this.handleTestCompletion(testId, 'failed');
             throw error;
         }
     }
+    async executeK6ViaMCP(scriptPath, config) {
+        return new Promise((resolve, reject) => {
+            const k6ServerPath = (0, path_1.join)(process.cwd(), '..', 'k6-mcp-server');
+            const isWindows = process.platform === 'win32';
+            const pythonPath = isWindows
+                ? (0, path_1.join)(k6ServerPath, '.venv', 'Scripts', 'python.exe')
+                : 'python';
+            const pythonProcess = (0, child_process_1.spawn)(pythonPath, ['k6_server.py'], {
+                cwd: k6ServerPath,
+                env: {
+                    ...process.env,
+                    K6_BIN: 'k6'
+                }
+            });
+            let output = '';
+            let errorOutput = '';
+            pythonProcess.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+            pythonProcess.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+            });
+            pythonProcess.on('close', (code) => {
+                if (code === 0) {
+                    resolve(output);
+                }
+                else {
+                    reject(new Error(`MCP server failed: ${errorOutput}`));
+                }
+            });
+            const testRequest = {
+                method: 'execute_k6_test',
+                params: {
+                    script_file: scriptPath,
+                    duration: config.duration || '30s',
+                    vus: config.vus || 10
+                }
+            };
+            pythonProcess.stdin.write(JSON.stringify(testRequest) + '\n');
+            pythonProcess.stdin.end();
+        });
+    }
     async cancelTest(testId) {
-        const process = this.runningTests.get(testId);
-        if (process) {
-            process.kill('SIGTERM');
-            this.runningTests.delete(testId);
-            this.handleTestCompletion(testId, 'cancelled');
-        }
+        this.runningTests.delete(testId);
+        this.handleTestCompletion(testId, 'cancelled');
     }
     async generateK6Script(testId, config) {
         const scriptContent = this.createK6ScriptContent(config);
@@ -117,42 +126,56 @@ export const options = {
   ],
   thresholds: {
     http_req_duration: ['p(95)<2000'],
-    errors: ['rate<0.1'],
-  },
+    errors: ['rate<0.1']
+  }
 };
 
-export default function() {
+export default function () {
   const response = http.get('${config.url}');
   
-  const success = check(response, {
+  check(response, {
     'status is 200': (r) => r.status === 200,
     'response time < 2000ms': (r) => r.timings.duration < 2000,
   });
   
-  errorRate.add(!success);
+  errorRate.add(response.status !== 200);
   sleep(1);
 }
 `;
     }
     parseK6Output(testId, output) {
+        const metrics = this.extractMetrics(output);
+        this.updateTestMetrics(testId, metrics);
+    }
+    extractMetrics(output) {
+        const metrics = {
+            http_req_duration: { avg: 0, min: 0, max: 0, p95: 0 },
+            http_req_rate: 0,
+            http_req_failed: 0,
+            vus: 0,
+            vus_max: 0
+        };
         const lines = output.split('\n');
         for (const line of lines) {
             if (line.includes('http_req_duration')) {
-                const match = line.match(/avg=(\d+\.?\d*)/);
-                if (match && match[1]) {
-                    const avgResponseTime = parseFloat(match[1]);
-                    this.updateTestMetrics(testId, { avgResponseTime });
-                }
             }
         }
+        return metrics;
     }
     updateTestMetrics(testId, metrics) {
-        const currentMetrics = this.testResults.get(testId) || {};
-        this.testResults.set(testId, { ...currentMetrics, ...metrics });
+        const existingResult = this.testResults.get(testId);
+        if (existingResult) {
+            existingResult.metrics = { ...existingResult.metrics, ...metrics };
+            this.testResults.set(testId, existingResult);
+        }
     }
     handleTestCompletion(testId, status) {
-        console.log(`Test ${testId} ${status}`);
-        this.testResults.delete(testId);
+        const result = this.testResults.get(testId);
+        if (result) {
+            result.status = status;
+            result.completedAt = new Date().toISOString();
+            this.testResults.set(testId, result);
+        }
         this.cleanupTempFiles(testId);
     }
     async cleanupTempFiles(testId) {
@@ -161,12 +184,8 @@ export default function() {
             const path = await Promise.resolve().then(() => __importStar(require('path')));
             const tempDir = path.join(process.cwd(), 'temp');
             const scriptPath = path.join(tempDir, `${testId}.js`);
-            const resultsPath = path.join(tempDir, 'results.json');
             if (fs.existsSync(scriptPath)) {
                 fs.unlinkSync(scriptPath);
-            }
-            if (fs.existsSync(resultsPath)) {
-                fs.unlinkSync(resultsPath);
             }
         }
         catch (error) {
@@ -178,6 +197,9 @@ export default function() {
     }
     isTestRunning(testId) {
         return this.runningTests.has(testId);
+    }
+    getTestResult(testId) {
+        return this.testResults.get(testId);
     }
 }
 exports.K6Service = K6Service;
