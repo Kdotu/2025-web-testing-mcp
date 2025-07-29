@@ -157,3 +157,188 @@ export const getStatistics = () => backendApi.getStatistics();
 
 // 타입 내보내기
 export type { BackendApiResponse, LoadTestConfig, LoadTestResult }; 
+
+// 테스트 타입 관련 API
+export interface TestType {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  category?: string;
+  icon?: string;
+  color?: string;
+  config_template?: any;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * 모든 테스트 타입 조회
+ */
+export const getTestTypes = async (): Promise<{ success: boolean; data?: TestType[]; error?: string }> => {
+  try {
+    const response = await fetch(`${BACKEND_API_BASE_URL}/api/test-types`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error fetching test types:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 활성화된 테스트 타입만 조회
+ */
+export const getEnabledTestTypes = async (): Promise<{ success: boolean; data?: TestType[]; error?: string }> => {
+  try {
+    const response = await fetch(`${BACKEND_API_BASE_URL}/api/test-types/enabled`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error fetching enabled test types:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 테스트 타입 추가
+ */
+export const addTestType = async (testType: Omit<TestType, 'created_at' | 'updated_at'>): Promise<{ success: boolean; data?: TestType; error?: string }> => {
+  try {
+    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(testType),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error adding test type:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 테스트 타입 수정
+ */
+export const updateTestType = async (id: string, updates: Partial<TestType>): Promise<{ success: boolean; data?: TestType; error?: string }> => {
+  try {
+    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error updating test type:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 테스트 타입 삭제
+ */
+export const deleteTestType = async (id: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error deleting test type:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 테스트 타입 활성화/비활성화 토글
+ */
+export const toggleTestType = async (id: string, enabled: boolean): Promise<{ success: boolean; data?: TestType; error?: string }> => {
+  try {
+    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/${id}/toggle`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ enabled }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error toggling test type:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * 기본 테스트 타입 초기화
+ */
+export const initializeDefaultTestTypes = async (): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/initialize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error initializing default test types:', error);
+    return { success: false, error: error.message };
+  }
+}; 

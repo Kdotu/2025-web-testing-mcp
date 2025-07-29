@@ -327,7 +327,7 @@
   }
   
   .neu-dialog-overlay {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(165, 180, 252, 0.15) 100%);
+    background: rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }

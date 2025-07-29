@@ -123,7 +123,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           try {
             // Supabase에서 최근 테스트 결과 불러오기
             const results = await getAllTestResults(1, 10); // 최근 10개 테스트
-            if (results.success && results.data) {
+          if (results.success && results.data) {
               // 테스트 결과를 Dashboard 형식에 맞게 변환
               const formattedResults = results.data.map((test: any) => ({
                 id: test.id,
@@ -154,10 +154,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             const apiResults = await getTestResults();
             if (apiResults.success && apiResults.data) {
               setTestResults(apiResults.data);
-              setIsOfflineMode(false);
-            } else {
-              setTestResults(mockData.recentTests);
-              setIsOfflineMode(true);
+            setIsOfflineMode(false);
+          } else {
+            setTestResults(mockData.recentTests);
+            setIsOfflineMode(true);
             }
           }
         } else {

@@ -591,20 +591,13 @@ export const getTestTypes = async () => {
     { id: "accessibility", name: "접근성 테스트", description: "웹 접근성 준수 검사", enabled: true },
   ];
 
-  if (isDemoMode()) {
-    return {
-      success: true,
-      data: defaultTestTypes,
-      demo: true,
-      message: '데모 모드: 기본 테스트 타입을 표시합니다.'
-    };
-  }
+  // 백엔드 API URL (환경변수에서 가져오거나 기본값 사용)
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
 
   try {
-    const response = await fetch(`${API_BASE_URL}/test-types`, {
+    const response = await fetch(`${BACKEND_URL}/api/test-types`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${publicAnonKey}`,
         'Content-Type': 'application/json',
       },
     });
@@ -617,24 +610,36 @@ export const getTestTypes = async () => {
     
     if (data.success && data.data) {
       setOfflineData('testTypes', data.data);
-    }
-    
-    return data;
-  } catch (error: any) {
-    logConnectionError('테스트 타입 조회', error, getRetryCount());
-    
-    if (isNetworkError(error)) {
-      const offlineData = getOfflineData();
-      
+      return data;
+    } else {
+      // 백엔드 API가 실패하면 기본 데이터 반환
       return {
         success: true,
-        data: offlineData.testTypes || defaultTestTypes,
+        data: defaultTestTypes,
+        message: '백엔드 연결 실패: 기본 테스트 타입을 표시합니다.'
+      };
+    }
+  } catch (error: any) {
+    console.error('Error fetching test types from backend:', error);
+    
+    // 오프라인 데이터가 있으면 사용
+    const offlineData = getOfflineData();
+    if (offlineData.testTypes && offlineData.testTypes.length > 0) {
+      return {
+        success: true,
+        data: offlineData.testTypes,
         offline: true,
-        message: '오프라인 모드: 기본 테스트 타입을 표시합니다.'
+        message: '오프라인 모드: 저장된 테스트 타입을 표시합니다.'
       };
     }
     
-    return { success: false, error: error.message };
+    // 기본 데이터 반환
+    return {
+      success: true,
+      data: defaultTestTypes,
+      offline: true,
+      message: '오프라인 모드: 기본 테스트 타입을 표시합니다.'
+    };
   }
 };
 
@@ -649,28 +654,74 @@ export const updateTestTypes = async (testTypes: any[]) => {
 };
 
 export const addTestType = async (testType: any) => {
-  if (isDemoMode()) {
-    const offlineData = getOfflineData();
-    const currentTypes = offlineData.testTypes || [];
-    const updatedTypes = [...currentTypes, testType];
-    setOfflineData('testTypes', updatedTypes);
-    return { success: true, message: '데모 모드: 테스트 타입이 로컬에 추가되었습니다.', data: testType, demo: true };
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/test-types`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(testType),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error adding test type:', error);
+    return { success: false, error: error.message };
   }
-  return { success: false, error: 'Not implemented in demo' };
 };
 
 export const updateTestType = async (id: string, testType: any) => {
-  if (isDemoMode()) {
-    return { success: true, message: '데모 모드: 테스트 타입이 로컬에서 수정되었습니다.', data: testType, demo: true };
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(testType),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error updating test type:', error);
+    return { success: false, error: error.message };
   }
-  return { success: false, error: 'Not implemented in demo' };
 };
 
 export const deleteTestType = async (id: string) => {
-  if (isDemoMode()) {
-    return { success: true, message: '데모 모드: 테스트 타입이 로컬에서 삭제되었습니다.', demo: true };
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.error('Error deleting test type:', error);
+    return { success: false, error: error.message };
   }
-  return { success: false, error: 'Not implemented in demo' };
 };
 
 // 별칭 함수들 (기존 컴포넌트와의 호환성을 위해)

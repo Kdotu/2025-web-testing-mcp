@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { errorHandler } from './middleware/error-handler';
 import { loadTestRoutes } from './routes/load-tests';
 import { testResultRoutes } from './routes/test-results';
+import { testTypeRoutes } from './routes/test-types';
 
 // 환경변수 로드
 dotenv.config();
@@ -37,6 +38,7 @@ app.get('/health', (_req, res) => {
 // API 라우트 설정
 app.use('/api/load-tests', loadTestRoutes);
 app.use('/api/test-results', testResultRoutes);
+app.use('/api/test-types', testTypeRoutes);
 
 // 404 핸들러
 app.use('*', (_req, res) => {

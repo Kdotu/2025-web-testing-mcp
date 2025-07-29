@@ -181,20 +181,6 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <Activity className="h-4 w-4 mr-2" />
                 테스트 타입
               </TabsTrigger>
-              <TabsTrigger 
-                value="general"
-                className="flex items-center justify-center rounded-lg px-4 py-4 font-semibold text-base transition-all duration-200 data-[state=active]:neu-button-active data-[state=active]:text-primary-foreground data-[state=active]:bg-primary h-14"
-              >
-                <Cog className="h-4 w-4 mr-2" />
-                일반 설정
-              </TabsTrigger>
-              <TabsTrigger 
-                value="advanced"
-                className="flex items-center justify-center rounded-lg px-4 py-4 font-semibold text-base transition-all duration-200 data-[state=active]:neu-button-active data-[state=active]:text-primary-foreground data-[state=active]:bg-primary h-14"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                고급 설정
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="test-types" className="space-y-6">
@@ -210,7 +196,7 @@ export function Settings({ onNavigate }: SettingsProps) {
                       테스트 타입 추가
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="neu-card border-none max-w-lg">
+                  <DialogContent className="bg-card border-none max-w-lg shadow-lg">
                     <DialogHeader>
                       <DialogTitle className="text-primary text-xl">새 테스트 타입 추가</DialogTitle>
                       <DialogDescription className="text-muted-foreground">
@@ -416,57 +402,6 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <h3 className="text-2xl font-semibold text-primary mb-2">일반 설정</h3>
                 <p className="text-muted-foreground text-lg">기본 테스트 설정을 구성하세요</p>
               </div>
-              
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="neu-flat rounded-xl px-6 py-6 flex items-center justify-between">
-                  <div>
-                    <Label className="font-semibold text-foreground text-lg">알림 설정</Label>
-                    <p className="text-muted-foreground mt-2">테스트 완료 시 알림 받기</p>
-                  </div>
-                  <Switch
-                    checked={notifications}
-                    onCheckedChange={setNotifications}
-                    className="data-[state=checked]:bg-primary"
-                  />
-                </div>
-
-                <div className="neu-flat rounded-xl px-6 py-6 flex items-center justify-between">
-                  <div>
-                    <Label className="font-semibold text-foreground text-lg">자동 저장</Label>
-                    <p className="text-muted-foreground mt-2">테스트 결과 자동 저장</p>
-                  </div>
-                  <Switch
-                    checked={autoSave}
-                    onCheckedChange={setAutoSave}
-                    className="data-[state=checked]:bg-primary"
-                  />
-                </div>
-
-                <div className="neu-flat rounded-xl px-6 py-6">
-                  <Label className="font-semibold text-foreground text-lg">최대 동시 테스트 수</Label>
-                  <div className="neu-input rounded-xl px-4 py-3 mt-4">
-                    <Input
-                      type="number"
-                      value={maxConcurrentTests}
-                      onChange={(e) => setMaxConcurrentTests(Number(e.target.value))}
-                      className="border-none bg-transparent text-foreground"
-                    />
-                  </div>
-                </div>
-
-                <div className="neu-flat rounded-xl px-6 py-6">
-                  <Label className="font-semibold text-foreground text-lg">기본 타임아웃 (초)</Label>
-                  <div className="neu-input rounded-xl px-4 py-3 mt-4">
-                    <Input
-                      type="number"
-                      value={defaultTimeout}
-                      onChange={(e) => setDefaultTimeout(Number(e.target.value))}
-                      className="border-none bg-transparent text-foreground"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <Alert className="neu-pressed rounded-xl border-none">
                 <Bell className="h-5 w-5" />
                 <AlertDescription className="text-muted-foreground">
@@ -563,12 +498,12 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <h4 className="font-semibold text-primary text-lg">성능 테스트</h4>
               </div>
               <div className="space-y-2">
-                <div className="neu-pressed rounded-lg px-4 py-2">
+                {/* <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Lighthouse CLI</span>
                 </div>
                 <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">WebPageTest</span>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -583,9 +518,9 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Google Lighthouse</span>
                 </div>
-                <div className="neu-pressed rounded-lg px-4 py-2">
+                {/* <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Lighthouse CI</span>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -600,9 +535,9 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">k6</span>
                 </div>
-                <div className="neu-pressed rounded-lg px-4 py-2">
+                {/* <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Artillery</span>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -614,12 +549,12 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <h4 className="font-semibold text-primary text-lg">보안 테스트</h4>
               </div>
               <div className="space-y-2">
-                <div className="neu-pressed rounded-lg px-4 py-2">
+                {/* <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">OWASP ZAP</span>
                 </div>
                 <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Nmap</span>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -631,12 +566,12 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <h4 className="font-semibold text-primary text-lg">접근성 테스트</h4>
               </div>
               <div className="space-y-2">
-                <div className="neu-pressed rounded-lg px-4 py-2">
+                {/* <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">axe-core</span>
                 </div>
                 <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Pa11y</span>
-                </div>
+                </div> */}
               </div>
             </div>
             
@@ -648,12 +583,12 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <h4 className="font-semibold text-primary text-lg">통합 모니터링</h4>
               </div>
               <div className="space-y-2">
-                <div className="neu-pressed rounded-lg px-4 py-2">
+                {/* <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Prometheus</span>
                 </div>
                 <div className="neu-pressed rounded-lg px-4 py-2">
                   <span className="text-sm font-mono text-muted-foreground">Grafana</span>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>

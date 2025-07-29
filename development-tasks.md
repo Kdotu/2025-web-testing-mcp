@@ -42,17 +42,21 @@
   - [x] GET /api/load-tests/:id/results - 테스트 결과 조회
   - [x] DELETE /api/load-tests/:id - 테스트 중단
   - [x] GET /api/test-results - 모든 테스트 결과 조회
+  - [x] POST /api/load-tests/k6-mcp - k6 MCP 테스트 실행
 
 - [x] **3.2** 타입 정의
   - [x] LoadTestConfig 인터페이스
   - [x] TestResult 인터페이스
   - [x] ApiResponse 인터페이스
   - [x] 에러 타입 정의
+  - [x] progress, currentStep, testType 필드 추가
 
 - [x] **3.3** 컨트롤러 및 서비스 레이어
   - [x] LoadTestController 구현
   - [x] K6Service 구현
   - [x] 에러 핸들링 미들웨어
+  - [x] k6 output 파싱 및 메트릭 추출
+  - [x] 실시간 진행률 업데이트
 
 ### Phase 4: 프론트엔드 연동 (우선순위 4) ✅ 완료
 - [x] **4.1** API 통신 유틸리티
@@ -71,6 +75,22 @@
   - [x] 폴링 기반 실시간 테스트 상태 업데이트
   - [x] k6 output 기반 진행률 표시 기능
   - [x] 테스트 완료 시 실행 현황 자동 새로고침
+
+- [x] **4.4** 경과 시간 표시 기능
+  - [x] TestResults.tsx에 경과 시간 표시 (MM:SS 포맷)
+  - [x] Dashboard.tsx에 경과 시간 표시
+  - [x] TestExecution.tsx 최근 활동에 소요시간 표시
+  - [x] 실시간 경과 시간 업데이트 (실행 중인 테스트)
+  - [x] test_type 데이터베이스 저장 및 표시
+
+- [x] **4.5** UI/UX 개선
+  - [x] TestResults.tsx 테이블 높이 제한 및 스크롤바 추가
+  - [x] TestResults.tsx 점수(Score) 컬럼 제거
+  - [x] TestResults.tsx 모달창 구현 (TestResultModal.tsx 분리)
+  - [x] TestResults.tsx 웹사이트 폰트 크기 축소
+  - [x] TestResults.tsx created_at 컬럼 사용하여 실행 시간 표시
+  - [x] 모달창 배경색 통일 (색조 없는 중성적 색상)
+  - [x] 모달창 컴포넌트 분리 (TestResultModal.tsx)
 
 ### Phase 5: 문서화 기능 (우선순위 5)
 - [ ] **5.1** HTML 리포트 생성
@@ -135,6 +155,14 @@
   - Dashboard.tsx 통계 데이터 연동 완료
   - k6 output 기반 진행률 표시 기능 구현
   - 테스트 완료 시 실행 현황 자동 새로고침 구현
+  - **UI/UX 개선 완료**:
+    - TestResults.tsx 테이블 높이 제한 및 스크롤바 추가
+    - TestResults.tsx 점수(Score) 컬럼 제거
+    - TestResults.tsx 모달창 구현 (TestResultModal.tsx 분리)
+    - TestResults.tsx 웹사이트 폰트 크기 축소
+    - TestResults.tsx created_at 컬럼 사용하여 실행 시간 표시
+    - 모달창 배경색 통일 (색조 없는 중성적 색상)
+    - 모달창 컴포넌트 분리 (TestResultModal.tsx)
 
 ### 기술 스택 결정사항
 - **백엔드**: Node.js/Express (빠른 개발, 풍부한 생태계)
@@ -180,13 +208,13 @@ CORS_ORIGIN=http://localhost:5173
 ## 📊 진행률 추적
 
 - **Phase 1**: 100% (3/3 완료) ✅
-- **Phase 2**: 100% (10/10 완료) ✅
+- **Phase 2**: 100% (2/2 완료) ✅
 - **Phase 3**: 100% (3/3 완료) ✅
 - **Phase 4**: 100% (5/5 완료) ✅
 - **Phase 5**: 0% (0/3 완료)
 - **Phase 6**: 0% (0/3 완료)
 
-**전체 진행률**: 88% (22/25 완료)
+**전체 진행률**: 92% (13/14 완료)
 
 ## 📁 생성된 파일 구조
 
@@ -215,7 +243,9 @@ frontend/
 │   ├── api.tsx ✅ (기존 Supabase API)
 │   └── backend-api.ts ✅ (새로운 백엔드 API 클라이언트)
 └── components/
-    └── TestExecution.tsx ✅ (백엔드 API 연동 추가)
+    ├── TestExecution.tsx ✅ (백엔드 API 연동 추가)
+    ├── TestResults.tsx ✅ (UI/UX 개선 완료)
+    └── TestResultModal.tsx ✅ (모달창 컴포넌트 분리)
 
 k6-mcp-server/
 ├── k6_server.py ✅ (MCP 서버)
@@ -225,16 +255,11 @@ k6-mcp-server/
 
 ## 🚀 다음 단계
 
-1. **Phase 4 계속**: 프론트엔드 연동
-   - TestExecution.tsx에서 k6 MCP 테스트 호출 구현
-   - TestResults.tsx 결과 표시 업데이트
-   - Dashboard.tsx 통계 데이터 연동
-
-2. **Phase 5 시작**: 문서화 기능
+1. **Phase 5 시작**: 문서화 기능
    - HTML 리포트 생성
    - PDF 문서화
    - 문서 관리 시스템
 
-### 📈 전체 진행률: 79% (19/24 완료)
+### 📈 전체 진행률: 92% (13/14 완료)
 
-MCP 연결 작업을 재진행하여 Phase 2를 완료한 후, 프론트엔드 연동 작업을 계속 진행하겠습니다! 
+Phase 4의 모든 작업이 완료되어 프론트엔드 연동이 성공적으로 마무리되었습니다. 이제 문서화 기능 개발을 시작할 준비가 되었습니다! 
