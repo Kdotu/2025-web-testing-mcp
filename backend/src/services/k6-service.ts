@@ -28,7 +28,7 @@ export class K6Service {
       // MCP 서버를 통해 k6 실행
       const result = await this.executeK6ViaMCP(scriptPath, config);
       console.log('k6 result:', result);
-      
+
       // 결과 처리
       this.parseK6Output(testId, result, config);
       
@@ -175,7 +175,7 @@ export default function () {
     
     try {
       // 메트릭 추출
-      const metrics = this.extractMetrics(output);
+    const metrics = this.extractMetrics(output);
       const summary = this.extractSummary(output);
       
       // 상세 메트릭 파싱 및 저장
@@ -425,7 +425,7 @@ export default function () {
     } catch (error) {
       console.error('Failed to extract detailed metrics:', error);
     }
-    
+
     return metrics;
   }
 
@@ -903,7 +903,7 @@ export default function () {
       const existingResult = await testResultService.getResultByTestId(testId);
       console.log('existingResult found:', !!existingResult);
       
-      if (existingResult) {
+    if (existingResult) {
         const extractedRawData = this.extractRawData(rawData, config);
         console.log('extractedRawData length:', extractedRawData.length);
         
