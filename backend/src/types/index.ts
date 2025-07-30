@@ -4,16 +4,9 @@
 export interface LoadTestConfig {
   id?: string;
   url: string;
-  name: string;
-  description?: string | undefined;
+  name?: string;
+  description?: string;
   stages: LoadTestStage[];
-  duration?: string; // k6 duration (e.g., "30s", "1m", "5m")
-  vus?: number; // number of virtual users
-  options?: {
-    vus?: number;
-    duration?: string;
-    thresholds?: Record<string, string[]>;
-  };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -22,8 +15,9 @@ export interface LoadTestConfig {
  * k6 테스트 스테이지 인터페이스
  */
 export interface LoadTestStage {
-  duration: string;
   target: number;
+  duration: string;
+  description?: string;
 }
 
 /**
@@ -34,12 +28,18 @@ export interface LoadTestResult {
   testId: string;
   testType?: string; // 테스트 유형 (load, performance, security 등)
   url: string;
-  config: LoadTestConfig;
+  name?: string;
+  description?: string; // 테스트 설명 추가
+  config?: any; // 설정값 저장 필드 (LoadTestConfig 또는 상세 설정)
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-  progress?: number;
   currentStep?: string;
   metrics: {
-    http_req_duration: { avg: number; min: number; max: number; p95: number };
+    http_req_duration: {
+      avg: number;
+      min: number;
+      max: number;
+      p95: number;
+    };
     http_req_rate: number;
     http_req_failed: number;
     vus: number;
@@ -53,7 +53,8 @@ export interface LoadTestResult {
     startTime: string;
     endTime: string;
   };
-  rawData?: any;
+  details?: any;
+  raw_data?: string; // k6 실행 로그 저장 필드 추가
   createdAt: string;
   updatedAt: string;
 }

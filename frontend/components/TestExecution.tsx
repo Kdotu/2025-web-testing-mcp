@@ -18,7 +18,6 @@ import {
 } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Switch } from "./ui/switch";
 import { Checkbox } from "./ui/checkbox";
@@ -63,7 +62,6 @@ interface RunningTest {
   backendTestId?: string; // 백엔드 testId
   url: string;
   type: string;
-  progress: number;
   status: string;
   startTime: string;
   currentStep: string;
@@ -152,15 +150,24 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
   // 백엔드 API 연결 체크
   useEffect(() => {
     const checkBackendConnection = async () => {
+      console.log('TestExecution: Checking backend connection...');
       try {
         const response = await checkBackendHealth();
-        setBackendConnected(response.success);
-        setBackendError(null);
-        if (response.success) {
-          // console.log('백엔드 API 연결 성공');
+        console.log('TestExecution: Backend health check response:', response);
+        
+        // 백엔드 응답 형식에 맞게 처리
+        const isConnected = response.success === true || (response as any).status === 'ok';
+        setBackendConnected(isConnected);
+        
+        if (isConnected) {
+          console.log('TestExecution: 백엔드 API 연결 성공');
+          setBackendError(null);
+        } else {
+          console.log('TestExecution: 백엔드 API 연결 실패:', response.error);
+          setBackendError(response.error || '백엔드 서버에 연결할 수 없습니다.');
         }
       } catch (error) {
-        console.error('백엔드 API 연결 실패:', error);
+        console.error('TestExecution: 백엔드 API 연결 실패:', error);
         setBackendConnected(false);
         setBackendError('백엔드 서버에 연결할 수 없습니다.');
       }
@@ -544,7 +551,6 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
               id: parseInt(test.id.split("_")[1]) || Date.now(),
               url: test.url,
               type: test.testType,
-              progress: test.progress,
               status:
                 test.status === "completed"
                   ? "완료"
@@ -730,10 +736,6 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         name: testDescription || `Load Test - ${testUrl}`,
         description: testDescription,
         stages: testSettings.load.stages,
-        options: {
-          vus: testSettings.load.maxVUs,
-          duration: testSettings.load.timeUnit,
-        },
       };
 
       console.log('백엔드 API로 부하 테스트 실행:', loadTestConfig);
@@ -745,7 +747,6 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           id: Date.now(),
           url: testUrl,
           type: selectedTestType,
-          progress: 0,
           status: 'running',
           startTime: new Date().toISOString(),
           currentStep: '테스트 초기화 중...',
@@ -795,7 +796,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
       const k6Script = generateK6Script(testUrl, testSettings.load);
       
       // 백엔드에 k6 MCP 테스트 요청
-      const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
       const response = await fetch(`${backendUrl}/api/load-tests/k6-mcp`, {
         method: 'POST',
         headers: {
@@ -804,11 +805,25 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         body: JSON.stringify({
           url: testUrl,
           name: testDescription || `k6 MCP Test - ${testUrl}`,
-          description: testDescription,
+          description: testDescription, // 테스트 설명
           script: k6Script,
           config: {
             duration: testSettings.load.timeUnit,
             vus: testSettings.load.maxVUs,
+            // 상세 설정 추가
+            detailedConfig: {
+              executor: testSettings.load.executor,
+              preset: testSettings.load.preset,
+              startRate: testSettings.load.startRate,
+              timeUnit: testSettings.load.timeUnit,
+              preAllocatedVUs: testSettings.load.preAllocatedVUs,
+              maxVUs: testSettings.load.maxVUs,
+              stages: testSettings.load.stages,
+              thresholds: {
+                http_req_duration: ['p(95)<2000'],
+                errors: ['rate<0.1']
+              }
+            }
           }
         }),
       });
@@ -827,7 +842,6 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           backendTestId: backendTestId, // 백엔드 testId 저장
           url: testUrl,
           type: selectedTestType,
-          progress: 0,
           status: 'running',
           startTime: new Date().toISOString(),
           currentStep: 'k6 MCP 테스트 초기화 중...',
@@ -851,29 +865,25 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                if (statusResponse.ok) {
                  const statusData = await statusResponse.json();
                  
-                 // progress 정보만 로깅
-                 if (statusData.data?.progress !== undefined) {
-                  //  console.log(`Progress update: ${statusData.data.progress}% - ${statusData.data.currentStep}`);
+                 // 상태 정보만 로깅
+                 if (statusData.data?.currentStep !== undefined) {
+                  //  console.log(`Status update: ${statusData.data.currentStep}`);
                  }
                 
                 // 실행 중인 테스트 업데이트 (백엔드 testId로 매칭)
                   setRunningTests(prev => {
                    const updatedTests = prev.map(test => {
                      if (test.backendTestId === backendTestId) {
-                       const newProgress = statusData.data?.progress !== undefined ? statusData.data.progress : test.progress;
                        const newCurrentStep = statusData.data?.currentStep || test.currentStep;
                        const newStatus = statusData.data?.status || test.status;
                        
                        const updatedTest = {
                          ...test,
-                         progress: newProgress,
                          currentStep: newCurrentStep,
                          status: newStatus
                        };
                        
                       //  console.log(`Test ${backendTestId} updated:`, {
-                      //    oldProgress: test.progress,
-                      //    newProgress: newProgress,
                       //    oldCurrentStep: test.currentStep,
                       //    newCurrentStep: newCurrentStep,
                       //    oldStatus: test.status,
@@ -973,116 +983,120 @@ export default function () {
     )
       return;
 
-    // 백엔드가 연결되어 있고 부하 테스트인 경우 k6 MCP 테스트 사용
-    if (backendConnected && selectedTestType === 'load') {
-      await handleK6MCPTest();
+    // 백엔드가 연결되어 있지 않으면 오류 메시지 표시
+    if (!backendConnected) {
+      alert('백엔드 서버에 연결할 수 없습니다. 서버 상태를 확인해주세요.');
       return;
     }
 
     setIsExecuting(true);
 
     try {
-      // 백엔드에 테스트 실행 요청
-      const result = await executeTest(
-        normalizedUrl,
-        selectedTestType,
-        testSettings[selectedTestType as keyof TestSettings],
-      );
+      // 모든 테스트 유형에 대해 k6 스크립트 생성
+      const k6Script = generateTestScript(normalizedUrl, selectedTestType, testSettings);
+      
+      // 백엔드 API를 사용한 테스트 실행
+      const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
+      
+      const response = await fetch(`${backendUrl}/api/load-tests/k6-mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: normalizedUrl,
+          name: testDescription || `${selectedTestType} Test - ${normalizedUrl}`,
+          description: testDescription,
+          script: k6Script,
+          config: {
+            duration: selectedTestType === 'load' ? testSettings.load.timeUnit : '30s',
+            vus: selectedTestType === 'load' ? testSettings.load.maxVUs : 10,
+            detailedConfig: {
+              testType: selectedTestType,
+              settings: testSettings[selectedTestType as keyof TestSettings]
+            }
+          }
+        }),
+      });
 
-      if (result.success && result.testId) {
+      if (response.ok) {
+        const result = await response.json();
+        console.log('백엔드 테스트 시작됨:', result);
+        
+        const backendTestId = result.data?.testId || result.data?.id;
+        const frontendTestId = Date.now();
+        
         const newTest: RunningTest = {
-          id: Date.now(),
+          id: frontendTestId,
+          backendTestId: backendTestId,
           url: normalizedUrl,
           type: selectedTestType,
-          progress: 0,
-          status: "실행중",
-          startTime: new Date().toLocaleTimeString(),
-          currentStep: "초기화 중...",
-          estimatedTime: "약 3분",
-          logs: [
-            `${new Date().toLocaleTimeString()} - 테스트 시작: ${normalizedUrl}`,
-          ],
-          settings:
-            testSettings[
-              selectedTestType as keyof TestSettings
-            ],
+          status: 'running',
+          startTime: new Date().toISOString(),
+          currentStep: '테스트 초기화 중...',
+          estimatedTime: '예상 시간 계산 중...',
+          logs: [`${selectedTestType} 테스트 시작: ${normalizedUrl}`],
+          settings: testSettings[selectedTestType as keyof TestSettings],
+          testStartTime: Date.now(),
         };
 
-        setRunningTests((prev) => [...prev, newTest]);
-
-        // 테스트 상태 폴링
-        const pollInterval = setInterval(async () => {
-          try {
-            const statusResult = await getTestStatus(
-              result.testId!,
-            );
-
-            if (statusResult.success && statusResult.data) {
-              const testData = statusResult.data;
-              const steps = getTestSteps(selectedTestType);
-              const currentStepIndex = Math.floor(
-                (testData.progress / 100) * steps.length,
-              );
-
-              setRunningTests((prev) =>
-                prev.map((test) =>
-                  test.id === newTest.id
-                    ? {
+        setRunningTests(prev => [...prev, newTest]);
+        
+        // 테스트 상태 폴링 시작
+        if (backendTestId) {
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusResponse = await fetch(`${backendUrl}/api/load-tests/${backendTestId}`);
+              if (statusResponse.ok) {
+                const statusData = await statusResponse.json();
+                
+                setRunningTests(prev => {
+                  const updatedTests = prev.map(test => {
+                    if (test.backendTestId === backendTestId) {
+                      const newCurrentStep = statusData.data?.currentStep || test.currentStep;
+                      const newStatus = statusData.data?.status || test.status;
+                      
+                      return {
                         ...test,
-                        progress: testData.progress,
-                        status:
-                          testData.status === "completed"
-                            ? "완료"
-                            : testData.status === "stopped"
-                              ? "중단됨"
-                              : testData.status === "failed"
-                                ? "실패"
-                                : "실행중",
-                        currentStep:
-                          testData.status === "completed"
-                            ? "완료"
-                            : testData.status === "stopped"
-                              ? "사용자에 의해 중단됨"
-                              : testData.status === "failed"
-                                ? "오류 발생"
-                                : steps[currentStepIndex] ||
-                                  "처리 중...",
-                        estimatedTime:
-                          testData.status === "completed" ||
-                          testData.status === "stopped"
-                            ? "완료"
-                            : "약 3분",
-                        logs: testData.logs || test.logs,
-                      }
-                    : test,
-                ),
-              );
-
-              // 테스트 완료되면 폴링 중지
-              if (
-                testData.status === "completed" ||
-                testData.status === "stopped" ||
-                testData.status === "failed"
-              ) {
-                clearInterval(pollInterval);
-                setIsExecuting(false);
-
-                // 폼 초기화
-                setTestUrl("");
-                setSelectedTestType("");
-                setTestDescription("");
+                        currentStep: newCurrentStep,
+                        status: newStatus
+                      };
+                    }
+                    return test;
+                  });
+                  
+                  return updatedTests;
+                });
+                
+                // 테스트 완료 시 폴링 중지
+                if (statusData.data?.status === 'completed' || statusData.data?.status === 'failed') {
+                  clearInterval(pollInterval);
+                  console.log('테스트 완료:', statusData.data);
+                  
+                  // 완료된 테스트를 실행 중 목록에서 제거
+                  setRunningTests(prev => prev.filter(test => test.backendTestId !== backendTestId));
+                  
+                  // 폼 초기화
+                  setTestUrl("");
+                  setSelectedTestType("");
+                  setTestDescription("");
+                  setIsExecuting(false);
+                }
               }
+            } catch (error) {
+              console.error('테스트 상태 확인 중 오류:', error);
             }
-          } catch (error) {
-            console.error("Error polling test status:", error);
-          }
-        }, 1000);
+          }, 3000);
+        }
       } else {
-        console.error("Failed to start test:", result.error);
+        const error = await response.json();
+        console.error('테스트 실행 실패:', error);
+        alert(`테스트 실행 실패: ${error.message || '알 수 없는 오류'}`);
         setIsExecuting(false);
       }
     } catch (error) {
-      console.error("Error starting test:", error);
+      console.error('테스트 실행 중 오류:', error);
+      alert('테스트 실행 중 오류가 발생했습니다.');
       setIsExecuting(false);
     }
   };
@@ -1103,7 +1117,7 @@ export default function () {
             ? {
                 ...test,
                 status: "중단됨",
-                progress: test.progress,
+
                 currentStep: "사용자에 의해 중단됨",
               }
             : test,
@@ -1114,11 +1128,7 @@ export default function () {
     }
   };
 
-  const getProgressColor = (progress: number) => {
-    if (progress === 100) return "#7886C7";
-    if (progress > 50) return "#A9B5DF";
-    return "#9BA8E8";
-  };
+
 
   const updateTestSetting = (
     testType: keyof TestSettings,
@@ -1913,6 +1923,164 @@ export default function () {
     }
   };
 
+  // 모든 테스트 유형에 대한 k6 스크립트 생성
+  const generateTestScript = (url: string, testType: string, settings: TestSettings): string => {
+    switch (testType) {
+      case 'load':
+        return generateK6Script(url, settings.load);
+      case 'performance':
+        return generatePerformanceScript(url, settings.performance);
+      case 'lighthouse':
+        return generateLighthouseScript(url, settings.lighthouse);
+      case 'security':
+        return generateSecurityScript(url, settings.security);
+      case 'accessibility':
+        return generateAccessibilityScript(url, settings.accessibility);
+      default:
+        return generateK6Script(url, settings.load);
+    }
+  };
+
+  // 성능 테스트 스크립트
+  const generatePerformanceScript = (url: string, settings: any): string => {
+    return `
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate } from 'k6/metrics';
+
+const errorRate = new Rate('errors');
+
+export const options = {
+  stages: [
+    { duration: '10s', target: 5 },
+    { duration: '20s', target: 10 },
+    { duration: '10s', target: 0 }
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<2000'],
+    errors: ['rate<0.1']
+  }
+};
+
+export default function () {
+  const response = http.get('${url}');
+  
+  check(response, {
+    'status is 200': (r) => r.status === 200,
+    'response time < 2000ms': (r) => r.timings.duration < 2000,
+  });
+  
+  errorRate.add(response.status !== 200);
+  sleep(1);
+}
+`;
+  };
+
+  // Lighthouse 테스트 스크립트
+  const generateLighthouseScript = (url: string, settings: any): string => {
+    return `
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate } from 'k6/metrics';
+
+const errorRate = new Rate('errors');
+
+export const options = {
+  stages: [
+    { duration: '10s', target: 3 },
+    { duration: '20s', target: 5 },
+    { duration: '10s', target: 0 }
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<5000'],
+    errors: ['rate<0.1']
+  }
+};
+
+export default function () {
+  const response = http.get('${url}');
+  
+  check(response, {
+    'status is 200': (r) => r.status === 200,
+    'response time < 5000ms': (r) => r.timings.duration < 5000,
+  });
+  
+  errorRate.add(response.status !== 200);
+  sleep(2);
+}
+`;
+  };
+
+  // 보안 테스트 스크립트
+  const generateSecurityScript = (url: string, settings: any): string => {
+    return `
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate } from 'k6/metrics';
+
+const errorRate = new Rate('errors');
+
+export const options = {
+  stages: [
+    { duration: '10s', target: 2 },
+    { duration: '20s', target: 3 },
+    { duration: '10s', target: 0 }
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<3000'],
+    errors: ['rate<0.1']
+  }
+};
+
+export default function () {
+  const response = http.get('${url}');
+  
+  check(response, {
+    'status is 200': (r) => r.status === 200,
+    'response time < 3000ms': (r) => r.timings.duration < 3000,
+  });
+  
+  errorRate.add(response.status !== 200);
+  sleep(3);
+}
+`;
+  };
+
+  // 접근성 테스트 스크립트
+  const generateAccessibilityScript = (url: string, settings: any): string => {
+    return `
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Rate } from 'k6/metrics';
+
+const errorRate = new Rate('errors');
+
+export const options = {
+  stages: [
+    { duration: '10s', target: 2 },
+    { duration: '20s', target: 3 },
+    { duration: '10s', target: 0 }
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<3000'],
+    errors: ['rate<0.1']
+  }
+};
+
+export default function () {
+  const response = http.get('${url}');
+  
+  check(response, {
+    'status is 200': (r) => r.status === 200,
+    'response time < 3000ms': (r) => r.timings.duration < 3000,
+  });
+  
+  errorRate.add(response.status !== 200);
+  sleep(3);
+}
+`;
+  };
+
   return (
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-8 mx-auto">
@@ -2148,24 +2316,7 @@ export default function () {
 
                   <div className="space-y-3">
                     {/* <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        진행률
-                      </span>
-                      <span className="font-medium text-primary">
-                        {test.progress}%
-                      </span>
-                    </div>
-                    <Progress
-                      value={test.progress}
-                      className="h-3"
-                      style={
-                        {
-                          background: "var(--background)",
-                          "--progress-foreground":
-                            getProgressColor(test.progress),
-                        } as any
-                      }
-                    /> */}
+
                     <div className="flex justify-between text-sm mt-2">
                       <span className="text-muted-foreground">
                         경과 시간
@@ -2177,7 +2328,7 @@ export default function () {
                     {/* 디버깅용 로그 */}
                     {/* {process.env.NODE_ENV === 'development' && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Debug: {test.backendTestId} - {test.progress}% - {test.currentStep} - {elapsedTime[test.id]}
+                        Debug: {test.backendTestId} - {test.currentStep} - {elapsedTime[test.id]}
                       </p>
                     )} */}
                   </div>

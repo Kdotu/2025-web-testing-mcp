@@ -49,7 +49,7 @@ npm run dev
 yarn dev
 ```
 
-애플리케이션이 http://localhost:3000에서 실행됩니다.
+애플리케이션이 http://localhost:3100에서 실행됩니다.
 
 ## 빌드
 
@@ -137,7 +137,7 @@ http {
         }
 
         location /api/ {
-            proxy_pass http://your-api-server:3001;
+            proxy_pass http://your-api-server:3101;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
         }

@@ -1,6 +1,7 @@
 import { LoadTestConfig, LoadTestResult } from '../types';
 import { join } from 'path';
 import { spawn } from 'child_process';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * k6 MCP 테스트 실행 서비스
@@ -14,18 +15,24 @@ export class K6Service {
   }
 
   /**
-   * k6 테스트 실행 (MCP 방식)
+   * k6 테스트 실행
    */
   async executeTest(testId: string, config: LoadTestConfig): Promise<void> {
     try {
+      // 테스트 시작 시 상태를 running으로 설정
+      this.runningTests.set(testId, { status: 'running', startTime: new Date() });
+      
       // k6 스크립트 생성
       const scriptPath = await this.generateK6Script(testId, config);
       
       // MCP 서버를 통해 k6 실행
       const result = await this.executeK6ViaMCP(scriptPath, config);
+      console.log('k6 result:', result);
       
       // 결과 처리
-      this.parseK6Output(testId, result);
+      this.parseK6Output(testId, result, config);
+      
+      // 테스트 완료 시 상태 업데이트
       this.handleTestCompletion(testId, 'completed');
 
     } catch (error) {
@@ -41,13 +48,13 @@ export class K6Service {
   private async executeK6ViaMCP(scriptPath: string, config: LoadTestConfig): Promise<string> {
     return new Promise((resolve, reject) => {
       console.log(`Executing k6 test: ${scriptPath}`);
-      console.log(`Config: duration=${config.duration}, vus=${config.vus}`);
+      console.log(`Config: duration=${(config as any).duration}, vus=${(config as any).vus}`);
       
       // k6 명령어 직접 실행
       const k6Process = spawn('k6', [
         'run',
-        '--duration', config.duration || '30s',
-        '--vus', String(config.vus || 10),
+        '--duration', (config as any).duration || '30s',
+        '--vus', String((config as any).vus || 10),
         scriptPath
       ], {
         env: {
@@ -83,7 +90,7 @@ export class K6Service {
 
       k6Process.on('error', (error) => {
         console.error('k6 process error:', error);
-        reject(new Error(`k6 process error: ${error.message}`));
+        reject(error);
       });
     });
   }
@@ -159,17 +166,29 @@ export default function () {
   }
 
   /**
-   * k6 출력 파싱 및 DB 저장
+   * k6 출력 파싱 및 저장
    */
-  private parseK6Output(testId: string, output: string): void {
+  private parseK6Output(testId: string, output: string, config?: LoadTestConfig): void {
     console.log('Parsing k6 output for testId:', testId);
+    console.log('Output length:', output.length);
+    console.log('Config:', config);
     
-    // k6 출력에서 메트릭 추출
-    const metrics = this.extractMetrics(output);
-    const summary = this.extractSummary(output);
-    
-    // DB에 결과 저장
-    this.saveTestResult(testId, metrics, summary);
+    try {
+      // 메트릭 추출
+      const metrics = this.extractMetrics(output);
+      const summary = this.extractSummary(output);
+      
+      // 상세 메트릭 파싱 및 저장
+      const detailedMetrics = this.extractDetailedMetrics(output);
+      
+      // DB에 저장 (raw_data 포함, 설정 정보 전달)
+      this.saveTestResult(testId, metrics, summary, output, config);
+      this.saveDetailedMetrics(testId, detailedMetrics);
+      
+      console.log('k6 output parsed and saved to DB');
+    } catch (error) {
+      console.error('Failed to parse k6 output:', error);
+    }
   }
 
   /**
@@ -275,6 +294,467 @@ export default function () {
   }
 
   /**
+   * 상세 메트릭 추출
+   */
+  private extractDetailedMetrics(output: string): any {
+    const metrics: any = {};
+    
+    try {
+      // HTTP 메트릭 파싱
+      const httpDurationMatch = output.match(/http_req_duration.*?: avg=([\d.]+)ms min=([\d.]+)ms med=([\d.]+)ms max=([\d.]+)ms p\(90\)=([\d.]+)ms p\(95\)=([\d.]+)ms/);
+      if (httpDurationMatch && httpDurationMatch[1] && httpDurationMatch[2] && httpDurationMatch[3] && httpDurationMatch[4] && httpDurationMatch[5] && httpDurationMatch[6]) {
+        metrics.http_req_duration_avg = parseFloat(httpDurationMatch[1]);
+        metrics.http_req_duration_min = parseFloat(httpDurationMatch[2]);
+        metrics.http_req_duration_med = parseFloat(httpDurationMatch[3]);
+        metrics.http_req_duration_max = parseFloat(httpDurationMatch[4]);
+        metrics.http_req_duration_p90 = parseFloat(httpDurationMatch[5]);
+        metrics.http_req_duration_p95 = parseFloat(httpDurationMatch[6]);
+      }
+      
+      // HTTP 요청 실패율
+      const httpFailedMatch = output.match(/http_req_failed.*?: ([\d.]+)%/);
+      if (httpFailedMatch && httpFailedMatch[1]) {
+        metrics.http_req_failed_rate = parseFloat(httpFailedMatch[1]);
+      }
+      
+      // HTTP 요청 수
+      const httpReqsMatch = output.match(/http_reqs.*?: (\d+)\s+([\d.]+)\/s/);
+      if (httpReqsMatch && httpReqsMatch[1] && httpReqsMatch[2]) {
+        metrics.http_reqs_total = parseInt(httpReqsMatch[1]);
+        metrics.http_reqs_rate = parseFloat(httpReqsMatch[2]);
+      }
+      
+      // 체크 메트릭
+      const checksTotalMatch = output.match(/checks_total.*?: (\d+)/);
+      const checksSucceededMatch = output.match(/checks_succeeded.*?: ([\d.]+)% (\d+) out of (\d+)/);
+      const checksFailedMatch = output.match(/checks_failed.*?: ([\d.]+)% (\d+) out of (\d+)/);
+      
+      if (checksTotalMatch && checksTotalMatch[1]) {
+        metrics.checks_total = parseInt(checksTotalMatch[1]);
+      }
+      if (checksSucceededMatch && checksSucceededMatch[1] && checksSucceededMatch[2]) {
+        metrics.checks_succeeded_rate = parseFloat(checksSucceededMatch[1]);
+        metrics.checks_succeeded = parseInt(checksSucceededMatch[2]);
+      }
+      if (checksFailedMatch && checksFailedMatch[2]) {
+        metrics.checks_failed = parseInt(checksFailedMatch[2]);
+      }
+      
+      // 실행 메트릭
+      const iterationsMatch = output.match(/iterations.*?: (\d+)\s+([\d.]+)\/s/);
+      if (iterationsMatch && iterationsMatch[1] && iterationsMatch[2]) {
+        metrics.iterations_total = parseInt(iterationsMatch[1]);
+        metrics.iterations_rate = parseFloat(iterationsMatch[2]);
+      }
+      
+      const iterationDurationMatch = output.match(/iteration_duration.*?: avg=([\d.]+)s\s+min=([\d.]+)s\s+med=([\d.]+)s\s+max=([\d.]+)s\s+p\(90\)=([\d.]+)s\s+p\(95\)=([\d.]+)s/);
+      if (iterationDurationMatch && iterationDurationMatch[1] && iterationDurationMatch[2] && iterationDurationMatch[3] && iterationDurationMatch[4] && iterationDurationMatch[5] && iterationDurationMatch[6]) {
+        metrics.iteration_duration_avg = parseFloat(iterationDurationMatch[1]);
+        metrics.iteration_duration_min = parseFloat(iterationDurationMatch[2]);
+        metrics.iteration_duration_med = parseFloat(iterationDurationMatch[3]);
+        metrics.iteration_duration_max = parseFloat(iterationDurationMatch[4]);
+        metrics.iteration_duration_p90 = parseFloat(iterationDurationMatch[5]);
+        metrics.iteration_duration_p95 = parseFloat(iterationDurationMatch[6]);
+      }
+      
+      // VU 메트릭
+      const vusMatch = output.match(/vus.*?: (\d+)\s+min=(\d+)\s+max=(\d+)/);
+      if (vusMatch && vusMatch[1] && vusMatch[2] && vusMatch[3]) {
+        metrics.vus_avg = parseInt(vusMatch[1]);
+        metrics.vus_min = parseInt(vusMatch[2]);
+        metrics.vus_max = parseInt(vusMatch[3]);
+      }
+      
+      // 네트워크 메트릭
+      const dataReceivedMatch = output.match(/data_received.*?: ([\d.]+) (MB|KB)\s+([\d.]+) (MB|KB)\/s/);
+      if (dataReceivedMatch && dataReceivedMatch[1] && dataReceivedMatch[2] && dataReceivedMatch[3] && dataReceivedMatch[4]) {
+        const size = parseFloat(dataReceivedMatch[1]);
+        const unit = dataReceivedMatch[2];
+        const rate = parseFloat(dataReceivedMatch[3]);
+        const rateUnit = dataReceivedMatch[4];
+        
+        // MB를 바이트로 변환
+        if (unit === 'MB') {
+          metrics.data_received_bytes = Math.round(size * 1024 * 1024);
+        } else if (unit === 'KB') {
+          metrics.data_received_bytes = Math.round(size * 1024);
+        }
+        
+        if (rateUnit === 'MB') {
+          metrics.data_received_rate = rate * 1024 * 1024;
+        } else if (rateUnit === 'KB') {
+          metrics.data_received_rate = rate * 1024;
+        }
+      }
+      
+      const dataSentMatch = output.match(/data_sent.*?: ([\d.]+) (MB|KB)\s+([\d.]+) (MB|KB|B)\/s/);
+      if (dataSentMatch && dataSentMatch[1] && dataSentMatch[2] && dataSentMatch[3] && dataSentMatch[4]) {
+        const size = parseFloat(dataSentMatch[1]);
+        const unit = dataSentMatch[2];
+        const rate = parseFloat(dataSentMatch[3]);
+        const rateUnit = dataSentMatch[4];
+        
+        if (unit === 'MB') {
+          metrics.data_sent_bytes = Math.round(size * 1024 * 1024);
+        } else if (unit === 'KB') {
+          metrics.data_sent_bytes = Math.round(size * 1024);
+        }
+        
+        if (rateUnit === 'MB') {
+          metrics.data_sent_rate = rate * 1024 * 1024;
+        } else if (rateUnit === 'KB') {
+          metrics.data_sent_rate = rate * 1024;
+        } else if (rateUnit === 'B') {
+          metrics.data_sent_rate = rate;
+        }
+      }
+      
+      // 커스텀 메트릭 (errors)
+      const errorsMatch = output.match(/errors.*?: ([\d.]+)% (\d+) out of (\d+)/);
+      if (errorsMatch && errorsMatch[1] && errorsMatch[2]) {
+        metrics.errors_rate = parseFloat(errorsMatch[1]);
+        metrics.errors_total = parseInt(errorsMatch[2]);
+      }
+      
+      // 임계값 결과 파싱
+      const thresholdResults = this.parseThresholdResults(output);
+      metrics.threshold_results = thresholdResults;
+      metrics.thresholds_passed = thresholdResults?.passed || 0;
+      metrics.thresholds_failed = thresholdResults?.failed || 0;
+      
+    } catch (error) {
+      console.error('Failed to extract detailed metrics:', error);
+    }
+    
+    return metrics;
+  }
+
+  /**
+   * 임계값 결과 파싱
+   */
+  private parseThresholdResults(output: string): any {
+    const results: any = { passed: 0, failed: 0, details: {} };
+    
+    try {
+      // THRESHOLDS 섹션 찾기
+      const thresholdsSection = output.match(/█ THRESHOLDS([\s\S]*?)(?=█|$)/);
+      if (thresholdsSection && thresholdsSection[1]) {
+        const thresholdLines = thresholdsSection[1].split('\n');
+        
+        for (const line of thresholdLines) {
+          const trimmedLine = line.trim();
+          if (trimmedLine && !trimmedLine.startsWith('█')) {
+            // ✓ 또는 ✗ 기호로 통과/실패 확인
+            if (trimmedLine.includes('✓')) {
+              results.passed++;
+              const metricName = trimmedLine.match(/^\s*([^\s]+)/)?.[1];
+              if (metricName) {
+                results.details[metricName] = { status: 'passed', value: trimmedLine };
+              }
+            } else if (trimmedLine.includes('✗')) {
+              results.failed++;
+              const metricName = trimmedLine.match(/^\s*([^\s]+)/)?.[1];
+              if (metricName) {
+                results.details[metricName] = { status: 'failed', value: trimmedLine };
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse threshold results:', error);
+    }
+    
+    return results;
+  }
+
+  /**
+   * 상세 메트릭을 DB에 저장 (단순화된 구조)
+   */
+  private async saveDetailedMetrics(testId: string, metrics: any): Promise<void> {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      
+      const supabaseUrl = process.env['SUPABASE_URL'];
+      const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+      
+      if (!supabaseUrl || !supabaseKey) {
+        console.error('Supabase credentials not found');
+        return;
+      }
+      
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      // 메트릭을 key-value 형태로 변환하여 저장
+      const metricRecords = this.convertMetricsToRecords(testId, metrics);
+      
+      if (metricRecords.length > 0) {
+        const { error: dbError } = await supabase
+          .from('m2_test_metrics')
+          .insert(metricRecords);
+        
+        if (dbError) {
+          console.error('Failed to save detailed metrics to database:', dbError);
+        } else {
+          console.log(`Successfully saved ${metricRecords.length} metric records to DB for test:`, testId);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save detailed metrics:', error);
+    }
+  }
+
+  /**
+   * 메트릭을 key-value 형태의 레코드로 변환
+   */
+  private convertMetricsToRecords(testId: string, metrics: any): any[] {
+    const records: any[] = [];
+    const now = new Date().toISOString();
+    
+    // HTTP 메트릭
+    if (metrics.http_req_duration_avg !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_duration_avg',
+        value: metrics.http_req_duration_avg,
+        unit: 'ms',
+        description: 'HTTP 요청 평균 응답 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.http_req_duration_p95 !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_duration_p95',
+        value: metrics.http_req_duration_p95,
+        unit: 'ms',
+        description: 'HTTP 요청 95퍼센타일 응답 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.http_req_failed_rate !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_failed_rate',
+        value: metrics.http_req_failed_rate,
+        unit: '%',
+        description: 'HTTP 요청 실패율',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.http_reqs_total !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'reqs_total',
+        value: metrics.http_reqs_total,
+        unit: 'count',
+        description: '총 HTTP 요청 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.http_reqs_rate !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'reqs_rate',
+        value: metrics.http_reqs_rate,
+        unit: 'req/s',
+        description: 'HTTP 요청 속도',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // 체크 메트릭
+    if (metrics.checks_total !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'checks',
+        metric_name: 'total',
+        value: metrics.checks_total,
+        unit: 'count',
+        description: '총 체크 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.checks_succeeded !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'checks',
+        metric_name: 'succeeded',
+        value: metrics.checks_succeeded,
+        unit: 'count',
+        description: '성공한 체크 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.checks_succeeded_rate !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'checks',
+        metric_name: 'succeeded_rate',
+        value: metrics.checks_succeeded_rate,
+        unit: '%',
+        description: '체크 성공률',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // 실행 메트릭
+    if (metrics.iterations_total !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'execution',
+        metric_name: 'iterations_total',
+        value: metrics.iterations_total,
+        unit: 'count',
+        description: '총 반복 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.iterations_rate !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'execution',
+        metric_name: 'iterations_rate',
+        value: metrics.iterations_rate,
+        unit: 'iter/s',
+        description: '반복 속도',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.iteration_duration_avg !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'execution',
+        metric_name: 'duration_avg',
+        value: metrics.iteration_duration_avg,
+        unit: 's',
+        description: '평균 반복 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // VU 메트릭
+    if (metrics.vus_avg !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'vus',
+        metric_name: 'avg',
+        value: metrics.vus_avg,
+        unit: 'count',
+        description: '평균 가상 사용자 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.vus_min !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'vus',
+        metric_name: 'min',
+        value: metrics.vus_min,
+        unit: 'count',
+        description: '최소 가상 사용자 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.vus_max !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'vus',
+        metric_name: 'max',
+        value: metrics.vus_max,
+        unit: 'count',
+        description: '최대 가상 사용자 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // 네트워크 메트릭
+    if (metrics.data_received_bytes !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'network',
+        metric_name: 'data_received_bytes',
+        value: metrics.data_received_bytes,
+        unit: 'bytes',
+        description: '수신된 데이터량',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.data_sent_bytes !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'network',
+        metric_name: 'data_sent_bytes',
+        value: metrics.data_sent_bytes,
+        unit: 'bytes',
+        description: '송신된 데이터량',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // 임계값 메트릭
+    if (metrics.thresholds_passed !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'thresholds',
+        metric_name: 'passed',
+        value: metrics.thresholds_passed,
+        unit: 'count',
+        description: '통과한 임계값 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.thresholds_failed !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'thresholds',
+        metric_name: 'failed',
+        value: metrics.thresholds_failed,
+        unit: 'count',
+        description: '실패한 임계값 수',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    return records;
+  }
+
+  /**
    * k6 실시간 진행률 파싱 (최적화)
    */
   private parseK6Progress(testId: string, output: string): void {
@@ -332,7 +812,7 @@ export default function () {
         }
         
         // progress가 변경된 경우에만 업데이트
-        this.updateTestProgress(testId, progress, currentStep);
+        this.updateTestProgress(testId, currentStep);
       }
     } catch (error) {
       console.error('Failed to parse k6 progress:', error);
@@ -340,41 +820,11 @@ export default function () {
   }
 
   /**
-   * 테스트 진행률을 DB에 업데이트 (최적화)
+   * 테스트 진행률 업데이트 (progress 제거)
    */
-  private async updateTestProgress(testId: string, progress: number, currentStep: string): Promise<void> {
+  private async updateTestProgress(testId: string, currentStep: string): Promise<void> {
     try {
-      const { TestResultService } = await import('../services/test-result-service');
-      const testResultService = new TestResultService();
-      
-      const existingResult = await testResultService.getResultByTestId(testId);
-      
-      if (existingResult) {
-        // progress가 변경된 경우에만 업데이트
-        if (existingResult.progress !== progress || existingResult.currentStep !== currentStep) {
-          const updatedResult = {
-            ...existingResult,
-            progress: progress,
-            currentStep: currentStep,
-            status: 'running' as const,
-            updatedAt: new Date().toISOString()
-          };
-          
-          await testResultService.updateResult(updatedResult);
-          console.log(`Test progress updated: ${testId} - ${progress}% - ${currentStep}`);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update test progress:', error);
-    }
-  }
-
-  /**
-   * 테스트 결과를 DB에 저장
-   */
-  private async saveTestResult(testId: string, metrics: Partial<LoadTestResult['metrics']>, summary: Partial<LoadTestResult['summary']>): Promise<void> {
-    try {
-      // TestResultService를 통해 DB에 저장
+      // TestResultService를 통해 DB에 업데이트
       const { TestResultService } = await import('../services/test-result-service');
       const testResultService = new TestResultService();
       
@@ -383,14 +833,128 @@ export default function () {
       if (existingResult) {
         const updatedResult = {
           ...existingResult,
-          metrics: { ...existingResult.metrics, ...metrics },
-          summary: { ...existingResult.summary, ...summary },
-          status: 'completed' as const,
+          currentStep: currentStep,
           updatedAt: new Date().toISOString()
         };
         
         await testResultService.updateResult(updatedResult);
-        console.log('Test result saved to DB:', testId);
+      }
+    } catch (error) {
+      console.error('Failed to update test progress:', error);
+    }
+  }
+
+  /**
+   * k6 출력에서 raw_data 추출 (타임스탬프 및 설정 정보 추가)
+   */
+  private extractRawData(output: string, config?: LoadTestConfig): string {
+    // 현재 시간을 한국 시간으로 포맷팅
+    const now = new Date();
+    const koreanTime = now.toLocaleString('ko-KR', { 
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).replace(/\./g, '-').replace(/\s/g, ' ');
+
+    const timestampLine = `====TEST START DATE ${koreanTime}====\n\n`;
+    
+    // 설정 정보 추가
+    let configInfo = '';
+    if (config) {
+      configInfo = `------------------------------------\n-------TEST CONFIG-------\n`;
+      configInfo += `Duration: ${(config as any).duration || '30s'}\n`;
+      configInfo += `Virtual Users: ${(config as any).vus || 10}\n`;
+      if ((config as any).detailedConfig) {
+        configInfo += `Test Type: ${(config as any).detailedConfig.testType || 'load'}\n`;
+        if ((config as any).detailedConfig.settings) {
+          configInfo += `Settings: ${JSON.stringify((config as any).detailedConfig.settings, null, 2)}\n`;
+        }
+      }
+      configInfo += `------------------------------------\n\n`;
+    }
+    
+    // k6 result 부분 찾기
+    const startIndex = output.indexOf('k6 result:');
+    if (startIndex === -1) {
+      // k6 result가 없으면 전체 출력에 타임스탬프와 설정 정보 추가
+      return timestampLine + configInfo + output;
+    }
+    
+    return timestampLine + configInfo + output.substring(startIndex);
+  }
+
+  /**
+   * 테스트 결과를 DB에 저장
+   */
+  private async saveTestResult(testId: string, metrics: Partial<LoadTestResult['metrics']>, summary: Partial<LoadTestResult['summary']>, rawData: string, config?: LoadTestConfig): Promise<void> {
+    try {
+      console.log('saveTestResult called with testId:', testId);
+      console.log('rawData length:', rawData.length);
+      console.log('config:', config);
+      
+      // TestResultService를 통해 DB에 저장
+      const { TestResultService } = await import('../services/test-result-service');
+      const testResultService = new TestResultService();
+      
+      const existingResult = await testResultService.getResultByTestId(testId);
+      console.log('existingResult found:', !!existingResult);
+      
+      if (existingResult) {
+        const extractedRawData = this.extractRawData(rawData, config);
+        console.log('extractedRawData length:', extractedRawData.length);
+        
+        const updatedResult = {
+          ...existingResult,
+          metrics: { ...existingResult.metrics, ...metrics },
+          summary: { ...existingResult.summary, ...summary },
+          raw_data: extractedRawData,
+          status: 'completed' as const, // 테스트 완료 시에만 completed로 설정
+          updatedAt: new Date().toISOString()
+        };
+        
+        await testResultService.updateResult(updatedResult);
+        console.log('Test result updated in DB:', testId);
+      } else {
+        console.error('No existing result found for testId:', testId);
+        // existingResult가 없어도 raw_data를 저장하기 위해 새로운 결과 생성
+        const extractedRawData = this.extractRawData(rawData, config);
+        console.log('Creating new result with raw_data, length:', extractedRawData.length);
+        
+        const newResult: LoadTestResult = {
+          id: uuidv4(),
+          testId,
+          testType: 'load',
+          url: config?.url || '',
+          name: config?.name || 'k6 Test',
+          status: 'completed', // 테스트 완료 시에만 completed로 설정
+          metrics: {
+            http_req_duration: { avg: 0, min: 0, max: 0, p95: 0 },
+            http_req_rate: 0,
+            http_req_failed: 0,
+            vus: 0,
+            vus_max: 0,
+            ...metrics
+          },
+          summary: {
+            totalRequests: 0,
+            successfulRequests: 0,
+            failedRequests: 0,
+            duration: 0,
+            startTime: new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            ...summary
+          },
+          raw_data: extractedRawData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        await testResultService.saveResult(newResult);
+        console.log('New test result saved in DB:', testId);
       }
     } catch (error) {
       console.error('Failed to save test result to DB:', error);

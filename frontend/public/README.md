@@ -59,10 +59,10 @@ public/
 npm run dev
 
 # 예시 파일들은 브라우저에서 직접 접근 가능
-# http://localhost:3000/examples/dashboard.html
-# http://localhost:3000/examples/test-execution.html  
-# http://localhost:3000/examples/test-results.html
-# http://localhost:3000/examples/settings.html
+# http://localhost:3100/examples/dashboard.html
+# http://localhost:3100/examples/test-execution.html  
+# http://localhost:3100/examples/test-results.html
+# http://localhost:3100/examples/settings.html
 ```
 
 ## 🎨 디자인 특징

@@ -85,12 +85,10 @@ export class LoadTestController {
     console.log(`Found test result:`, {
       id: result.id,
       status: result.status,
-      progress: result.progress,
       currentStep: result.currentStep
     });
 
-    // DB에서 저장된 진행률과 현재 단계 사용
-    let progress = result.progress || 0;
+    // DB에서 저장된 현재 단계 사용
     let currentStep = result.currentStep || '테스트 준비 중...';
     
     if (result.status === 'running') {
@@ -98,31 +96,20 @@ export class LoadTestController {
       const isRunning = this.k6Service.isTestRunning(testId);
       console.log(`k6 service isRunning for ${testId}:`, isRunning);
       
-      if (!isRunning && progress === 0) {
-        // 아직 시작되지 않은 경우
-        progress = 0;
-        currentStep = '테스트 준비 중...';
+      if (!isRunning) {
+        // k6 서비스에서 실행 중이 아니면 상태를 업데이트
+        await this.updateTestStatus(testId, 'completed', 'Test completed');
+        currentStep = '테스트 완료';
       }
-      // 이미 DB에 저장된 progress와 currentStep 사용
-    } else if (result.status === 'completed') {
-      progress = 100;
-      currentStep = '테스트 완료';
-    } else if (result.status === 'failed') {
-      progress = 100;
-      currentStep = '테스트 실패';
     }
 
-    const response = {
+    return {
       testId,
       status: result.status,
-      progress,
-      currentStep,
+      currentStep: currentStep,
       message: `Test ${result.status}`,
       timestamp: new Date().toISOString()
     };
-    
-    console.log(`Test status response for ${testId}:`, response);
-    return response;
   }
 
   /**
@@ -199,6 +186,7 @@ export class LoadTestController {
     config: {
       duration: string;
       vus: number;
+      detailedConfig?: any; // 상세 설정 추가
     };
   }): Promise<LoadTestResult> {
     const testId = uuidv4();
@@ -216,20 +204,18 @@ export class LoadTestController {
     const scriptPath = path.join(tempDir, `${testId}.js`);
     fs.writeFileSync(scriptPath, params.script);
 
-    // 초기 테스트 결과 생성
+    // 초기 테스트 결과 생성 (설정값 포함)
     const initialResult: LoadTestResult = {
       id: uuidv4(),
       testId,
       testType: 'load', // 부하테스트로 설정
       url: params.url,
+      name: params.name,
+      ...(params.description && { description: params.description }), // 조건부로 추가
       config: {
-        id: testId,
-        url: params.url,
-        name: params.name,
-        description: params.description,
-        stages: [], // k6 MCP에서는 stages를 직접 사용하지 않음
-        createdAt: now,
-        updatedAt: now
+        duration: params.config.duration,
+        vus: params.config.vus,
+        detailedConfig: params.config.detailedConfig || {}
       },
       status: 'running',
       metrics: {
@@ -254,7 +240,7 @@ export class LoadTestController {
     // 데이터베이스에 저장
     await this.testResultService.saveResult(initialResult);
 
-    // k6 MCP 테스트 실행 (비동기) - URL 정보 포함
+    // k6 MCP 테스트 실행 (비동기) - 올바른 config 전달
     this.executeK6MCPTestAsync(testId, scriptPath, params.config, params.url).catch(error => {
       console.error('k6 MCP test execution failed:', error);
       this.updateTestStatus(testId, 'failed', 'k6 MCP test execution failed');
@@ -269,22 +255,25 @@ export class LoadTestController {
   private async executeK6MCPTestAsync(
     testId: string, 
     _scriptPath: string, 
-    _config: { duration: string; vus: number },
+    config: { duration: string; vus: number; detailedConfig?: any },
     url: string
   ): Promise<void> {
     try {
-      // k6 서비스를 통해 MCP 테스트 실행 (URL 포함)
+      // k6 서비스를 통해 MCP 테스트 실행 (올바른 config 구조 전달)
       await this.k6Service.executeTest(testId, {
         id: testId,
-        url: url, // 실제 URL 전달
+        url: url,
         name: 'k6 MCP Test',
+        duration: config.duration,
+        vus: config.vus,
+        detailedConfig: config.detailedConfig,
         stages: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       } as any);
 
-      // 성공 시 상태 업데이트
-      await this.updateTestStatus(testId, 'completed', 'k6 MCP test completed successfully');
+      // 테스트가 성공적으로 완료되었을 때만 completed 상태로 업데이트
+      console.log('k6 test completed successfully, updating status to completed');
     } catch (error) {
       console.error('k6 MCP test execution error:', error);
       await this.updateTestStatus(testId, 'failed', 'k6 MCP test execution failed');

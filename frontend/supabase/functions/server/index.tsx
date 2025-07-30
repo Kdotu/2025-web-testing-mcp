@@ -8,7 +8,7 @@ const app = new Hono();
 
 // CORS 설정
 app.use('*', cors({
-  origin: ['http://localhost:3000', 'https://ihubdmrqggwusivtopsi.supabase.co'],
+  origin: ['http://localhost:3100', 'https://ihubdmrqggwusivtopsi.supabase.co'],
   credentials: true,
 }));
 

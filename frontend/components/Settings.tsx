@@ -191,7 +191,7 @@ export function Settings({ onNavigate }: SettingsProps) {
                 </div>
                 <Dialog open={isAddingTestType} onOpenChange={setIsAddingTestType}>
                   <DialogTrigger asChild>
-                    <Button className="neu-accent rounded-xl px-6 py-3 text-primary-foreground font-semibold">
+                    <Button className="neu-accent rounded-xl px-6 py-3 text-primary-foreground font-semibold" disabled>
                       <Plus className="h-5 w-5 mr-2" />
                       테스트 타입 추가
                     </Button>

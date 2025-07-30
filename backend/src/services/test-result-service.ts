@@ -42,49 +42,85 @@ export class TestResultService {
   }
 
   /**
-   * 테스트 결과 저장
+   * 결과를 DB 행에서 파싱
+   */
+  private parseResultFromRow(row: any): LoadTestResult {
+    return {
+      id: row.id,
+      testId: row.test_id,
+      testType: row.test_type,
+      url: row.url,
+      name: row.name,
+      description: row.description, // description 필드 추가
+      status: row.status,
+      currentStep: row.current_step,
+      metrics: row.metrics || {},
+      summary: row.summary || {},
+      details: row.details || {},
+      config: row.config || {}, // config 필드 추가
+      raw_data: row.raw_data, // raw_data 필드 추가
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  /**
+   * 결과 저장 (최초 insert)
    */
   async saveResult(result: LoadTestResult): Promise<void> {
-    const { error } = await this.serviceClient
+    const { error } = await this.supabaseClient
       .from('m2_test_results')
-      .insert({
-        id: result.id,
+      .insert([{
         test_id: result.testId,
-        test_type: result.testType || 'load', // 기본값은 load
+        name: result.name,
+        description: result.description, // description 저장
         url: result.url,
-        config: result.config,
         status: result.status,
-        metrics: result.metrics,
+        test_type: result.testType,
+        current_step: result.currentStep,
         summary: result.summary,
-        raw_data: result.rawData,
-        created_at: result.createdAt,
-        updated_at: result.updatedAt
-      });
+        metrics: result.metrics,
+        details: result.details,
+        config: result.config, // config 저장
+        raw_data: result.raw_data // raw_data 저장
+      }]);
 
     if (error) {
       console.error('Failed to save test result:', error);
-      throw new Error('Failed to save test result');
+      throw error;
     }
   }
 
   /**
-   * 테스트 결과 업데이트
+   * 결과 업데이트 (기존 레코드 업데이트)
    */
   async updateResult(result: LoadTestResult): Promise<void> {
-    const { error } = await this.serviceClient
+    console.log('updateResult called with testId:', result.testId);
+    console.log('raw_data length:', result.raw_data?.length || 0);
+    
+    const { error } = await this.supabaseClient
       .from('m2_test_results')
       .update({
+        name: result.name,
+        description: result.description, // description 업데이트
+        url: result.url,
         status: result.status,
-        metrics: result.metrics,
+        test_type: result.testType,
+        current_step: result.currentStep,
         summary: result.summary,
-        raw_data: result.rawData,
-        updated_at: result.updatedAt
+        metrics: result.metrics,
+        details: result.details,
+        config: result.config, // config 업데이트
+        raw_data: result.raw_data, // raw_data 업데이트
+        updated_at: new Date().toISOString()
       })
-      .eq('id', result.id);
+      .eq('test_id', result.testId);
 
     if (error) {
       console.error('Failed to update test result:', error);
-      throw new Error('Failed to update test result');
+      throw error;
+    } else {
+      console.log('Test result updated successfully in DB');
     }
   }
 
@@ -237,25 +273,6 @@ export class TestResultService {
       failedTests: failedTests || 0,
       averageResponseTime,
       averageErrorRate
-    };
-  }
-
-  /**
-   * 행 데이터를 LoadTestResult로 파싱
-   */
-  private parseResultFromRow(row: any): LoadTestResult {
-    return {
-      id: row.id,
-      testId: row.test_id,
-      testType: row.test_type,
-      url: row.url,
-      config: row.config,
-      status: row.status,
-      metrics: row.metrics,
-      summary: row.summary,
-      rawData: row.raw_data,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
     };
   }
 } 

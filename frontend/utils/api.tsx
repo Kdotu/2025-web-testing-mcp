@@ -592,7 +592,7 @@ export const getTestTypes = async () => {
   ];
 
   // 백엔드 API URL (환경변수에서 가져오거나 기본값 사용)
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types`, {
@@ -654,7 +654,7 @@ export const updateTestTypes = async (testTypes: any[]) => {
 };
 
 export const addTestType = async (testType: any) => {
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types`, {
@@ -678,7 +678,7 @@ export const addTestType = async (testType: any) => {
 };
 
 export const updateTestType = async (id: string, testType: any) => {
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {
@@ -702,7 +702,7 @@ export const updateTestType = async (id: string, testType: any) => {
 };
 
 export const deleteTestType = async (id: string) => {
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3001';
+  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {

@@ -1,7 +1,7 @@
 import { LoadTestConfig, LoadTestResult, ApiResponse } from '../../backend/src/types';
 
 // 백엔드 API 기본 URL
-const BACKEND_API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const BACKEND_API_BASE_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
 
 // API 응답 타입
 interface BackendApiResponse<T = any> {
@@ -30,6 +30,7 @@ class BackendApiClient {
     options: RequestInit = {}
   ): Promise<BackendApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
+    console.log('BackendApiClient: Making request to', url);
     
     const defaultOptions: RequestInit = {
       headers: {
@@ -44,11 +45,14 @@ class BackendApiClient {
         ...options,
       });
 
+      console.log('BackendApiClient: Response status:', response.status);
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('BackendApiClient: Response data:', data);
       return data;
     } catch (error: any) {
       console.error(`API 요청 실패 (${endpoint}):`, error);
@@ -64,7 +68,10 @@ class BackendApiClient {
    * 헬스 체크
    */
   async checkHealth(): Promise<BackendApiResponse> {
-    return this.request('/health');
+    console.log('BackendApiClient: Checking health at', this.baseUrl);
+    const result = await this.request('/health');
+    console.log('BackendApiClient: Health check result:', result);
+    return result;
   }
 
   /**
@@ -225,7 +232,7 @@ export const getEnabledTestTypes = async (): Promise<{ success: boolean; data?: 
  */
 export const addTestType = async (testType: Omit<TestType, 'created_at' | 'updated_at'>): Promise<{ success: boolean; data?: TestType; error?: string }> => {
   try {
-    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types`, {
+    const response = await fetch(`${BACKEND_API_BASE_URL}/api/test-types`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -250,7 +257,7 @@ export const addTestType = async (testType: Omit<TestType, 'created_at' | 'updat
  */
 export const updateTestType = async (id: string, updates: Partial<TestType>): Promise<{ success: boolean; data?: TestType; error?: string }> => {
   try {
-    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/${id}`, {
+    const response = await fetch(`${BACKEND_API_BASE_URL}/api/test-types/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -275,7 +282,7 @@ export const updateTestType = async (id: string, updates: Partial<TestType>): Pr
  */
 export const deleteTestType = async (id: string): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/${id}`, {
+    const response = await fetch(`${BACKEND_API_BASE_URL}/api/test-types/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -299,7 +306,7 @@ export const deleteTestType = async (id: string): Promise<{ success: boolean; er
  */
 export const toggleTestType = async (id: string, enabled: boolean): Promise<{ success: boolean; data?: TestType; error?: string }> => {
   try {
-    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/${id}/toggle`, {
+    const response = await fetch(`${BACKEND_API_BASE_URL}/api/test-types/${id}/toggle`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -324,7 +331,7 @@ export const toggleTestType = async (id: string, enabled: boolean): Promise<{ su
  */
 export const initializeDefaultTestTypes = async (): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch(`${VITE_BACKEND_URL}/api/test-types/initialize`, {
+    const response = await fetch(`${BACKEND_API_BASE_URL}/api/test-types/initialize`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -341,4 +348,42 @@ export const initializeDefaultTestTypes = async (): Promise<{ success: boolean; 
     console.error('Error initializing default test types:', error);
     return { success: false, error: error.message };
   }
+}; 
+
+// TestMetric 인터페이스 추가
+export interface TestMetric {
+  id: string;
+  test_id: string;
+  metric_type: string;
+  metric_name: string;
+  value: number;
+  unit: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 메트릭 관련 API 함수들
+export const getTestMetrics = async (testId: string): Promise<TestMetric[]> => {
+  const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
+  const response = await fetch(`${backendUrl}/api/test-metrics/${testId}`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch test metrics: ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return data.data || [];
+};
+
+export const getGroupedTestMetrics = async (testId: string): Promise<any> => {
+  const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
+  const response = await fetch(`${backendUrl}/api/test-metrics/${testId}/grouped`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch grouped test metrics: ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return data.data || {};
 }; 

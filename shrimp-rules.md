@@ -166,7 +166,7 @@ import { MCPClient } from '@modelcontextprotocol/sdk/client';
 const client = new MCPClient({
   server: {
     command: 'k6-mcp-server',
-    args: ['--port', '3001']
+    args: ['--port', '3101']
   }
 });
 ```
@@ -341,7 +341,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"])
 **올바른 구현:**
 ```typescript
 // 환경변수 사용
-const K6_MCP_SERVER_URL = process.env.K6_MCP_SERVER_URL || 'http://localhost:3001';
+const K6_MCP_SERVER_URL = process.env.K6_MCP_SERVER_URL || 'http://localhost:3101';
 
 // 비동기 테스트 실행
 async function executeTest(config: LoadTestConfig): Promise<TestResult> {
@@ -358,7 +358,7 @@ async function executeTest(config: LoadTestConfig): Promise<TestResult> {
 **금지된 구현:**
 ```typescript
 // 하드코딩 금지
-const K6_MCP_SERVER_URL = 'http://localhost:3001';
+const K6_MCP_SERVER_URL = 'http://localhost:3101';
 
 // 동기 실행 금지
 function executeTest(config: LoadTestConfig): TestResult {
