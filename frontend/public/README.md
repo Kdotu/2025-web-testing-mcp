@@ -120,13 +120,6 @@ npm run dev
 2. **레이아웃 수정**: 컴포넌트 구조 변경 시 반영
 3. **새 기능**: 새로운 UI 요소 추가 시 예시에 포함
 
-## 📞 문의
-
-예시 파일과 관련된 문의사항이나 버그 리포트는 다음을 통해 연락하세요:
-
-- **GitHub Issues**: [프로젝트 이슈 페이지](https://github.com/your-org/mcp-website-tester/issues)
-- **이메일**: support@your-domain.com
-
 ---
 
 *이 예시 파일들은 MCP 웹사이트 테스터 프로젝트의 디자인 시스템을 시각적으로 확인하기 위한 참고 자료입니다.*
