@@ -176,7 +176,81 @@ export class LoadTestController {
   }
 
   /**
-   * k6 MCP 테스트 실행
+   * k6 MCP 테스트 실행 (직접 실행 방식)
+   */
+  async executeK6MCPTestDirect(params: {
+    url: string;
+    name: string;
+    description?: string;
+    script: string;
+    config: {
+      duration: string;
+      vus: number;
+      detailedConfig?: any; // 상세 설정 추가
+    };
+  }): Promise<LoadTestResult> {
+    const testId = uuidv4();
+    const now = new Date().toISOString();
+
+    // k6 스크립트를 임시 파일로 저장
+    const fs = await import('fs');
+    const path = await import('path');
+    const tempDir = path.join(process.cwd(), 'temp');
+    
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const scriptPath = path.join(tempDir, `${testId}.js`);
+    fs.writeFileSync(scriptPath, params.script);
+
+    // 초기 테스트 결과 생성 (설정값 포함)
+    const initialResult: LoadTestResult = {
+      id: uuidv4(),
+      testId,
+      testType: 'load', // 부하테스트로 설정
+      url: params.url,
+      name: params.name,
+      ...(params.description && { description: params.description }), // 조건부로 추가
+      config: {
+        duration: params.config.duration,
+        vus: params.config.vus,
+        detailedConfig: params.config.detailedConfig || {}
+      },
+      status: 'running',
+      metrics: {
+        http_req_duration: { avg: 0, min: 0, max: 0, p95: 0 },
+        http_req_rate: 0,
+        http_req_failed: 0,
+        vus: 0,
+        vus_max: 0
+      },
+      summary: {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        duration: 0,
+        startTime: now,
+        endTime: now
+      },
+      createdAt: now,
+      updatedAt: now
+    };
+
+    // 데이터베이스에 저장
+    await this.testResultService.saveResult(initialResult);
+
+    // k6 MCP 테스트 실행 (비동기) - 직접 실행 방식
+    this.executeK6MCPTestDirectAsync(testId, scriptPath, params.config, params.url).catch(error => {
+      console.error('k6 MCP test execution failed:', error);
+      this.updateTestStatus(testId, 'failed', 'k6 MCP test execution failed');
+    });
+
+    return initialResult;
+  }
+
+  /**
+   * k6 MCP 테스트 실행 (MCP 서버 방식)
    */
   async executeK6MCPTest(params: {
     url: string;
@@ -240,7 +314,7 @@ export class LoadTestController {
     // 데이터베이스에 저장
     await this.testResultService.saveResult(initialResult);
 
-    // k6 MCP 테스트 실행 (비동기) - 올바른 config 전달
+    // k6 MCP 테스트 실행 (비동기) - MCP 서버 방식
     this.executeK6MCPTestAsync(testId, scriptPath, params.config, params.url).catch(error => {
       console.error('k6 MCP test execution failed:', error);
       this.updateTestStatus(testId, 'failed', 'k6 MCP test execution failed');
@@ -250,9 +324,42 @@ export class LoadTestController {
   }
 
   /**
-   * k6 MCP 테스트 비동기 실행
+   * k6 MCP 테스트 비동기 실행 (MCP 서버 방식)
    */
   private async executeK6MCPTestAsync(
+    testId: string, 
+    _scriptPath: string, 
+    config: { duration: string; vus: number; detailedConfig?: any },
+    url: string
+  ): Promise<void> {
+    try {
+      // k6 서비스를 통해 MCP 서버 방식으로 테스트 실행
+      await this.k6Service.executeTestViaMCP(testId, {
+        id: testId,
+        url: url,
+        targetUrl: url, // targetUrl 필드 추가
+        name: 'k6 MCP Test',
+        duration: config.duration,
+        vus: config.vus,
+        detailedConfig: config.detailedConfig,
+        stages: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      } as any);
+
+      // 테스트가 성공적으로 완료되었을 때만 completed 상태로 업데이트
+      console.log('k6 MCP server test completed successfully, updating status to completed');
+    } catch (error) {
+      console.error('k6 MCP server test execution error:', error);
+      await this.updateTestStatus(testId, 'failed', 'k6 MCP server test execution failed');
+      throw error;
+    }
+  }
+
+  /**
+   * k6 MCP 테스트 비동기 실행 (직접 실행 방식)
+   */
+  private async executeK6MCPTestDirectAsync(
     testId: string, 
     _scriptPath: string, 
     config: { duration: string; vus: number; detailedConfig?: any },
@@ -263,6 +370,7 @@ export class LoadTestController {
       await this.k6Service.executeTest(testId, {
         id: testId,
         url: url,
+        targetUrl: url, // targetUrl 필드 추가
         name: 'k6 MCP Test',
         duration: config.duration,
         vus: config.vus,

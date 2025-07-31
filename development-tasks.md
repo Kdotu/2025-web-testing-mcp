@@ -91,6 +91,7 @@
   - [x] TestResults.tsx created_at 컬럼 사용하여 실행 시간 표시
   - [x] 모달창 배경색 통일 (색조 없는 중성적 색상)
   - [x] 모달창 컴포넌트 분리 (TestResultModal.tsx)
+  - [x] TestResultModal.tsx X 버튼 외에 모달 배경 클릭 시 닫힘 기능 구현
 
 - [x] **4.6** 테스트 타입 관리 시스템
   - [x] m2_test_types 테이블 스키마 설계 및 생성
@@ -109,6 +110,17 @@
   - [x] raw_data 컬럼 추가 (k6 실행 로그 저장)
   - [x] description, config 컬럼 추가 (m2_test_results)
 
+- [x] **4.8** TestExecution.tsx UI/UX 대폭 개선
+  - [x] 테스트 진행 중 "테스트 시작" 버튼 비활성화 기능
+  - [x] 세로 레이아웃으로 변경 (기본 테스트 설정 → 테스트 설정 → 테스트 시작 버튼 → 실행 현황)
+  - [x] 실행 방식 선택 제거 (MCP 서버 방식만 사용)
+  - [x] 테스트 유형 선택을 버튼 형식으로 변경
+  - [x] 부하테스트 설정 레이아웃 개선 (프리셋 선택과 현재 설정을 한 줄에 배치)
+  - [x] 테스트 유형과 활용 MCP 도구를 세로 배치로 변경
+  - [x] 테스트 유형 좌측에 TestTube 아이콘 추가
+  - [x] 텍스트 너비 통일 (w-28)로 버튼과 요소 시작점 정렬
+  - [x] 테스트 유형이 선택되지 않아도 활용 MCP 도구 라벨 표시
+
 ### Phase 5: 상세 메트릭 시스템 (우선순위 5) 🔄 진행 중
 - [x] **5.1** 메트릭 데이터베이스 설계
   - [x] m2_test_metrics 테이블 스키마 설계
@@ -122,10 +134,57 @@
   - [ ] 메트릭 값 및 단위 표시
   - [ ] 메트릭 설명 (한국어) 표시
 
-- [ ] **5.3** 메트릭 분석 기능
+- [x] **5.3** MCP 서버 실행 방식 문제 해결 ✅ 완료
+  - [x] **문제점**: MCP 서버 방식으로 실행 시 테스트가 끝나지 않는 문제
+    - [x] 증상: status가 'running'에서 벗어나지 않음, currentStep이 null
+    - [x] 원인: MCP 서버(Python)가 1회성 실행이 아니라 계속 대기 상태로 남아있음
+    - [x] 결과: Node.js에서 close 이벤트가 발생하지 않아 handleTestCompletion 호출 안됨
+  - [x] **수정 완료 사항**:
+    - [x] k6-mcp-server/k6_server.py를 1회성 실행 방식으로 변경 (FastMCP 제거)
+    - [x] MCP 서버가 k6 실행 후 프로세스 종료되도록 수정
+    - [x] Node.js에서 MCP 서버 close 이벤트 정상 처리 확인
+    - [x] 백엔드 로그 추가: MCP 서버 프로세스 시작/종료, close 이벤트 발생 여부
+  - [x] **해결 방안 적용**:
+    - [x] MCP 서버를 1회성 실행(요청-응답 후 종료)으로 변경
+    - [x] JSON 기반 stdin/stdout 통신 방식으로 변경
+    - [x] 백엔드에서 JSON 응답 파싱 로직 구현
+
+- [x] **5.4** 네트워크 연결 문제 해결 ✅ 완료
+  - [x] **문제점**: localhost 연결 오류 (`connectex: No connection could be made because the target machine actively refused it.`)
+  - [x] **원인 분석**: IPv4/IPv6 주소 불일치 (k6가 127.0.0.1로 연결, 서버는 [::1]에서 실행)
+  - [x] **해결 방안**:
+    - [x] 백엔드에서 localhost를 [::1]로 자동 변환하는 로직 구현
+    - [x] https://를 http://로 자동 변환하는 로직 구현 (로컬 개발 환경용)
+    - [x] k6 임계값 조정 (http_req_duration: p(95)<5000, http_req_failed: rate<0.8)
+  - [x] **프론트엔드 UI 개선**:
+    - [x] 사용자가 입력한 URL을 그대로 표시 (변환 로직은 백엔드에서만 처리)
+    - [x] URL 변환 로직을 백엔드로 이동하여 UI 일관성 유지
+
+- [ ] **5.5** 메트릭 분석 기능
   - [ ] 메트릭 통계 계산
   - [ ] 성능 임계값 분석
   - [ ] 메트릭 비교 기능
+
+- [ ] **5.6** 추가 MCP 서버 연동 (2025-07-31 계획)
+  - [ ] **Lighthouse MCP 서버 연동**:
+    - [ ] Lighthouse MCP 서버 구조 설계 및 구현
+    - [ ] 백엔드 Lighthouse MCP 클라이언트 구현
+    - [ ] Lighthouse 테스트 실행 API 엔드포인트 추가
+    - [ ] 프론트엔드 Lighthouse 테스트 실행 연동
+    - [ ] Lighthouse 결과 파싱 및 메트릭 추출
+    - [ ] Lighthouse 결과 데이터베이스 저장
+  - [ ] **Playwright MCP 서버 연동**:
+    - [ ] Playwright MCP 서버 구조 설계 및 구현
+    - [ ] 백엔드 Playwright MCP 클라이언트 구현
+    - [ ] Playwright 테스트 실행 API 엔드포인트 추가
+    - [ ] 프론트엔드 Playwright 테스트 실행 연동
+    - [ ] Playwright 결과 파싱 및 메트릭 추출
+    - [ ] Playwright 결과 데이터베이스 저장
+  - [ ] **통합 관리 시스템**:
+    - [ ] MCP 서버 타입별 실행 관리
+    - [ ] 테스트 유형별 MCP 서버 매핑
+    - [ ] MCP 서버 상태 모니터링
+    - [ ] 에러 핸들링 및 재시도 로직
 
 ### Phase 6: 문서화 기능 (우선순위 6)
 - [ ] **6.1** HTML 리포트 생성
@@ -162,11 +221,47 @@
 ## 🚀 현재 개발 상태
 
 **현재 단계**: Phase 5 - 상세 메트릭 시스템 (진행 중)  
-**다음 작업**: TestResultModal.tsx에서 m2_test_metrics 데이터 조회 및 표시
+**다음 작업**: 상세 메트릭 표시 (Phase 5.2)
 
 ## 📝 개발 노트
 
+### 2025-07-31
+- **TestExecution.tsx UI/UX 대폭 개선 완료**:
+  - 테스트 진행 중 "테스트 시작" 버튼 비활성화 기능 구현
+  - 세로 레이아웃으로 변경하여 더 직관적인 사용자 경험 제공
+  - 실행 방식 선택 제거 (MCP 서버 방식만 사용)
+  - 테스트 유형 선택을 버튼 형식으로 변경하여 더 나은 시각적 피드백 제공
+  - 부하테스트 설정 레이아웃 개선 (프리셋 선택과 현재 설정을 한 줄에 배치)
+  - 테스트 유형과 활용 MCP 도구를 세로 배치로 변경하여 논리적 흐름 개선
+  - 테스트 유형 좌측에 TestTube 아이콘 추가로 시각적 일관성 향상
+  - 텍스트 너비 통일 (w-28)로 버튼과 요소 시작점 정렬 개선
+  - 테스트 유형이 선택되지 않아도 활용 MCP 도구 라벨이 표시되도록 개선
+- **추가 MCP 서버 연동 계획**:
+  - Lighthouse MCP 서버 연동 작업 시작 예정
+  - Playwright MCP 서버 연동 작업 시작 예정
+  - 기존 k6 MCP 서버와 동일한 패턴으로 구현 계획
+  - 테스트 유형별 MCP 서버 매핑 시스템 구축 예정
+
 ### 2025-07-30
+- **MCP 서버 실행 방식 문제 해결 완료**:
+  - MCP 서버 방식으로 실행 시 테스트가 끝나지 않는 문제 해결
+  - k6-mcp-server/k6_server.py를 1회성 실행 방식으로 변경 (FastMCP 제거)
+  - JSON 기반 stdin/stdout 통신 방식으로 변경
+  - 백엔드에서 JSON 응답 파싱 로직 구현
+  - MCP 서버가 k6 실행 후 프로세스 종료되도록 수정
+  - Node.js에서 MCP 서버 close 이벤트 정상 처리 확인
+- **네트워크 연결 문제 해결 완료**:
+  - localhost 연결 오류 해결 (`connectex: No connection could be made because the target machine actively refused it.`)
+  - IPv4/IPv6 주소 불일치 문제 해결 (k6가 127.0.0.1로 연결, 서버는 [::1]에서 실행)
+  - 백엔드에서 localhost를 [::1]로 자동 변환하는 로직 구현
+  - https://를 http://로 자동 변환하는 로직 구현 (로컬 개발 환경용)
+  - k6 임계값 조정 (http_req_duration: p(95)<5000, http_req_failed: rate<0.8)
+  - 사용자가 입력한 URL을 그대로 표시하도록 UI 개선 (변환 로직은 백엔드에서만 처리)
+- **k6 실행 방식 분리 완료**:
+  - 기존 직접 실행 방식 유지 (executeK6Direct)
+  - 새로운 MCP 서버 방식 추가 (executeK6ViaMCP)
+  - 프론트엔드에서 실행 방식 선택 UI 구현
+  - 백엔드 API 엔드포인트 분리 (/k6-mcp-direct, /k6-mcp)
 - **데이터베이스 스키마 최적화 완료**:
   - m2_test_results에서 progress 컬럼 제거
   - insert/update 로직 최적화 (최초 insert 후 update 방식)
@@ -278,12 +373,12 @@ CORS_ORIGIN=http://localhost:3100
 - **Phase 1**: 100% (3/3 완료) ✅
 - **Phase 2**: 100% (2/2 완료) ✅
 - **Phase 3**: 100% (3/3 완료) ✅
-- **Phase 4**: 100% (7/7 완료) ✅
-- **Phase 5**: 33% (1/3 완료) 🔄
+- **Phase 4**: 100% (8/8 완료) ✅
+- **Phase 5**: 50% (3/6 완료) 🔄
 - **Phase 6**: 0% (0/3 완료)
 - **Phase 7**: 0% (0/3 완료)
 
-**전체 진행률**: 85% (16/19 완료)
+**전체 진행률**: 83% (19/23 완료)
 
 ## 📁 생성된 파일 구조
 
@@ -318,13 +413,13 @@ frontend/
 │   ├── api.tsx ✅ (기존 Supabase API)
 │   └── backend-api.ts ✅ (새로운 백엔드 API 클라이언트)
 └── components/
-    ├── TestExecution.tsx ✅ (백엔드 API 연동 추가)
+    ├── TestExecution.tsx ✅ (백엔드 API 연동 및 UI/UX 대폭 개선)
     ├── TestResults.tsx ✅ (UI/UX 개선 완료)
     ├── TestResultModal.tsx ✅ (모달창 컴포넌트 분리)
     └── Settings.tsx ✅ (테스트 타입 관리 연동)
 
 k6-mcp-server/
-├── k6_server.py ✅ (MCP 서버)
+├── k6_server.py ✅ (MCP 서버 - 1회성 실행 방식으로 변경)
 ├── requirements.txt ✅
 └── hello.js ✅ (테스트 스크립트)
 ```
@@ -337,11 +432,20 @@ k6-mcp-server/
    - 메트릭 값 및 단위 표시
    - 메트릭 설명 (한국어) 표시
 
-2. **Phase 5.3 완료**: 메트릭 분석 기능
+2. **Phase 5.5 완료**: 메트릭 분석 기능
    - 메트릭 통계 계산
    - 성능 임계값 분석
    - 메트릭 비교 기능
 
-### 📈 전체 진행률: 85% (16/19 완료)
+3. **Phase 5.6 시작**: 추가 MCP 서버 연동 (2025-07-31 계획)
+   - Lighthouse MCP 서버 연동
+   - Playwright MCP 서버 연동
+   - 통합 관리 시스템 구축
 
-Phase 4의 모든 작업이 완료되어 프론트엔드 연동이 성공적으로 마무리되었습니다. 데이터베이스 스키마 최적화까지 완성되어 이제 상세 메트릭 시스템 개발을 진행하고 있습니다! 
+4. **Phase 6 시작**: 문서화 기능
+   - HTML 리포트 생성
+   - PDF 문서화
+   - 문서 관리 시스템
+
+### 📈 전체 진행률: 83% (19/23 완료)
+

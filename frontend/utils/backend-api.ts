@@ -145,6 +145,46 @@ class BackendApiClient {
   async getStatistics(): Promise<BackendApiResponse> {
     return this.request('/api/test-results/statistics');
   }
+
+  /**
+   * k6 MCP 테스트 실행 (직접 실행 방식)
+   */
+  async executeK6MCPTestDirect(params: {
+    url: string;
+    name: string;
+    description?: string;
+    script: string;
+    config: {
+      duration: string;
+      vus: number;
+      detailedConfig?: any;
+    };
+  }): Promise<BackendApiResponse<LoadTestResult>> {
+    return this.request('/api/load-tests/k6-mcp-direct', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /**
+   * k6 MCP 테스트 실행 (MCP 서버 방식)
+   */
+  async executeK6MCPTest(params: {
+    url: string;
+    name: string;
+    description?: string;
+    script: string;
+    config: {
+      duration: string;
+      vus: number;
+      detailedConfig?: any;
+    };
+  }): Promise<BackendApiResponse<LoadTestResult>> {
+    return this.request('/api/load-tests/k6-mcp', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
 }
 
 // 기본 API 클라이언트 인스턴스
@@ -161,6 +201,31 @@ export const getAllTestResults = (page?: number, limit?: number, status?: string
 export const getTestResultById = (id: string) => backendApi.getTestResultById(id);
 export const deleteTestResult = (id: string) => backendApi.deleteTestResult(id);
 export const getStatistics = () => backendApi.getStatistics();
+
+// k6 MCP 테스트 실행 함수들
+export const executeK6MCPTestDirect = (params: {
+  url: string;
+  name: string;
+  description?: string;
+  script: string;
+  config: {
+    duration: string;
+    vus: number;
+    detailedConfig?: any;
+  };
+}) => backendApi.executeK6MCPTestDirect(params);
+
+export const executeK6MCPTest = (params: {
+  url: string;
+  name: string;
+  description?: string;
+  script: string;
+  config: {
+    duration: string;
+    vus: number;
+    detailedConfig?: any;
+  };
+}) => backendApi.executeK6MCPTest(params);
 
 // 타입 내보내기
 export type { BackendApiResponse, LoadTestConfig, LoadTestResult }; 

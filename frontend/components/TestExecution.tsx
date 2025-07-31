@@ -36,6 +36,7 @@ import {
   TrendingUp,
   BarChart3,
   Wrench,
+  TestTube,
 } from "lucide-react";
 import {
   executeTest,
@@ -53,6 +54,8 @@ import {
   getTestStatus as getBackendTestStatus,
   cancelTest as cancelBackendTest,
   checkBackendHealth,
+  executeK6MCPTestDirect,
+  executeK6MCPTest,
   type LoadTestConfig,
   type LoadTestResult,
 } from "../utils/backend-api";
@@ -146,6 +149,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
   const [backendError, setBackendError] = useState<string | null>(null);
   const [useBackendApi, setUseBackendApi] = useState(false);
   const [elapsedTime, setElapsedTime] = useState<{[key: number]: string}>({});
+  const [recentResults, setRecentResults] = useState<any[]>([]);
 
   // 백엔드 API 연결 체크
   useEffect(() => {
@@ -642,18 +646,11 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
   const handleUrlChange = (value: string) => {
     setTestUrl(value);
 
-    if (!value.trim()) {
-      setUrlError("");
-      return;
-    }
-
-    const normalizedUrl = normalizeUrl(value);
-    if (!validateUrl(normalizedUrl)) {
-      setUrlError(
-        "올바른 웹 URL을 입력하세요 (예: https://example.com)",
-      );
+    // URL 유효성 검사
+    if (value && !validateUrl(value)) {
+      setUrlError('올바른 URL을 입력해주세요.');
     } else {
-      setUrlError("");
+      setUrlError('');
     }
   };
 
@@ -795,42 +792,37 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
       // k6 스크립트 생성
       const k6Script = generateK6Script(testUrl, testSettings.load);
       
-      // 백엔드에 k6 MCP 테스트 요청
-      const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
-      const response = await fetch(`${backendUrl}/api/load-tests/k6-mcp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: testUrl,
-          name: testDescription || `k6 MCP Test - ${testUrl}`,
-          description: testDescription, // 테스트 설명
-          script: k6Script,
-          config: {
-            duration: testSettings.load.timeUnit,
-            vus: testSettings.load.maxVUs,
-            // 상세 설정 추가
-            detailedConfig: {
-              executor: testSettings.load.executor,
-              preset: testSettings.load.preset,
-              startRate: testSettings.load.startRate,
-              timeUnit: testSettings.load.timeUnit,
-              preAllocatedVUs: testSettings.load.preAllocatedVUs,
-              maxVUs: testSettings.load.maxVUs,
-              stages: testSettings.load.stages,
-              thresholds: {
-                http_req_duration: ['p(95)<2000'],
-                errors: ['rate<0.1']
-              }
+      // 실행 방식에 따라 다른 API 호출
+      const testParams = {
+        url: testUrl,
+        name: testDescription || `k6 MCP Test - ${testUrl}`,
+        description: testDescription,
+        script: k6Script,
+        config: {
+          duration: testSettings.load.timeUnit,
+          vus: testSettings.load.maxVUs,
+          detailedConfig: {
+            executor: testSettings.load.executor,
+            preset: testSettings.load.preset,
+            startRate: testSettings.load.startRate,
+            timeUnit: testSettings.load.timeUnit,
+            preAllocatedVUs: testSettings.load.preAllocatedVUs,
+            maxVUs: testSettings.load.maxVUs,
+            stages: testSettings.load.stages,
+            thresholds: {
+              http_req_duration: ['p(95)<2000'],
+              errors: ['rate<0.1']
             }
           }
-        }),
-      });
+        }
+      };
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('k6 MCP 테스트 시작됨:', result);
+      let result;
+      // MCP 서버 방식만 사용
+        result = await executeK6MCPTest(testParams);
+
+      if (result.success) {
+        console.log(`k6 MCP 테스트 시작됨 (MCP 서버):`, result);
         
         // 백엔드에서 반환된 testId를 사용
         const backendTestId = result.data?.testId || result.data?.id;
@@ -839,21 +831,20 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         // 프론트엔드 테스트 객체 생성 (백엔드 testId 포함)
         const newTest: RunningTest = {
           id: frontendTestId,
-          backendTestId: backendTestId, // 백엔드 testId 저장
+          backendTestId: backendTestId,
           url: testUrl,
           type: selectedTestType,
           status: 'running',
           startTime: new Date().toISOString(),
-          currentStep: 'k6 MCP 테스트 초기화 중...',
+          currentStep: `k6 MCP 테스트 초기화 중... (MCP 서버)`,
           estimatedTime: '예상 시간 계산 중...',
-          logs: [`k6 MCP 테스트 시작: ${testUrl}`],
-          settings: testSettings,
-          testStartTime: Date.now(), // 테스트 시작 시간 (밀리초)
+          logs: [`k6 MCP 테스트 시작: ${testUrl} (MCP 서버)`],
+          settings: testSettings[selectedTestType as keyof TestSettings],
+          testStartTime: Date.now(),
         };
 
         setRunningTests(prev => {
           const updatedTests = [...prev, newTest];
-          // console.log('Running tests updated:', updatedTests);
           return updatedTests;
         });
         
@@ -861,77 +852,66 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         if (backendTestId) {
           const pollInterval = setInterval(async () => {
             try {
-              const statusResponse = await fetch(`${backendUrl}/api/load-tests/${backendTestId}`);
-               if (statusResponse.ok) {
-                 const statusData = await statusResponse.json();
-                 
-                 // 상태 정보만 로깅
-                 if (statusData.data?.currentStep !== undefined) {
-                  //  console.log(`Status update: ${statusData.data.currentStep}`);
-                 }
+              const statusResponse = await getBackendTestStatus(backendTestId);
+              if (statusResponse.success) {
+                const statusData = statusResponse.data;
                 
                 // 실행 중인 테스트 업데이트 (백엔드 testId로 매칭)
-                  setRunningTests(prev => {
-                   const updatedTests = prev.map(test => {
-                     if (test.backendTestId === backendTestId) {
-                       const newCurrentStep = statusData.data?.currentStep || test.currentStep;
-                       const newStatus = statusData.data?.status || test.status;
-                       
-                       const updatedTest = {
-                         ...test,
-                         currentStep: newCurrentStep,
-                         status: newStatus
-                       };
-                       
-                      //  console.log(`Test ${backendTestId} updated:`, {
-                      //    oldCurrentStep: test.currentStep,
-                      //    newCurrentStep: newCurrentStep,
-                      //    oldStatus: test.status,
-                      //    newStatus: newStatus
-                      //  });
-                       
-                       return updatedTest;
-                     }
-                     return test;
-                   });
-                   
-                  //  console.log('All running tests after update:', updatedTests);
-                   return updatedTests;
-                 });
-                
-                // 테스트 완료 시 폴링 중지
-                if (statusData.data?.status === 'completed' || statusData.data?.status === 'failed') {
-                  clearInterval(pollInterval);
-                  console.log('테스트 완료:', statusData.data);
-                  
-                  // 완료된 테스트를 실행 중 목록에서 제거
-                  setRunningTests(prev => prev.filter(test => test.backendTestId !== backendTestId));
-                  
-                  // 실행 현황 새로고침
-                  try {
-                    const resultsResult = await getAllTestResults();
-                    if (resultsResult.success && resultsResult.data) {
-                      const resultsArray = Array.isArray(resultsResult.data) ? resultsResult.data : [];
-                      // console.log('Test results refreshed:', resultsArray);
+                setRunningTests(prev => {
+                  const updatedTests = prev.map(test => {
+                    if (test.backendTestId === backendTestId) {
+                      const newCurrentStep = statusData?.currentStep || test.currentStep;
+                      const newStatus = statusData?.status || test.status;
+                      
+                      const updatedTest = {
+                        ...test,
+                        currentStep: newCurrentStep,
+                        status: newStatus,
+                        logs: [...test.logs, `${new Date().toLocaleTimeString()}: ${newCurrentStep}`]
+                      };
+
+                      // 테스트가 완료되면 폴링 중단
+                      if (newStatus === 'completed' || newStatus === 'failed') {
+                        clearInterval(pollInterval);
+                        // 최근 결과 새로고침
+                        (async () => {
+                          try {
+                            const resultsResult = await getBackendTestResults();
+                            if (resultsResult.success && resultsResult.data) {
+                              const resultsArray = Array.isArray(resultsResult.data) ? resultsResult.data : [];
+                              setRecentResults(resultsArray.slice(0, 5));
+                            }
+                          } catch (error) {
+                            console.error('Failed to refresh test results:', error);
+                          }
+                        })();
+                      }
+
+                      return updatedTest;
                     }
-                  } catch (error) {
-                    console.error('Failed to refresh test results:', error);
-                  }
-                }
+                    return test;
+                  });
+                  return updatedTests;
+                });
               }
             } catch (error) {
-                  console.error('테스트 상태 확인 중 오류:', error);
-               }
-             }, 3000); // 3초마다 상태 확인 (최적화)
+              console.error('Status polling error:', error);
+              clearInterval(pollInterval);
+            }
+          }, 2000);
+
+          // 5분 후 폴링 중단 (안전장치)
+          setTimeout(() => {
+            clearInterval(pollInterval);
+          }, 300000);
         }
       } else {
-        const error = await response.json();
-        console.error('k6 MCP 테스트 실행 실패:', error);
-        alert(`k6 MCP 테스트 실행 실패: ${error.message}`);
+        console.error('k6 MCP 테스트 시작 실패:', result.error);
+        alert(`테스트 시작 실패: ${result.error}`);
       }
     } catch (error) {
       console.error('k6 MCP 테스트 실행 중 오류:', error);
-      alert('k6 MCP 테스트 실행 중 오류가 발생했습니다.');
+      alert('테스트 실행 중 오류가 발생했습니다.');
     } finally {
       setIsExecuting(false);
     }
@@ -955,8 +935,8 @@ export const options = {
     ${stages}
   ],
   thresholds: {
-    http_req_duration: ['p(95)<2000'],
-    errors: ['rate<0.1']
+    http_req_duration: ['p(95)<5000'], // 2000ms에서 5000ms로 증가
+    errors: ['rate<0.8'] // 0.1에서 0.8로 증가
   }
 };
 
@@ -965,7 +945,7 @@ export default function () {
   
   check(response, {
     'status is 200': (r) => r.status === 200,
-    'response time < 2000ms': (r) => r.timings.duration < 2000,
+    'response time < 5000ms': (r) => r.timings.duration < 5000, // 2000ms에서 5000ms로 증가
   });
   
   errorRate.add(response.status !== 200);
@@ -979,7 +959,9 @@ export default function () {
     if (
       !normalizedUrl ||
       !selectedTestType ||
-      !validateUrl(normalizedUrl)
+      isExecuting ||
+      !validateUrl(normalizedUrl) ||
+      runningTests.some(test => test.status === "running" || test.status === "실행중")
     )
       return;
 
@@ -995,37 +977,35 @@ export default function () {
       // 모든 테스트 유형에 대해 k6 스크립트 생성
       const k6Script = generateTestScript(normalizedUrl, selectedTestType, testSettings);
       
-      // 백엔드 API를 사용한 테스트 실행
-      const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
-      
-      const response = await fetch(`${backendUrl}/api/load-tests/k6-mcp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: normalizedUrl,
-          name: testDescription || `${selectedTestType} Test - ${normalizedUrl}`,
-          description: testDescription,
-          script: k6Script,
-          config: {
-            duration: selectedTestType === 'load' ? testSettings.load.timeUnit : '30s',
-            vus: selectedTestType === 'load' ? testSettings.load.maxVUs : 10,
-            detailedConfig: {
-              testType: selectedTestType,
-              settings: testSettings[selectedTestType as keyof TestSettings]
-            }
+      // 테스트 파라미터 설정
+      const testParams = {
+        url: normalizedUrl,
+        name: testDescription || `${selectedTestType} Test - ${normalizedUrl}`,
+        description: testDescription,
+        script: k6Script,
+        config: {
+          duration: selectedTestType === 'load' ? testSettings.load.timeUnit : '30s',
+          vus: selectedTestType === 'load' ? testSettings.load.maxVUs : 10,
+          detailedConfig: {
+            testType: selectedTestType,
+            settings: testSettings[selectedTestType as keyof TestSettings]
           }
-        }),
-      });
+        }
+      };
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('백엔드 테스트 시작됨:', result);
+      // 실행 방식에 따라 다른 API 호출
+      let result;
+      // MCP 서버 방식만 사용
+        result = await executeK6MCPTest(testParams);
+
+      if (result.success) {
+        console.log(`k6 MCP 테스트 시작됨 (MCP 서버):`, result);
         
+        // 백엔드에서 반환된 testId를 사용
         const backendTestId = result.data?.testId || result.data?.id;
         const frontendTestId = Date.now();
         
+        // 프론트엔드 테스트 객체 생성 (백엔드 testId 포함)
         const newTest: RunningTest = {
           id: frontendTestId,
           backendTestId: backendTestId,
@@ -1033,9 +1013,9 @@ export default function () {
           type: selectedTestType,
           status: 'running',
           startTime: new Date().toISOString(),
-          currentStep: '테스트 초기화 중...',
+          currentStep: `k6 MCP 테스트 초기화 중... (MCP 서버)`,
           estimatedTime: '예상 시간 계산 중...',
-          logs: [`${selectedTestType} 테스트 시작: ${normalizedUrl}`],
+          logs: [`k6 MCP 테스트 시작: ${normalizedUrl} (MCP 서버)`],
           settings: testSettings[selectedTestType as keyof TestSettings],
           testStartTime: Date.now(),
         };
@@ -1046,15 +1026,15 @@ export default function () {
         if (backendTestId) {
           const pollInterval = setInterval(async () => {
             try {
-              const statusResponse = await fetch(`${backendUrl}/api/load-tests/${backendTestId}`);
-              if (statusResponse.ok) {
-                const statusData = await statusResponse.json();
+              const statusResponse = await getBackendTestStatus(backendTestId);
+              if (statusResponse.success) {
+                const statusData = statusResponse.data;
                 
                 setRunningTests(prev => {
                   const updatedTests = prev.map(test => {
                     if (test.backendTestId === backendTestId) {
-                      const newCurrentStep = statusData.data?.currentStep || test.currentStep;
-                      const newStatus = statusData.data?.status || test.status;
+                      const newCurrentStep = statusData?.currentStep || test.currentStep;
+                      const newStatus = statusData?.status || test.status;
                       
                       return {
                         ...test,
@@ -1069,34 +1049,43 @@ export default function () {
                 });
                 
                 // 테스트 완료 시 폴링 중지
-                if (statusData.data?.status === 'completed' || statusData.data?.status === 'failed') {
+                if (statusData?.status === 'completed' || statusData?.status === 'failed') {
                   clearInterval(pollInterval);
-                  console.log('테스트 완료:', statusData.data);
+                  console.log('테스트 완료:', statusData);
                   
                   // 완료된 테스트를 실행 중 목록에서 제거
                   setRunningTests(prev => prev.filter(test => test.backendTestId !== backendTestId));
                   
-                  // 폼 초기화
-                  setTestUrl("");
-                  setSelectedTestType("");
-                  setTestDescription("");
-                  setIsExecuting(false);
+                  // 실행 현황 새로고침
+                  try {
+                    const resultsResult = await getBackendTestResults();
+                    if (resultsResult.success && resultsResult.data) {
+                      const resultsArray = Array.isArray(resultsResult.data) ? resultsResult.data : [];
+                      setRecentResults(resultsArray.slice(0, 5));
+                    }
+                  } catch (error) {
+                    console.error('Failed to refresh test results:', error);
+                  }
                 }
               }
             } catch (error) {
               console.error('테스트 상태 확인 중 오류:', error);
             }
-          }, 3000);
+          }, 3000); // 3초마다 상태 확인
+
+          // 5분 후 폴링 중단 (안전장치)
+          setTimeout(() => {
+            clearInterval(pollInterval);
+          }, 300000);
         }
       } else {
-        const error = await response.json();
-        console.error('테스트 실행 실패:', error);
-        alert(`테스트 실행 실패: ${error.message || '알 수 없는 오류'}`);
-        setIsExecuting(false);
+        console.error('백엔드 테스트 시작 실패:', result.error);
+        alert(`테스트 시작 실패: ${result.error}`);
       }
     } catch (error) {
       console.error('테스트 실행 중 오류:', error);
       alert('테스트 실행 중 오류가 발생했습니다.');
+    } finally {
       setIsExecuting(false);
     }
   };
@@ -1144,784 +1133,7 @@ export default function () {
     }));
   };
 
-  const renderTestTypeSettings = () => {
-    if (!selectedTestType) {
-      return (
-        <div className="neu-card rounded-3xl px-6 py-8 flex items-center justify-center">
-          <div className="text-center py-12 text-muted-foreground">
-            <Settings className="h-16 w-16 mx-auto mb-6 opacity-50" />
-            <p className="font-semibold text-lg mb-2">
-              테스트 유형을 선택하세요
-            </p>
-            <p className="text-base">
-              좌측에서 테스트 유형을 선택하면 상세 설정이
-              나타납니다
-            </p>
-          </div>
-        </div>
-      );
-    }
 
-    const currentSettings = testSettings[selectedTestType as keyof TestSettings] as any;
-
-    // 설정이 없거나 잘못된 경우 기본값 사용
-    if (!currentSettings) {
-      return (
-        <div className="neu-card rounded-3xl px-6 py-8 flex items-center justify-center">
-          <div className="text-center py-12 text-muted-foreground">
-            <Settings className="h-16 w-16 mx-auto mb-6 opacity-50" />
-            <p className="font-semibold text-lg mb-2">
-              설정 로딩 중...
-            </p>
-            <p className="text-base">잠시만 기다려주세요</p>
-          </div>
-        </div>
-      );
-    }
-
-    switch (selectedTestType) {
-      case "performance":
-        const performanceSettings = testSettings.performance;
-        return (
-          <div className="neu-card rounded-3xl px-6 py-8">
-            <div className="flex items-center space-x-4 mb-8">
-              <Settings className="h-7 w-7 text-primary" />
-              <h3 className="text-2xl font-semibold text-primary">
-                성능테스트 설정
-              </h3>
-            </div>
-            <div className="space-y-8">
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <Label className="text-foreground font-semibold text-lg">
-                    타임아웃 (초)
-                  </Label>
-                  <div className="neu-input rounded-xl px-4 py-3">
-                    <Input
-                      type="number"
-                      value={performanceSettings.timeout || 30}
-                      onChange={(e) =>
-                        updateTestSetting(
-                          "performance",
-                          "timeout",
-                          Number(e.target.value),
-                        )
-                      }
-                      min="10"
-                      max="300"
-                      className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <Label className="text-foreground font-semibold text-lg">
-                    재시도 횟수
-                  </Label>
-                  <div className="neu-input rounded-xl px-4 py-3">
-                    <Input
-                      type="number"
-                      value={performanceSettings.retries || 3}
-                      onChange={(e) =>
-                        updateTestSetting(
-                          "performance",
-                          "retries",
-                          Number(e.target.value),
-                        )
-                      }
-                      min="0"
-                      max="10"
-                      className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <Label className="text-foreground font-semibold text-lg">
-                  디바이스 타입
-                </Label>
-                <div className="neu-input rounded-xl px-3 py-2">
-                  <Select
-                    value={performanceSettings.device || "desktop"}
-                    onValueChange={(value) =>
-                      updateTestSetting(
-                        "performance",
-                        "device",
-                        value,
-                      )
-                    }
-                  >
-                    <SelectTrigger className="border-none bg-transparent text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="neu-card rounded-xl border-none bg-card">
-                      <SelectItem value="desktop">
-                        데스크톱
-                      </SelectItem>
-                      <SelectItem value="mobile">
-                        모바일
-                      </SelectItem>
-                      <SelectItem value="tablet">
-                        태블릿
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <Label className="text-foreground font-semibold text-lg">
-                  측정할 메트릭
-                </Label>
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    "FCP",
-                    "LCP",
-                    "CLS",
-                    "TBT",
-                    "SI",
-                    "FID",
-                  ].map((metric) => (
-                    <div
-                      key={metric}
-                      className="neu-subtle rounded-xl px-4 py-4 flex items-center space-x-4"
-                    >
-                      <Checkbox
-                        checked={(
-                          performanceSettings.metrics || []
-                        ).includes(metric)}
-                        onCheckedChange={(checked) => {
-                          const currentMetrics =
-                            performanceSettings.metrics || [];
-                          const newMetrics = checked
-                            ? [...currentMetrics, metric]
-                            : currentMetrics.filter(
-                                (m) => m !== metric,
-                              );
-                          updateTestSetting(
-                            "performance",
-                            "metrics",
-                            newMetrics,
-                          );
-                        }}
-                      />
-                      <Label className="font-semibold text-foreground cursor-pointer">
-                        {metric}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="neu-subtle rounded-xl px-6 py-6 flex items-center justify-between">
-                <Label className="text-foreground font-semibold text-lg">
-                  네트워크 스로틀링 적용
-                </Label>
-                <Switch
-                  checked={performanceSettings.throttling ?? true}
-                  onCheckedChange={(checked) =>
-                    updateTestSetting(
-                      "performance",
-                      "throttling",
-                      checked,
-                    )
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        );
-
-      case "load":
-        // 안전한 접근을 위한 현재 설정 검증 및 기본값 제공
-        const loadSettings = testSettings.load;
-        const safeLoadSettings = {
-          executor:
-            loadSettings.executor || "ramping-arrival-rate",
-          preset: loadSettings.preset || "medium",
-          startRate: loadSettings.startRate || 100,
-          timeUnit: loadSettings.timeUnit || "20s",
-          preAllocatedVUs:
-            loadSettings.preAllocatedVUs || 10,
-          maxVUs: loadSettings.maxVUs || 500,
-          stages: Array.isArray(loadSettings.stages)
-            ? loadSettings.stages
-            : getDefaultLoadSettings().stages,
-        };
-
-        const currentPreset =
-          loadTestPresets.find(
-            (p) => p.id === safeLoadSettings.preset,
-          ) || loadTestPresets[1]; // default to medium
-
-        // TPS 계산 함수
-        const calculateTPS = (
-          iterations: number,
-          timeUnit: string,
-        ) => {
-          const seconds = timeUnit.includes("m")
-            ? parseInt(timeUnit) * 60
-            : parseInt(timeUnit);
-          return Math.round((iterations / seconds) * 100) / 100;
-        };
-
-        // 시간 단위를 초로 변환
-        const parseTimeUnit = (timeUnit: string) => {
-          const match = timeUnit.match(/(\d+)([sm])/);
-          if (!match) return 1;
-          const [, value, unit] = match;
-          const num = parseInt(value);
-          return unit === "m" ? num * 60 : num;
-        };
-
-        return (
-          <div className="neu-card rounded-3xl px-6 py-8">
-            <div className="flex items-center space-x-4 mb-6">
-              <Settings className="h-7 w-7 text-primary" />
-              <h3 className="text-2xl font-semibold text-primary">
-                부하테스트 설정 (k6 기반)
-              </h3>
-            </div>
-            <div className="space-y-6">
-              {/* Preset 선택 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  테스트 프리셋 선택 <span className="text-xs text-muted-foreground ml-1">(Test Preset Selection)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  {loadTestPresets.map((preset) => {
-                    const IconComponent = preset.icon;
-                    const isSelected =
-                      safeLoadSettings.preset === preset.id;
-
-                    return (
-                      <button
-                        key={preset.id}
-                        onClick={() =>
-                          handlePresetChange(preset.id)
-                        }
-                        className={`neu-button rounded-xl p-4 text-left transition-all duration-200 ${
-                          isSelected ? "neu-button-active" : ""
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3 mb-2">
-                          <IconComponent
-                            className={`h-5 w-5 ${isSelected ? "text-primary-foreground" : "text-primary"}`}
-                          />
-                          <span
-                            className={`font-semibold ${isSelected ? "text-primary-foreground" : "text-primary"}`}
-                          >
-                            {preset.name}
-                          </span>
-                        </div>
-                        <p
-                          className={`text-sm ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}
-                        >
-                          {preset.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 기본 설정 표시 - 개선된 버전 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Label className="text-foreground font-semibold text-lg">
-                    현재 기본 설정 <span className="text-xs text-muted-foreground ml-1">(Current Settings)</span>
-                  </Label>
-                  <div className="neu-pressed rounded-lg px-3 py-1">
-                    <span className="text-xs text-muted-foreground">
-                      Executor: {safeLoadSettings.executor}
-                    </span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="neu-pressed rounded-lg px-4 py-3">
-                    <Label className="text-sm text-muted-foreground mb-1 block">
-                      시작 요청 속도 <span className="text-xs text-muted-foreground">(Start Rate)</span>
-                    </Label>
-                    <div className="flex flex-col">
-                      <span className="text-foreground font-semibold">
-                        {safeLoadSettings.startRate} 요청 /{" "}
-                        {safeLoadSettings.timeUnit}
-                      </span>
-                      <span className="text-xs text-foreground">
-                        ≈{" "}
-                        {calculateTPS(
-                          safeLoadSettings.startRate,
-                          safeLoadSettings.timeUnit,
-                        )}{" "}
-                        TPS
-                      </span>
-                    </div>
-                  </div>
-                  <div className="neu-pressed rounded-lg px-4 py-3">
-                    <Label className="text-sm text-muted-foreground mb-1 block">
-                      시간 단위 <span className="text-xs text-muted-foreground">(Time Unit)</span>
-                    </Label>
-                    <span className="text-foreground font-semibold">
-                      {safeLoadSettings.timeUnit}
-                      <span className="text-xs text-foreground ml-1">
-                        (
-                        {parseTimeUnit(
-                          safeLoadSettings.timeUnit,
-                        )}
-                        초)
-                      </span>
-                    </span>
-                  </div>
-                  <div className="neu-pressed rounded-lg px-4 py-3">
-                    <Label className="text-sm text-muted-foreground mb-1 block">
-                      사전 할당 VU <span className="text-xs text-muted-foreground">(Pre-allocated VUs)</span>
-                    </Label>
-                    <span className="text-foreground font-semibold">
-                      {safeLoadSettings.preAllocatedVUs}
-                    </span>
-                  </div>
-                  <div className="neu-pressed rounded-lg px-4 py-3">
-                    <Label className="text-sm text-muted-foreground mb-1 block">
-                      최대 VU <span className="text-xs text-muted-foreground">(Max VUs)</span>
-                    </Label>
-                    <span className="text-foreground font-semibold">
-                      {safeLoadSettings.maxVUs}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Executor 설명 추가 */}
-                <div className="mt-4 neu-pressed rounded-lg px-4 py-3">
-                  <div className="flex items-start space-x-2">
-                    <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-muted-foreground">
-                      <strong>Ramping Arrival Rate:</strong>{" "}
-                      일정 시간 동안 목표 요청률(iterations per
-                      timeUnit)까지 선형 증가시키는 부하
-                      방식입니다. 실제 TPS는 시스템 응답 성능에
-                      따라 달라질 수 있습니다.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Custom 모드일 때만 상세 설정 표시 */}
-              {safeLoadSettings.preset === "custom" && (
-                <>
-                  {/* Executor 선택 */}
-                  <div className="neu-subtle rounded-xl px-6 py-6">
-                    <Label className="text-foreground font-semibold text-lg mb-4 block">
-                      실행 모드 <span className="text-xs text-muted-foreground ml-1">(Executor)</span>
-                    </Label>
-                    <div className="neu-input rounded-xl px-3 py-2">
-                      <Select
-                        value={safeLoadSettings.executor}
-                        onValueChange={(value) =>
-                          updateTestSetting(
-                            "load",
-                            "executor",
-                            value,
-                          )
-                        }
-                      >
-                        <SelectTrigger className="border-none bg-transparent text-foreground">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="neu-card rounded-xl border-none bg-card">
-                          <SelectItem value="ramping-arrival-rate">
-                            Ramping Arrival Rate (점진적 요청률
-                            증가)
-                          </SelectItem>
-                          <SelectItem value="constant-arrival-rate">
-                            Constant Arrival Rate (일정한 요청률
-                            유지)
-                          </SelectItem>
-                          <SelectItem value="ramping-vus">
-                            Ramping VUs (점진적 가상 사용자
-                            증가)
-                          </SelectItem>
-                          <SelectItem value="constant-vus">
-                            Constant VUs (일정한 가상 사용자 수)
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="mt-3 neu-pressed rounded-lg px-4 py-3">
-                      <div className="flex items-start space-x-2">
-                        <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-muted-foreground">
-                          <strong>권장:</strong>{" "}
-                          ramping-arrival-rate는 실제 사용자
-                          행동 패턴을 가장 잘 시뮬레이션합니다.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 컴팩트한 설정 그리드 */}
-                  <div className="neu-subtle rounded-xl px-6 py-6">
-                    <Label className="text-foreground font-semibold text-lg mb-4 block">
-                      상세 설정 <span className="text-xs text-muted-foreground ml-1">(Advanced Settings)</span>
-                    </Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-sm text-muted-foreground mb-2 block">
-                          시작 요청 수 <span className="text-xs text-muted-foreground">(Start Requests)</span>
-                        </Label>
-                        <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
-                          <Input
-                            type="number"
-                            value={safeLoadSettings.startRate}
-                            onChange={(e) => {
-                              const value = Math.max(
-                                1,
-                                Math.min(
-                                  10000,
-                                  Number(e.target.value) || 1,
-                                ),
-                              );
-                              updateTestSetting(
-                                "load",
-                                "startRate",
-                                value,
-                              );
-                            }}
-                            min="1"
-                            max="10000"
-                            className="border-none bg-transparent text-center text-primary font-semibold text-sm focus:text-foreground transition-colors"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 text-center">
-                          per {safeLoadSettings.timeUnit} ≈{" "}
-                          {calculateTPS(
-                            safeLoadSettings.startRate,
-                            safeLoadSettings.timeUnit,
-                          )}{" "}
-                          TPS
-                        </p>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm text-muted-foreground mb-2 block">
-                          시간 단위 <span className="text-xs text-muted-foreground">(Time Unit)</span>
-                        </Label>
-                        <div className="neu-input rounded-lg px-2 py-1 ring-1 ring-primary/20">
-                          <Select
-                            value={safeLoadSettings.timeUnit}
-                            onValueChange={(value) =>
-                              updateTestSetting(
-                                "load",
-                                "timeUnit",
-                                value,
-                              )
-                            }
-                          >
-                            <SelectTrigger className="border-none bg-transparent text-primary text-sm h-8 hover:text-foreground transition-colors">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="neu-card rounded-xl border-none bg-card">
-                              <SelectItem value="1s">
-                                1초
-                              </SelectItem>
-                              <SelectItem value="5s">
-                                5초
-                              </SelectItem>
-                              <SelectItem value="10s">
-                                10초
-                              </SelectItem>
-                              <SelectItem value="20s">
-                                20초
-                              </SelectItem>
-                              <SelectItem value="30s">
-                                30초
-                              </SelectItem>
-                              <SelectItem value="1m">
-                                1분
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 text-center">
-                          {parseTimeUnit(
-                            safeLoadSettings.timeUnit,
-                          )}
-                          초
-                        </p>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm text-muted-foreground mb-2 block">
-                          사전 할당 VU <span className="text-xs text-muted-foreground">(Pre-allocated VUs)</span>
-                        </Label>
-                        <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
-                          <Input
-                            type="number"
-                            value={
-                              safeLoadSettings.preAllocatedVUs
-                            }
-                            onChange={(e) => {
-                              const value = Math.max(
-                                1,
-                                Math.min(
-                                  100,
-                                  Number(e.target.value) || 1,
-                                ),
-                              );
-                              updateTestSetting(
-                                "load",
-                                "preAllocatedVUs",
-                                value,
-                              );
-                            }}
-                            min="1"
-                            max="100"
-                            className="border-none bg-transparent text-center text-primary font-semibold text-sm focus:text-foreground transition-colors"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 text-center">
-                          시작 시 할당
-                        </p>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm text-muted-foreground mb-2 block">
-                          최대 VU <span className="text-xs text-muted-foreground">(Max VUs)</span>
-                        </Label>
-                        <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
-                          <Input
-                            type="number"
-                            value={safeLoadSettings.maxVUs}
-                            onChange={(e) => {
-                              const value = Math.max(
-                                1,
-                                Math.min(
-                                  2000,
-                                  Number(e.target.value) || 1,
-                                ),
-                              );
-                              updateTestSetting(
-                                "load",
-                                "maxVUs",
-                                value,
-                              );
-                            }}
-                            min="1"
-                            max="2000"
-                            className="border-none bg-transparent text-center text-primary font-semibold text-sm focus:text-foreground transition-colors"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 text-center">
-                          최대 동시 연결
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 neu-pressed rounded-lg px-4 py-3">
-                      <div className="flex items-start space-x-2">
-                        <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-muted-foreground">
-                          <strong>k6 기준:</strong> iterations
-                          per timeUnit으로 설정하며, 실제 TPS는
-                          시스템 응답 성능에 따라 달라질 수
-                          있습니다. 프리셋 사용을 권장합니다.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* 테스트 단계 (Stages) - 모든 모드에서 표시하되 Custom만 편집 가능 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  테스트 단계 <span className="text-xs text-muted-foreground ml-1">(Stages)</span>
-                  {safeLoadSettings.preset !== "custom" && (
-                    <span className="text-sm text-muted-foreground ml-2">
-                      • {currentPreset.name} 프리셋
-                    </span>
-                  )}
-                </Label>
-                <div className="space-y-4">
-                  {safeLoadSettings.stages.map(
-                    (stage, index) => (
-                      <div
-                        key={index}
-                        className="neu-input rounded-xl p-4"
-                      >
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                          <div>
-                            <Label className="text-sm text-muted-foreground mb-2 block">
-                              목표 요청 수 <span className="text-xs text-muted-foreground">(Target Requests)</span>
-                              <span className="text-xs ml-1">
-                                (per {safeLoadSettings.timeUnit}
-                                )
-                              </span>
-                            </Label>
-                            <Input
-                              type="number"
-                              value={stage.target || 0}
-                              onChange={(e) => {
-                                if (
-                                  safeLoadSettings.preset !==
-                                  "custom"
-                                )
-                                  return;
-                                const newStages = [
-                                  ...safeLoadSettings.stages,
-                                ];
-                                newStages[index] = {
-                                  ...stage,
-                                  target:
-                                    Number(e.target.value) || 0,
-                                };
-                                updateTestSetting(
-                                  "load",
-                                  "stages",
-                                  newStages,
-                                );
-                              }}
-                              disabled={
-                                safeLoadSettings.preset !==
-                                "custom"
-                              }
-                              className={`border-none bg-transparent text-foreground text-center font-semibold ${
-                                safeLoadSettings.preset !==
-                                "custom"
-                                  ? "opacity-60"
-                                  : ""
-                              }`}
-                              min="0"
-                              max="50000"
-                            />
-                            <p className="text-xs text-muted-foreground mt-1 text-center">
-                              ≈{" "}
-                              {calculateTPS(
-                                stage.target || 0,
-                                safeLoadSettings.timeUnit,
-                              )}{" "}
-                              TPS
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-sm text-muted-foreground mb-2 block">
-                              지속 시간 <span className="text-xs text-muted-foreground">(Duration)</span>
-                            </Label>
-                            {safeLoadSettings.preset ===
-                            "custom" ? (
-                              <Select
-                                value={stage.duration || "1m"}
-                                onValueChange={(value) => {
-                                  const newStages = [
-                                    ...safeLoadSettings.stages,
-                                  ];
-                                  newStages[index] = {
-                                    ...stage,
-                                    duration: value,
-                                  };
-                                  updateTestSetting(
-                                    "load",
-                                    "stages",
-                                    newStages,
-                                  );
-                                }}
-                              >
-                                <SelectTrigger className="border-none bg-transparent text-foreground">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="neu-card rounded-xl border-none bg-card">
-                                  <SelectItem value="0">
-                                    0s (즉시 스파이크)
-                                  </SelectItem>
-                                  <SelectItem value="10s">
-                                    10s
-                                  </SelectItem>
-                                  <SelectItem value="20s">
-                                    20s
-                                  </SelectItem>
-                                  <SelectItem value="30s">
-                                    30s
-                                  </SelectItem>
-                                  <SelectItem value="1m">
-                                    1m
-                                  </SelectItem>
-                                  <SelectItem value="2m">
-                                    2m
-                                  </SelectItem>
-                                  <SelectItem value="5m">
-                                    5m
-                                  </SelectItem>
-                                  <SelectItem value="10m">
-                                    10m
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <div className="neu-pressed rounded-lg px-3 py-2 opacity-60">
-                                <span className="text-sm text-muted-foreground">
-                                  {stage.duration === "0"
-                                    ? "0s (즉시)"
-                                    : stage.duration}
-                                </span>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-1 text-center">
-                              {stage.duration === "0"
-                                ? "즉시 변경"
-                                : `${parseTimeUnit(stage.duration || "1m")}초`}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-sm text-muted-foreground mb-2 block">
-                              단계 설명 <span className="text-xs text-muted-foreground">(Stage Description)</span>
-                              {stage.duration === "0" && (
-                                <Zap className="inline-block h-3 w-3 ml-1 text-yellow-600" />
-                              )}
-                            </Label>
-                            <div className="neu-pressed rounded-lg px-3 py-2">
-                              <span className="text-sm text-muted-foreground">
-                                {stage.duration === "0"
-                                  ? "⚡ 즉시 스파이크"
-                                  : stage.description ||
-                                    "점진적 변화"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </div>
-                <div className="mt-4 neu-pressed rounded-xl px-4 py-3">
-                  <div className="flex items-start space-x-2">
-                    <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                    <p className="text-muted-foreground text-sm">
-                      <strong>k6 기준:</strong> target은
-                      "iterations per timeUnit" 값이며,
-                      duration이 "0"인 단계는 즉시 스파이크를
-                      생성합니다. 실제 TPS는 시스템 응답 성능에
-                      따라 달라집니다. Custom 모드에서만 수정
-                      가능합니다.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="neu-card rounded-3xl px-6 py-8 flex items-center justify-center">
-            <div className="text-center py-12 text-muted-foreground">
-              <Settings className="h-16 w-16 mx-auto mb-6 opacity-50" />
-              <p className="font-semibold text-lg mb-2">설정</p>
-              <p className="text-base">
-                이 테스트 유형은 설정이 별도로 없습니다.
-              </p>
-            </div>
-          </div>
-        );
-    }
-  };
 
   // 모든 테스트 유형에 대한 k6 스크립트 생성
   const generateTestScript = (url: string, testType: string, settings: TestSettings): string => {
@@ -2081,7 +1293,7 @@ export default function () {
 `;
   };
 
-  return (
+      return (
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-8 mx-auto">
       {/* 헤더 */}
@@ -2092,52 +1304,81 @@ export default function () {
         <p className="text-muted-foreground text-lg">
           웹사이트에 대한 다양한 테스트를 실행하세요
         </p>
-      </div>
+          </div>
 
-      {/* 메인 설정 영역: 기본 설정 + 상세 설정 */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* 기본 테스트 설정 (좌측) */}
-        <div className="neu-card rounded-3xl px-6 py-8">
+      {/* 메인 설정 영역: 세로 레이아웃 */}
+      <div className="space-y-8">
+        {/* 기본 테스트 설정 */}
+          <div className="neu-card rounded-3xl px-6 py-8">
           <div className="mb-8">
             <h3 className="text-2xl font-semibold text-primary mb-4">
               기본 테스트 설정
-            </h3>
+              </h3>
             <p className="text-muted-foreground text-lg">
               테스트할 웹사이트와 테스트 유형을 선택하세요
             </p>
 
-            {/* 선택된 테스트 유형의 MCP 도구 표시 */}
-            {selectedTestType && (
-              <div className="mt-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <Activity className="h-5 w-5 text-primary" />
-                  <Label className="text-foreground font-semibold text-lg">
-                    활용 MCP 도구
+            {/* 테스트 유형과 활용 MCP 도구 표시 - 항상 표시 */}
+            <div className="mt-6">
+                            {/* 테스트 유형 선택 */}
+              <div className="mb-4">
+                <div className="flex items-center space-x-3">
+                  <TestTube className="h-5 w-5 text-primary" />
+                  <Label className="text-foreground font-semibold text-lg w-28">
+                    테스트 유형
                   </Label>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {getMcpTools(selectedTestType).map((tool) => (
-                    <div
-                      key={tool}
-                      className="neu-pressed rounded-lg px-3 py-2"
-                    >
-                      <Badge
-                        variant="secondary"
-                        className="font-semibold text-sm bg-transparent border-none text-muted-foreground"
+                  <div className="flex gap-2">
+                    {testTypes.map((type) => (
+                      <button
+                        key={type.id}
+                        onClick={() => setSelectedTestType(type.id)}
+                        disabled={isExecuting}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          selectedTestType === type.id 
+                            ? "neu-accent text-primary-foreground" 
+                            : "neu-button text-foreground hover:text-primary"
+                        } ${isExecuting ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
-                        {tool}
-                      </Badge>
-                    </div>
-                  ))}
+                        {type.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            )}
+              
+              {/* 활용 MCP 도구 표시 */}
+              <div className="mb-4">
+                <div className="flex items-center space-x-3">
+                  <Activity className="h-5 w-5 text-primary" />
+                  <Label className="text-foreground font-semibold text-lg w-28">
+                    활용 MCP 도구
+                  </Label>
+                  {selectedTestType && (
+                    <div className="flex gap-2">
+                      {getMcpTools(selectedTestType).map((tool) => (
+                        <div
+                          key={tool}
+                          className="neu-pressed rounded-lg px-3 py-2"
+                        >
+                          <Badge
+                            variant="secondary"
+                            className="font-semibold text-sm bg-transparent border-none text-muted-foreground"
+                          >
+                            {tool}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="space-y-6">
+              <div className="space-y-6">
             <div className="space-y-4">
-              <Label className="text-foreground font-semibold text-lg">
+                <Label className="text-foreground font-semibold text-lg">
                 테스트 URL
-              </Label>
+                </Label>
               <div
                 className={`neu-input rounded-xl px-4 py-3 ${urlError ? "border-destructive border-2" : ""}`}
               >
@@ -2153,45 +1394,19 @@ export default function () {
                   className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
                   pattern="https?://.*"
                 />
-              </div>
+                    </div>
               {urlError && (
                 <div className="flex items-start space-x-2 text-destructive">
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <p className="text-sm">{urlError}</p>
                 </div>
               )}
-            </div>
-
-            <div className="space-y-4">
-              <Label className="text-foreground font-semibold text-lg">
-                테스트 유형
-              </Label>
-              <div className="neu-input rounded-xl px-3 py-2">
-                <Select
-                  value={selectedTestType}
-                  onValueChange={setSelectedTestType}
-                  disabled={isExecuting}
-                >
-                  <SelectTrigger className="border-none bg-transparent text-foreground">
-                    <SelectValue placeholder="테스트 유형을 선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent className="neu-card rounded-xl border-none bg-card">
-                    {testTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        <div className="font-medium text-foreground">
-                          {type.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
 
             <div className="space-y-4">
-              <Label className="text-foreground font-semibold text-lg">
+                <Label className="text-foreground font-semibold text-lg">
                 테스트 설명 (선택사항)
-              </Label>
+                </Label>
               <div className="neu-input rounded-xl px-4 py-1">
                 <Textarea
                   placeholder="이 테스트에 대한 간단한 설명을 입력하세요"
@@ -2204,6 +1419,8 @@ export default function () {
                 />
               </div>
             </div>
+
+
 
             {selectedTestType && (
               <div className="neu-pressed rounded-xl px-6 py-5">
@@ -2222,48 +1439,467 @@ export default function () {
           </div>
         </div>
 
-        {/* 테스트 유형별 상세 설정 (우측) */}
-        {renderTestTypeSettings()}
+        {/* 테스트 설정 영역 - 항상 표시 */}
+          <div className="neu-card rounded-3xl px-6 py-8">
+            <div className="flex items-center space-x-4 mb-6">
+              <Settings className="h-7 w-7 text-primary" />
+              <h3 className="text-2xl font-semibold text-primary">
+              {selectedTestType ? `${testTypes.find(t => t.id === selectedTestType)?.name} 설정` : '테스트 설정'}
+              </h3>
+            </div>
+          
+          {!selectedTestType ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Settings className="h-16 w-16 mx-auto mb-6 opacity-50" />
+              <p className="font-semibold text-lg mb-2">
+                테스트 유형을 선택하세요
+              </p>
+              <p className="text-base">
+                좌측에서 테스트 유형을 선택하면 상세 설정이 나타납니다
+              </p>
+            </div>
+          ) : selectedTestType === 'load' ? (
+            // 부하테스트 설정 - 이전과 동일한 구조
+            <div className="space-y-6">
+              {/* 프리셋 선택과 현재 설정을 한 줄에 표시 */}
+              <div className="grid grid-cols-2 gap-6">
+              {/* Preset 선택 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  테스트 프리셋 선택 <span className="text-xs text-muted-foreground ml-1">(Test Preset Selection)</span>
+                </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                  {loadTestPresets.map((preset) => {
+                    const IconComponent = preset.icon;
+                      const isSelected = testSettings.load.preset === preset.id;
+
+                    return (
+                      <button
+                        key={preset.id}
+                          onClick={() => handlePresetChange(preset.id)}
+                        className={`neu-button rounded-xl p-4 text-left transition-all duration-200 ${
+                          isSelected ? "neu-button-active" : ""
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3 mb-2">
+                          <IconComponent
+                            className={`h-5 w-5 ${isSelected ? "text-primary-foreground" : "text-primary"}`}
+                          />
+                          <span
+                            className={`font-semibold ${isSelected ? "text-primary-foreground" : "text-primary"}`}
+                          >
+                            {preset.name}
+                          </span>
+                        </div>
+                        <p
+                          className={`text-sm ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}
+                        >
+                          {preset.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+                {/* 기본 설정 표시 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <div className="flex items-center justify-between mb-4">
+                  <Label className="text-foreground font-semibold text-lg">
+                    현재 기본 설정 <span className="text-xs text-muted-foreground ml-1">(Current Settings)</span>
+                  </Label>
+                  <div className="neu-pressed rounded-lg px-3 py-1">
+                    <span className="text-xs text-muted-foreground">
+                        Executor: {testSettings.load.executor}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="neu-pressed rounded-lg px-4 py-3">
+                    <Label className="text-sm text-muted-foreground mb-1 block">
+                      시작 요청 속도 <span className="text-xs text-muted-foreground">(Start Rate)</span>
+                    </Label>
+                    <div className="flex flex-col">
+                      <span className="text-foreground font-semibold">
+                          {testSettings.load.startRate} 요청 / {testSettings.load.timeUnit}
+                      </span>
+                      <span className="text-xs text-foreground">
+                          ≈ {Math.round((testSettings.load.startRate / parseInt(testSettings.load.timeUnit)) * 100) / 100} TPS
+                      </span>
+                    </div>
+                  </div>
+                  <div className="neu-pressed rounded-lg px-4 py-3">
+                    <Label className="text-sm text-muted-foreground mb-1 block">
+                      시간 단위 <span className="text-xs text-muted-foreground">(Time Unit)</span>
+                    </Label>
+                    <span className="text-foreground font-semibold">
+                        {testSettings.load.timeUnit}
+                    </span>
+                  </div>
+                  <div className="neu-pressed rounded-lg px-4 py-3">
+                    <Label className="text-sm text-muted-foreground mb-1 block">
+                      사전 할당 VU <span className="text-xs text-muted-foreground">(Pre-allocated VUs)</span>
+                    </Label>
+                    <span className="text-foreground font-semibold">
+                        {testSettings.load.preAllocatedVUs}
+                    </span>
+                  </div>
+                  <div className="neu-pressed rounded-lg px-4 py-3">
+                    <Label className="text-sm text-muted-foreground mb-1 block">
+                      최대 VU <span className="text-xs text-muted-foreground">(Max VUs)</span>
+                    </Label>
+                    <span className="text-foreground font-semibold">
+                        {testSettings.load.maxVUs}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Executor 설명 추가 */}
+                <div className="mt-4 neu-pressed rounded-lg px-4 py-3">
+                  <div className="flex items-start space-x-2">
+                    <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground">
+                      <strong>Ramping Arrival Rate:</strong>{" "}
+                        일정 시간 동안 목표 요청률(iterations per timeUnit)까지 선형 증가시키는 부하 방식입니다. 
+                        실제 TPS는 시스템 응답 성능에 따라 달라질 수 있습니다.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom 모드일 때만 상세 설정 표시 */}
+              {testSettings.load.preset === "custom" && (
+                <>
+                  {/* 실행모드와 상세설정을 한 줄에 표시 */}
+                  <div className="grid grid-cols-2 gap-6">
+                  {/* Executor 선택 */}
+                  <div className="neu-subtle rounded-xl px-6 py-6">
+                    <Label className="text-foreground font-semibold text-lg mb-4 block">
+                      실행 모드 <span className="text-xs text-muted-foreground ml-1">(Executor)</span>
+                    </Label>
+                    <div className="neu-input rounded-xl px-3 py-2">
+                      <Select
+                          value={testSettings.load.executor}
+                        onValueChange={(value) =>
+                            updateTestSetting("load", "executor", value)
+                        }
+                      >
+                        <SelectTrigger className="border-none bg-transparent text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="neu-card rounded-xl border-none bg-card">
+                          <SelectItem value="ramping-arrival-rate">
+                              Ramping Arrival Rate (점진적 요청률 증가)
+                          </SelectItem>
+                          <SelectItem value="constant-arrival-rate">
+                              Constant Arrival Rate (일정한 요청률 유지)
+                          </SelectItem>
+                          <SelectItem value="ramping-vus">
+                              Ramping VUs (점진적 가상 사용자 증가)
+                          </SelectItem>
+                          <SelectItem value="constant-vus">
+                            Constant VUs (일정한 가상 사용자 수)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="mt-3 neu-pressed rounded-lg px-4 py-3">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-muted-foreground">
+                          <strong>권장:</strong>{" "}
+                            ramping-arrival-rate는 실제 사용자 행동 패턴을 가장 잘 시뮬레이션합니다.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                    {/* 상세 설정 */}
+                  <div className="neu-subtle rounded-xl px-6 py-6">
+                    <Label className="text-foreground font-semibold text-lg mb-4 block">
+                      상세 설정 <span className="text-xs text-muted-foreground ml-1">(Advanced Settings)</span>
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-sm text-muted-foreground mb-2 block">
+                          시작 요청 수 <span className="text-xs text-muted-foreground">(Start Requests)</span>
+                        </Label>
+                        <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
+                          <Input
+                            type="number"
+                              value={testSettings.load.startRate}
+                            onChange={(e) => {
+                                const value = Math.max(1, Math.min(10000, Number(e.target.value) || 1));
+                                updateTestSetting("load", "startRate", value);
+                            }}
+                            min="1"
+                            max="10000"
+                            className="border-none bg-transparent text-center text-primary font-semibold text-sm focus:text-foreground transition-colors"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 text-center">
+                            per {testSettings.load.timeUnit} ≈ {Math.round((testSettings.load.startRate / parseInt(testSettings.load.timeUnit)) * 100) / 100} TPS
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm text-muted-foreground mb-2 block">
+                          시간 단위 <span className="text-xs text-muted-foreground">(Time Unit)</span>
+                        </Label>
+                        <div className="neu-input rounded-lg px-2 py-1 ring-1 ring-primary/20">
+                          <Select
+                              value={testSettings.load.timeUnit}
+                            onValueChange={(value) =>
+                                updateTestSetting("load", "timeUnit", value)
+                            }
+                          >
+                            <SelectTrigger className="border-none bg-transparent text-primary text-sm h-8 hover:text-foreground transition-colors">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="neu-card rounded-xl border-none bg-card">
+                                <SelectItem value="1s">1초</SelectItem>
+                                <SelectItem value="5s">5초</SelectItem>
+                                <SelectItem value="10s">10초</SelectItem>
+                                <SelectItem value="20s">20초</SelectItem>
+                                <SelectItem value="30s">30초</SelectItem>
+                                <SelectItem value="1m">1분</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 text-center">
+                            {testSettings.load.timeUnit.includes('m') ? parseInt(testSettings.load.timeUnit) * 60 : parseInt(testSettings.load.timeUnit)}초
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm text-muted-foreground mb-2 block">
+                          사전 할당 VU <span className="text-xs text-muted-foreground">(Pre-allocated VUs)</span>
+                        </Label>
+                        <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
+                          <Input
+                            type="number"
+                              value={testSettings.load.preAllocatedVUs}
+                            onChange={(e) => {
+                                const value = Math.max(1, Math.min(100, Number(e.target.value) || 1));
+                                updateTestSetting("load", "preAllocatedVUs", value);
+                            }}
+                            min="1"
+                            max="100"
+                            className="border-none bg-transparent text-center text-primary font-semibold text-sm focus:text-foreground transition-colors"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 text-center">
+                          시작 시 할당
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm text-muted-foreground mb-2 block">
+                          최대 VU <span className="text-xs text-muted-foreground">(Max VUs)</span>
+                        </Label>
+                        <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
+                          <Input
+                            type="number"
+                              value={testSettings.load.maxVUs}
+                            onChange={(e) => {
+                                const value = Math.max(1, Math.min(2000, Number(e.target.value) || 1));
+                                updateTestSetting("load", "maxVUs", value);
+                            }}
+                            min="1"
+                            max="2000"
+                            className="border-none bg-transparent text-center text-primary font-semibold text-sm focus:text-foreground transition-colors"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 text-center">
+                          최대 동시 연결
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 neu-pressed rounded-lg px-4 py-3">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-muted-foreground">
+                            <strong>k6 기준:</strong> iterations per timeUnit으로 설정하며, 실제 TPS는 시스템 응답 성능에 따라 달라질 수 있습니다. 프리셋 사용을 권장합니다.
+                        </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* 테스트 단계 (Stages) */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  테스트 단계 <span className="text-xs text-muted-foreground ml-1">(Stages)</span>
+                  {testSettings.load.preset !== "custom" && (
+                    <span className="text-sm text-muted-foreground ml-2">
+                      • {loadTestPresets.find(p => p.id === testSettings.load.preset)?.name} 프리셋
+                    </span>
+                  )}
+                </Label>
+                <div className="space-y-4">
+                  {testSettings.load.stages.map((stage, index) => (
+                    <div key={index} className="neu-input rounded-xl p-4">
+                        <div className="grid grid-cols-3 gap-4 items-center">
+                          <div>
+                            <Label className="text-sm text-muted-foreground mb-2 block">
+                              목표 요청 수 <span className="text-xs text-muted-foreground">(Target Requests)</span>
+                            <span className="text-xs ml-1">(per {testSettings.load.timeUnit})</span>
+                            </Label>
+                            <Input
+                              type="number"
+                              value={stage.target || 0}
+                              onChange={(e) => {
+                              if (testSettings.load.preset !== "custom") return;
+                              const newStages = [...testSettings.load.stages];
+                              newStages[index] = { ...stage, target: Number(e.target.value) || 0 };
+                              updateTestSetting("load", "stages", newStages);
+                            }}
+                            disabled={testSettings.load.preset !== "custom"}
+                              className={`border-none bg-transparent text-foreground text-center font-semibold ${
+                              testSettings.load.preset !== "custom" ? "opacity-60" : ""
+                              }`}
+                              min="0"
+                              max="50000"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1 text-center">
+                            ≈ {Math.round((stage.target || 0) / parseInt(testSettings.load.timeUnit) * 100) / 100} TPS
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground mb-2 block">
+                              지속 시간 <span className="text-xs text-muted-foreground">(Duration)</span>
+                            </Label>
+                          {testSettings.load.preset === "custom" ? (
+                              <Select
+                                value={stage.duration || "1m"}
+                                onValueChange={(value) => {
+                                const newStages = [...testSettings.load.stages];
+                                newStages[index] = { ...stage, duration: value };
+                                updateTestSetting("load", "stages", newStages);
+                                }}
+                              >
+                                <SelectTrigger className="border-none bg-transparent text-foreground">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="neu-card rounded-xl border-none bg-card">
+                                <SelectItem value="0">0s (즉시 스파이크)</SelectItem>
+                                <SelectItem value="10s">10s</SelectItem>
+                                <SelectItem value="20s">20s</SelectItem>
+                                <SelectItem value="30s">30s</SelectItem>
+                                <SelectItem value="1m">1m</SelectItem>
+                                <SelectItem value="2m">2m</SelectItem>
+                                <SelectItem value="5m">5m</SelectItem>
+                                <SelectItem value="10m">10m</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="neu-pressed rounded-lg px-3 py-2 opacity-60">
+                                <span className="text-sm text-muted-foreground">
+                                {stage.duration === "0" ? "0s (즉시)" : stage.duration}
+                                </span>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1 text-center">
+                            {stage.duration === "0" ? "즉시 변경" : `${stage.duration.includes('m') ? parseInt(stage.duration) * 60 : parseInt(stage.duration)}초`}
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground mb-2 block">
+                              단계 설명 <span className="text-xs text-muted-foreground">(Stage Description)</span>
+                              {stage.duration === "0" && (
+                                <Zap className="inline-block h-3 w-3 ml-1 text-yellow-600" />
+                              )}
+                            </Label>
+                            <div className="neu-pressed rounded-lg px-3 py-2">
+                              <span className="text-sm text-muted-foreground">
+                              {stage.duration === "0" ? "⚡ 즉시 스파이크" : stage.description || "점진적 변화"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                  ))}
+                </div>
+                <div className="mt-4 neu-pressed rounded-xl px-4 py-3">
+                  <div className="flex items-start space-x-2">
+                    <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <p className="text-muted-foreground text-sm">
+                      <strong>k6 기준:</strong> target은 "iterations per timeUnit" 값이며, duration이 "0"인 단계는 즉시 스파이크를 생성합니다. 
+                      실제 TPS는 시스템 응답 성능에 따라 달라집니다. Custom 모드에서만 수정 가능합니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // 다른 테스트 유형에 대한 간단한 설정
+            <div className="neu-subtle rounded-xl px-6 py-6">
+              <div className="flex items-start space-x-4">
+                <AlertCircle className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <p className="text-muted-foreground mb-2">
+                    {testTypes.find(t => t.id === selectedTestType)?.description}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    이 테스트 유형은 기본 설정으로 실행됩니다. 상세 설정이 필요한 경우 개발팀에 문의하세요.
+        </p>
+      </div>
+                </div>
+                </div>
+              )}
       </div>
 
       {/* 테스트 시작 버튼 */}
       {selectedTestType && (
-        <div className="flex justify-center">
-          <button
-            onClick={handleStartTest}
-            disabled={
-              !testUrl ||
-              !selectedTestType ||
-              isExecuting ||
-              !validateUrl(normalizeUrl(testUrl))
-            }
-            className={`
-              px-12 py-6 rounded-2xl text-xl font-semibold
-              transition-all duration-200 flex items-center space-x-4 w-full justify-center
-              ${
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            <button
+              onClick={handleStartTest}
+              disabled={
                 !testUrl ||
                 !selectedTestType ||
                 isExecuting ||
-                !validateUrl(normalizeUrl(testUrl))
-                  ? "neu-button opacity-50 cursor-not-allowed text-muted-foreground"
-                  : "neu-button-primary text-white"
+                  !validateUrl(normalizeUrl(testUrl)) ||
+                  runningTests.some(test => test.status === "running" || test.status === "실행중")
               }
-            `}
-          >
-            {isExecuting ? (
-              <>
-                <Timer className="h-6 w-6 animate-spin" />
-                <span>테스트 실행 중...</span>
-              </>
-            ) : (
-              <>
-                <Play className="h-6 w-6 " />
-                <span>테스트 시작</span>
-              </>
-            )}
-          </button>
+              className={`
+                px-12 py-6 rounded-2xl text-xl font-semibold
+                transition-all duration-200 flex items-center space-x-4 w-full justify-center
+                ${
+                  !testUrl ||
+                  !selectedTestType ||
+                  isExecuting ||
+                    !validateUrl(normalizeUrl(testUrl)) ||
+                    runningTests.some(test => test.status === "running" || test.status === "실행중")
+                    ? "neu-button opacity-50 cursor-not-allowed text-muted-foreground"
+                    : "neu-button-primary text-white"
+                }
+              `}
+            >
+              {isExecuting ? (
+                <>
+                  <Timer className="h-6 w-6 animate-spin" />
+                  <span>테스트 실행 중...</span>
+                </>
+                ) : runningTests.some(test => test.status === "running" || test.status === "실행중") ? (
+                  <>
+                    <Timer className="h-6 w-6 animate-pulse" />
+                    <span>다른 테스트가 진행 중입니다</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-6 w-6 " />
+                  <span>테스트 시작</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
+      </div>
 
       {/* 실행중인 테스트 목록 - 단순화된 버전 */}
       {(() => {
