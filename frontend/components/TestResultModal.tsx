@@ -320,7 +320,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
               )}
               
               {/* 다운로드 버튼 */}
-              <div className="mt-6 flex flex-wrap gap-4 justify-end">
+              {/* <div className="mt-6 flex flex-wrap gap-4 justify-end">
                 <button 
                   className="neu-accent rounded-xl px-6 py-4 font-semibold text-primary-foreground transition-all duration-200 hover:neu-accent"
                   onClick={() => onDownload(result, 'pdf')}
@@ -342,7 +342,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
                   <Download className="h-5 w-5 mr-3" />
                   CSV 다운로드
                 </button>
-              </div>
+              </div> */}
             </div>
 
             {/* 성능 메트릭 */}

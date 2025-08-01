@@ -60,6 +60,7 @@ export interface TestType {
   name: string;
   description: string;
   enabled: boolean;
+  mcp_tool?: string;
 }
 
 // 연결 상태 체크를 위한 유틸리티 함수

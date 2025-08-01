@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Progress } from "./ui/progress";
 import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3 } from "lucide-react";
-import { getAllTestResults, getTestResultById } from "../utils/backend-api";
+import { getAllTestResults, getTestResultById, getTestTypes } from "../utils/backend-api";
 import { TestResultModal } from "./TestResultModal";
 
 interface TestResultsProps {
@@ -20,50 +20,100 @@ export function TestResults({ onNavigate }: TestResultsProps) {
   const [selectedResult, setSelectedResult] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testResults, setTestResults] = useState<any[]>([]);
+  const [testTypes, setTestTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
 
-  // 경과 시간 계산 함수 (MM:SS 포맷)
-  const calculateElapsedTime = (startTime: string, endTime?: string): string => {
-    const start = new Date(startTime).getTime();
-    const end = endTime ? new Date(endTime).getTime() : currentTime;
-    const elapsedTime = end - start;
-    const elapsedSeconds = Math.floor(elapsedTime / 1000);
-    
-    const minutes = Math.floor(elapsedSeconds / 60);
-    const seconds = elapsedSeconds % 60;
-    
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  // 백엔드 API에서 테스트 결과 데이터 가져오기
+  // 테이블 드래그 스크롤 기능
   useEffect(() => {
-    const fetchTestResults = async () => {
+    const tableContainer = document.querySelector('.overflow-x-auto') as HTMLElement;
+    if (!tableContainer) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    const handleMouseDown = (e: Event) => {
+      const mouseEvent = e as MouseEvent;
+      // 버튼 클릭이 아닌 경우에만 드래그 시작
+      if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+      
+      isDragging = true;
+      startX = mouseEvent.pageX - tableContainer.offsetLeft;
+      scrollLeft = tableContainer.scrollLeft;
+      tableContainer.style.cursor = 'grabbing';
+      tableContainer.style.userSelect = 'none';
+    };
+
+    const handleMouseMove = (e: Event) => {
+      if (!isDragging) return;
+      const mouseEvent = e as MouseEvent;
+      mouseEvent.preventDefault();
+      const x = mouseEvent.pageX - tableContainer.offsetLeft;
+      const walk = (x - startX) * 1.5;
+      tableContainer.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleMouseUp = () => {
+      isDragging = false;
+      tableContainer.style.cursor = 'grab';
+      tableContainer.style.userSelect = 'auto';
+    };
+
+    tableContainer.style.cursor = 'grab';
+    tableContainer.addEventListener('mousedown', handleMouseDown);
+    tableContainer.addEventListener('mousemove', handleMouseMove);
+    tableContainer.addEventListener('mouseup', handleMouseUp);
+    tableContainer.addEventListener('mouseleave', handleMouseUp);
+
+    return () => {
+      tableContainer.removeEventListener('mousedown', handleMouseDown);
+      tableContainer.removeEventListener('mousemove', handleMouseMove);
+      tableContainer.removeEventListener('mouseup', handleMouseUp);
+      tableContainer.removeEventListener('mouseleave', handleMouseUp);
+    };
+  }, []);
+
+
+
+  // 백엔드 API에서 테스트 결과 데이터와 테스트 타입 데이터 가져오기
+  useEffect(() => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const result = await getAllTestResults(1, 50);
         
-        if (result.success && result.data) {
-          // data가 배열인지 확인하고 설정
-          const resultsArray = Array.isArray(result.data) ? result.data : [];
+        // 테스트 결과와 테스트 타입을 병렬로 가져오기
+        const [resultsResult, typesResult] = await Promise.all([
+          getAllTestResults(1, 50),
+          getTestTypes()
+        ]);
+        
+        if (resultsResult.success && resultsResult.data) {
+          const resultsArray = Array.isArray(resultsResult.data) ? resultsResult.data : [];
           setTestResults(resultsArray);
-          // console.log('Fetched test results:', resultsArray);
         } else {
-          const errorMessage = result.error || '테스트 결과를 불러오는데 실패했습니다.';
+          const errorMessage = resultsResult.error || '테스트 결과를 불러오는데 실패했습니다.';
           setError(errorMessage);
-          console.error('Failed to fetch test results:', result.error);
-          setTestResults([]); // 빈 배열로 초기화
+          console.error('Failed to fetch test results:', resultsResult.error);
+          setTestResults([]);
+        }
+        
+        if (typesResult.success && typesResult.data) {
+          setTestTypes(typesResult.data);
+        } else {
+          console.error('Failed to fetch test types:', typesResult.error);
+          setTestTypes([]);
         }
       } catch (err) {
-        setError('테스트 결과를 불러오는 중 오류가 발생했습니다.');
-        console.error('Error fetching test results:', err);
+        setError('데이터를 불러오는 중 오류가 발생했습니다.');
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTestResults();
+    fetchData();
   }, []);
 
   // 실시간 경과 시간 업데이트 (실행 중인 테스트용)
@@ -77,9 +127,14 @@ export function TestResults({ onNavigate }: TestResultsProps) {
 
   const filteredResults = Array.isArray(testResults) ? testResults.filter(result => {
     const matchesSearch = result.url.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterType === "all" || result.type === filterType;
+    const matchesFilter = filterType === "all" || 
+                         result.type === filterType || 
+                         result.testType === filterType ||
+                         result.testTypeId === filterType;
     return matchesSearch && matchesFilter;
   }) : [];
+
+
 
   const getBadgeColor = (type: string) => {
     switch (type) {
@@ -321,11 +376,11 @@ export function TestResults({ onNavigate }: TestResultsProps) {
               </SelectTrigger>
               <SelectContent className="neu-card rounded-xl border-none bg-card">
                 <SelectItem value="all">모든 유형</SelectItem>
-                <SelectItem value="성능테스트">성능테스트</SelectItem>
-                      <SelectItem value="lighthouse">Lighthouse</SelectItem>
-                      <SelectItem value="load">부하테스트</SelectItem>
-                      <SelectItem value="security">보안테스트</SelectItem>
-                      <SelectItem value="accessibility">접근성테스트</SelectItem>
+                {testTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>
+                    {type.name} {type.mcp_tool && `(${type.mcp_tool})`}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -350,17 +405,16 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                 <p className="text-muted-foreground">다른 검색어나 필터를 시도해보세요</p>
               </div>
             ) : (
-        <div className="neu-pressed rounded-2xl p-2">
-                  <div className="overflow-x-auto" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <div className="neu-pressed rounded-2xl p-2">
+                  <div className="overflow-x-auto select-none" style={{ maxHeight: '400px', overflowY: 'auto' }}>
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-50 bg-card shadow-sm border-b">
                 <TableRow className="neu-subtle rounded-xl">
-                  <TableHead className="w-[300px] px-6 py-6 text-primary font-semibold text-lg">웹사이트</TableHead>
-                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg">테스트 유형</TableHead>
-                  <TableHead className="w-[150px] px-6 py-6 text-primary font-semibold text-lg">실행 일시</TableHead>
-                  <TableHead className="w-[100px] px-6 py-6 text-primary font-semibold text-lg">소요 시간</TableHead>
-                  <TableHead className="w-[80px] px-6 py-6 text-primary font-semibold text-lg">상태</TableHead>
-                  <TableHead className="w-[140px] text-right px-6 py-6 text-primary font-semibold text-lg">작업</TableHead>
+                  <TableHead className="w-[80px] px-6 py-6 text-primary font-semibold text-lg text-center">작업</TableHead>
+                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">웹사이트</TableHead>
+                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">테스트 유형</TableHead>
+                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">실행 일시</TableHead>
+                  <TableHead className="w-[80px] px-6 py-6 text-primary font-semibold text-lg text-center">상태</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -373,46 +427,8 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                               onClick={() => openModal(result)}
                     >
                       <TableCell className="px-6 py-6">
-                        <div className="flex items-center space-x-4">
-                          <Globe className="h-6 w-6 text-primary flex-shrink-0" />
-                          <div className="min-w-0">
-                                    <p className="font-semibold truncate text-foreground text-base">{result.url}</p>
-                                    <p className="text-muted-foreground text-xs">{result.createdAt ? new Date(result.createdAt).toLocaleString() : ''}</p>
-                          </div>
-                          <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-6 py-6">
-                        <div className="neu-subtle rounded-full px-4 py-2 inline-block" style={{ 
-                          backgroundColor: badgeColor.bg, 
-                          color: badgeColor.text
-                        }}>
-                                  <span className="font-semibold">{result.testType || result.type || '부하테스트'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-6 py-6">
-                        <div>
-                                  <div className="font-semibold text-foreground text-xs">{result.createdAt ? new Date(result.createdAt).toLocaleString() : ''}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-6 py-6 text-muted-foreground font-medium">
-                                {result.status === 'running' 
-                                  ? calculateElapsedTime(result.createdAt)
-                                  : (result.duration || calculateElapsedTime(result.createdAt, result.updatedAt))
-                                }
-                      </TableCell>
-                      <TableCell className="px-6 py-6">
-                        <div className="neu-subtle rounded-full px-4 py-2 inline-block border-2" style={{ 
-                          borderColor: '#7886C7', 
-                          color: '#7886C7',
-                          backgroundColor: 'transparent'
-                        }}>
-                          <span className="font-semibold">{result.status}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right px-6 py-6">
-                        <div className="flex justify-end space-x-3">
-                          <button 
+                        <div className="flex justify-center space-x-3">
+                          {/* <button 
                             className="neu-button rounded-xl p-3 font-medium text-foreground hover:text-primary transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -420,7 +436,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                             }}
                           >
                             <Eye className="h-4 w-4" />
-                          </button>
+                          </button> */}
                           <button 
                             className="neu-secondary rounded-xl p-3 font-medium text-secondary-foreground hover:text-primary transition-colors"
                             onClick={(e) => {
@@ -432,6 +448,39 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                           </button>
                         </div>
                       </TableCell>
+                      <TableCell className="px-3 py-6 w-[120px]">
+                        <div className="flex items-center space-x-2">
+                          <Globe className="h-5 w-5 text-primary flex-shrink-0" />
+                          <div className="min-w-0">
+                                    <p className="font-semibold truncate text-foreground text-sm">{result.url}</p>
+                                    <p className="text-muted-foreground text-xs">{result.createdAt ? new Date(result.createdAt).toLocaleString() : ''}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-6 py-6 w-[120px]">
+                        <div className="neu-subtle rounded-full px-4 py-2 inline-block" style={{ 
+                          backgroundColor: badgeColor.bg, 
+                          color: badgeColor.text
+                        }}>
+                                  <span className="font-semibold">{result.testType || result.type || '부하테스트'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-6 py-6 w-[120px]">
+                        <div>
+                                  <div className="font-semibold text-foreground text-xs">{result.createdAt ? new Date(result.createdAt).toLocaleString() : ''}</div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="px-6 py-6 w-[80px]">
+                        <div className="neu-subtle rounded-full px-4 py-2 inline-block border-2" style={{ 
+                          borderColor: '#7886C7', 
+                          color: '#7886C7',
+                          backgroundColor: 'transparent'
+                        }}>
+                          <span className="font-semibold">{result.status}</span>
+                        </div>
+                      </TableCell>
+
                     </TableRow>
                   );
                 })}

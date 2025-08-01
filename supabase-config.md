@@ -133,6 +133,7 @@ CREATE TABLE public.m2_test_types (
   config_template jsonb,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  mcp_tool text,
   CONSTRAINT m2_test_types_pkey PRIMARY KEY (id)
 );
 

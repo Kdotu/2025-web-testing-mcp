@@ -993,22 +993,22 @@ export default function () {
         result = await executeLighthouseTest(lighthouseParams);
       } else {
         // 다른 테스트 유형은 k6 사용
-        const k6Script = generateTestScript(normalizedUrl, selectedTestType, testSettings);
-        
-        const testParams = {
-          url: normalizedUrl,
-          name: testDescription || `${selectedTestType} Test - ${normalizedUrl}`,
-          description: testDescription,
-          script: k6Script,
-          config: {
-            duration: selectedTestType === 'load' ? testSettings.load.timeUnit : '30s',
-            vus: selectedTestType === 'load' ? testSettings.load.maxVUs : 10,
-            detailedConfig: {
-              testType: selectedTestType,
-              settings: testSettings[selectedTestType as keyof TestSettings]
-            }
+      const k6Script = generateTestScript(normalizedUrl, selectedTestType, testSettings);
+      
+      const testParams = {
+        url: normalizedUrl,
+        name: testDescription || `${selectedTestType} Test - ${normalizedUrl}`,
+        description: testDescription,
+        script: k6Script,
+        config: {
+          duration: selectedTestType === 'load' ? testSettings.load.timeUnit : '30s',
+          vus: selectedTestType === 'load' ? testSettings.load.maxVUs : 10,
+          detailedConfig: {
+            testType: selectedTestType,
+            settings: testSettings[selectedTestType as keyof TestSettings]
           }
-        };
+        }
+      };
 
         result = await executeK6MCPTest(testParams);
       }
@@ -2050,11 +2050,11 @@ export default function () {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     이 테스트 유형은 기본 설정으로 실행됩니다. 상세 설정이 필요한 경우 개발팀에 문의하세요.
-                  </p>
+        </p>
+      </div>
                 </div>
-              </div>
-            </div>
-          )}
+                </div>
+              )}
       </div>
 
       {/* 테스트 시작 버튼 */}

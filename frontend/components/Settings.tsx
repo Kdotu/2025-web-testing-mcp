@@ -9,9 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { Plus, Trash2, Edit, Save, Bell, Database, Settings as SettingsIcon, Cog, Shield, Activity, AlertCircle, CheckCircle } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Bell, Database, Settings as SettingsIcon, Cog, Activity, CheckCircle, Shield, AlertCircle } from "lucide-react";
 import { getTestTypes, addTestType, updateTestType, deleteTestType, type TestType } from "../utils/api";
 import { toast } from "sonner";
+import { TestTypeModal } from "./TestTypeModal";
 
 interface SettingsProps {
   onNavigate?: (tabId: string) => void;
@@ -20,14 +21,9 @@ interface SettingsProps {
 export function Settings({ onNavigate }: SettingsProps) {
   const [testTypes, setTestTypes] = useState<TestType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAddingTestType, setIsAddingTestType] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [editingTestType, setEditingTestType] = useState<TestType | null>(null);
-  const [newTestType, setNewTestType] = useState<Partial<TestType>>({ 
-    id: "", 
-    name: "", 
-    description: "", 
-    enabled: true 
-  });
   
   // 일반 설정
   const [notifications, setNotifications] = useState(true);
@@ -62,50 +58,38 @@ export function Settings({ onNavigate }: SettingsProps) {
     }
   };
 
-  const handleAddTestType = async () => {
-    if (!newTestType.id || !newTestType.name || !newTestType.description) {
-      toast.error('모든 필드를 입력해주세요.');
-      return;
-    }
-
+  const handleSaveTestType = async (testTypeData: Partial<TestType>) => {
     try {
-      const result = await addTestType(newTestType as TestType);
-      if (result.success) {
-        toast.success('테스트 타입이 추가되었습니다.');
-        loadTestTypes();
-        setNewTestType({ id: "", name: "", description: "", enabled: true });
-        setIsAddingTestType(false);
+      if (modalMode === 'add') {
+        const result = await addTestType(testTypeData as TestType);
+        if (result.success) {
+          toast.success('테스트 타입이 추가되었습니다.');
+          loadTestTypes();
+        } else {
+          toast.error(result.error || '테스트 타입 추가에 실패했습니다.');
+        }
       } else {
-        toast.error(result.error || '테스트 타입 추가에 실패했습니다.');
+        if (!editingTestType) return;
+        const result = await updateTestType(editingTestType.id, {
+          name: testTypeData.name!,
+          description: testTypeData.description!,
+          enabled: testTypeData.enabled!
+        });
+        
+        if (result.success) {
+          toast.success('테스트 타입이 수정되었습니다.');
+          loadTestTypes();
+        } else {
+          toast.error(result.error || '테스트 타입 수정에 실패했습니다.');
+        }
       }
     } catch (error) {
-      console.error('Error adding test type:', error);
-      toast.error('테스트 타입 추가에 실패했습니다.');
+      console.error('Error saving test type:', error);
+      toast.error('테스트 타입 저장에 실패했습니다.');
     }
   };
 
-  const handleUpdateTestType = async () => {
-    if (!editingTestType) return;
 
-    try {
-      const result = await updateTestType(editingTestType.id, {
-        name: editingTestType.name,
-        description: editingTestType.description,
-        enabled: editingTestType.enabled
-      });
-      
-      if (result.success) {
-        toast.success('테스트 타입이 수정되었습니다.');
-        loadTestTypes();
-        setEditingTestType(null);
-      } else {
-        toast.error(result.error || '테스트 타입 수정에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('Error updating test type:', error);
-      toast.error('테스트 타입 수정에 실패했습니다.');
-    }
-  };
 
   const handleToggleTestType = async (testType: TestType) => {
     try {
@@ -123,6 +107,32 @@ export function Settings({ onNavigate }: SettingsProps) {
       console.error('Error toggling test type:', error);
       toast.error('테스트 타입 상태 변경에 실패했습니다.');
     }
+  };
+
+  // 테스트 타입에 맞는 아이콘 반환
+  const getTestTypeIcon = (testType: TestType) => {
+    const typeId = testType.id.toLowerCase();
+    const typeName = testType.name.toLowerCase();
+    
+    // ID 기반 매칭
+    if (typeId.includes('lighthouse') || typeName.includes('lighthouse')) {
+      return <CheckCircle className="h-5 w-5 text-primary" />;
+    }
+    if (typeId.includes('load') || typeName.includes('부하') || typeName.includes('load')) {
+      return <Database className="h-5 w-5 text-primary" />;
+    }
+    if (typeId.includes('performance') || typeName.includes('성능')) {
+      return <Activity className="h-5 w-5 text-primary" />;
+    }
+    if (typeId.includes('security') || typeName.includes('보안')) {
+      return <Shield className="h-5 w-5 text-primary" />;
+    }
+    if (typeId.includes('accessibility') || typeName.includes('접근성')) {
+      return <AlertCircle className="h-5 w-5 text-primary" />;
+    }
+    
+    // 기본 아이콘
+    return <SettingsIcon className="h-5 w-5 text-primary" />;
   };
 
   const handleDeleteTestType = async (testType: TestType) => {
@@ -144,24 +154,7 @@ export function Settings({ onNavigate }: SettingsProps) {
     }
   };
 
-  const generateTestTypeId = (name: string) => {
-    return name.toLowerCase()
-      .replace(/[^a-z0-9가-힣]/g, '')
-      .replace(/[가-힣]/g, (char) => {
-        // 한글을 영문으로 간단한 변환 (실제로는 더 정교한 변환이 필요)
-        const hanToEng: { [key: string]: string } = {
-          '성능': 'performance',
-          '라이트하우스': 'lighthouse', 
-          '부하': 'load',
-          '보안': 'security',
-          '접근성': 'accessibility'
-        };
-        for (const [han, eng] of Object.entries(hanToEng)) {
-          if (name.includes(han)) return eng;
-        }
-        return char;
-      });
-  };
+
 
   return (
     <div className="w-full flex flex-col items-center">
@@ -189,84 +182,17 @@ export function Settings({ onNavigate }: SettingsProps) {
                   <h3 className="text-2xl font-semibold text-primary mb-2">테스트 타입 관리</h3>
                   <p className="text-muted-foreground text-lg">사용 가능한 테스트 타입을 관리합니다</p>
                 </div>
-                <Dialog open={isAddingTestType} onOpenChange={setIsAddingTestType}>
-                  <DialogTrigger asChild>
-                    <Button className="neu-accent rounded-xl px-6 py-3 text-primary-foreground font-semibold" disabled>
-                      <Plus className="h-5 w-5 mr-2" />
-                      테스트 타입 추가
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-card border-none max-w-lg shadow-lg">
-                    <DialogHeader>
-                      <DialogTitle className="text-primary text-xl">새 테스트 타입 추가</DialogTitle>
-                      <DialogDescription className="text-muted-foreground">
-                        새로운 테스트 타입을 시스템에 추가합니다
-                      </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="space-y-6 py-4">
-                      <div className="space-y-4">
-                        <Label className="text-foreground font-semibold text-lg">테스트 타입 ID</Label>
-                        <div className="neu-input rounded-xl px-4 py-3">
-                          <Input
-                            value={newTestType.id}
-                            onChange={(e) => setNewTestType({...newTestType, id: e.target.value})}
-                            placeholder="예: performance, security"
-                            className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
-                          />
-                        </div>
-                        <p className="text-sm text-muted-foreground">영문, 숫자, 하이픈만 사용 가능합니다.</p>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <Label className="text-foreground font-semibold text-lg">테스트 타입 이름</Label>
-                        <div className="neu-input rounded-xl px-4 py-3">
-                          <Input
-                            value={newTestType.name}
-                            onChange={(e) => {
-                              setNewTestType({
-                                ...newTestType, 
-                                name: e.target.value,
-                                id: newTestType.id || generateTestTypeId(e.target.value)
-                              });
-                            }}
-                            placeholder="예: 접근성 테스트"
-                            className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <Label className="text-foreground font-semibold text-lg">설명</Label>
-                        <div className="neu-input rounded-xl px-4 py-3">
-                          <Textarea
-                            value={newTestType.description}
-                            onChange={(e) => setNewTestType({...newTestType, description: e.target.value})}
-                            placeholder="예: 웹 접근성 준수 검사"
-                            className="min-h-24 border-none bg-transparent resize-none text-foreground placeholder:text-muted-foreground"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <DialogFooter className="space-x-3">
-                      <Button 
-                        variant="outline"
-                        onClick={() => setIsAddingTestType(false)}
-                        className="neu-button rounded-xl px-6 py-3"
-                      >
-                        취소
-                      </Button>
-                      <Button 
-                        onClick={handleAddTestType} 
-                        className="neu-accent rounded-xl px-6 py-3 text-primary-foreground"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        추가
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  className="neu-accent rounded-xl px-6 py-3 text-primary-foreground font-semibold" 
+                  onClick={() => {
+                    setModalMode('add');
+                    setEditingTestType(null);
+                    setIsModalOpen(true);
+                  }}
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  테스트 타입 추가
+                </Button>
               </div>
               
               {isLoading ? (
@@ -286,10 +212,24 @@ export function Settings({ onNavigate }: SettingsProps) {
                             className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
                           />
                           <div>
-                            <h4 className="font-semibold text-primary text-lg mb-2">{testType.name}</h4>
+
+                            <div className="flex items-center space-x-2 mb-2">
+                              <div className="neu-pressed rounded-full p-2 mr-2">
+                                {getTestTypeIcon(testType)}
+                              </div>
+                              <h4 className="font-semibold text-primary text-lg">{testType.name}</h4>
+                              
+                            </div>
                             <p className="text-muted-foreground">{testType.description}</p>
-                            <div className="neu-pressed rounded-full px-3 py-1 mt-3 inline-block">
-                              <span className="text-xs font-mono text-muted-foreground">ID: {testType.id}</span>
+                            <div className="flex items-center space-x-3 mt-3">
+                              <div className="neu-pressed rounded-full px-3 py-1">
+                                <span className="text-xs font-mono text-muted-foreground">ID: {testType.id}</span>
+                              </div>
+                              {testType.mcp_tool && (
+                                <div className="neu-pressed rounded-full px-3 py-1">
+                                  <span className="text-xs font-mono text-primary">MCP: {testType.mcp_tool}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -299,79 +239,19 @@ export function Settings({ onNavigate }: SettingsProps) {
                               {testType.enabled ? "활성화" : "비활성화"}
                             </Badge>
                           </div>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="neu-button rounded-xl px-4 py-3"
-                                onClick={() => setEditingTestType(testType)}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                수정
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="neu-card border-none max-w-lg">
-                              <DialogHeader>
-                                <DialogTitle className="text-primary text-xl">테스트 타입 수정</DialogTitle>
-                                <DialogDescription className="text-muted-foreground">
-                                  테스트 타입의 정보를 수정합니다
-                                </DialogDescription>
-                              </DialogHeader>
-                              
-                              {editingTestType && (
-                                <div className="space-y-6 py-4">
-                                  <div className="space-y-4">
-                                    <Label className="text-foreground font-semibold text-lg">테스트 타입 이름</Label>
-                                    <div className="neu-input rounded-xl px-4 py-3">
-                                      <Input
-                                        value={editingTestType.name}
-                                        onChange={(e) => setEditingTestType({...editingTestType, name: e.target.value})}
-                                        className="border-none bg-transparent text-foreground"
-                                      />
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="space-y-4">
-                                    <Label className="text-foreground font-semibold text-lg">설명</Label>
-                                    <div className="neu-input rounded-xl px-4 py-3">
-                                      <Textarea
-                                        value={editingTestType.description}
-                                        onChange={(e) => setEditingTestType({...editingTestType, description: e.target.value})}
-                                        className="min-h-24 border-none bg-transparent resize-none text-foreground"
-                                      />
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="neu-pressed rounded-xl px-4 py-4 flex items-center justify-between">
-                                    <Label className="text-foreground font-semibold">활성화 상태</Label>
-                                    <Switch
-                                      checked={editingTestType.enabled}
-                                      onCheckedChange={(checked) => setEditingTestType({...editingTestType, enabled: checked})}
-                                      className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                              
-                              <DialogFooter className="space-x-3">
-                                <Button 
-                                  variant="outline"
-                                  onClick={() => setEditingTestType(null)}
-                                  className="neu-button rounded-xl px-6 py-3"
-                                >
-                                  취소
-                                </Button>
-                                <Button 
-                                  onClick={handleUpdateTestType} 
-                                  className="neu-accent rounded-xl px-6 py-3 text-primary-foreground"
-                                >
-                                  <Save className="h-4 w-4 mr-2" />
-                                  저장
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="neu-button rounded-xl px-4 py-3"
+                            onClick={() => {
+                              setModalMode('edit');
+                              setEditingTestType(testType);
+                              setIsModalOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            수정
+                          </Button>
                           <Button 
                             variant="ghost" 
                             size="sm"
@@ -482,128 +362,20 @@ export function Settings({ onNavigate }: SettingsProps) {
           </Tabs>
         </div>
         
-        {/* MCP 도구 정보 섹션 */}
-        <div className="neu-card rounded-3xl px-6 py-8">
-          <div className="mb-6">
-            <h3 className="text-2xl font-semibold text-primary mb-2">MCP 도구 정보</h3>
-            <p className="text-muted-foreground text-lg">각 테스트 타입에서 사용하는 MCP(Model Context Protocol) 도구입니다</p>
-          </div>
-          
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div className="neu-pressed rounded-xl px-6 py-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="neu-pressed rounded-full p-3">
-                  <Activity className="h-5 w-5 text-primary" />
-                </div>
-                <h4 className="font-semibold text-primary text-lg">성능 테스트</h4>
-              </div>
-              <div className="space-y-2">
-                {/* <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Lighthouse CLI</span>
-                </div>
-                <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">WebPageTest</span>
-                </div> */}
-              </div>
-            </div>
-            
-            <div className="neu-pressed rounded-xl px-6 py-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="neu-pressed rounded-full p-3">
-                  <CheckCircle className="h-5 w-5 text-primary" />
-                </div>
-                <h4 className="font-semibold text-primary text-lg">Lighthouse</h4>
-              </div>
-              <div className="space-y-2">
-                <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Google Lighthouse</span>
-                </div>
-                {/* <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Lighthouse CI</span>
-                </div> */}
-              </div>
-            </div>
-            
-            <div className="neu-pressed rounded-xl px-6 py-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="neu-pressed rounded-full p-3">
-                  <Database className="h-5 w-5 text-primary" />
-                </div>
-                <h4 className="font-semibold text-primary text-lg">부하 테스트</h4>
-              </div>
-              <div className="space-y-2">
-                <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">k6</span>
-                </div>
-                {/* <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Artillery</span>
-                </div> */}
-              </div>
-            </div>
-            
-            <div className="neu-pressed rounded-xl px-6 py-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="neu-pressed rounded-full p-3">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <h4 className="font-semibold text-primary text-lg">보안 테스트</h4>
-              </div>
-              <div className="space-y-2">
-                {/* <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">OWASP ZAP</span>
-                </div>
-                <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Nmap</span>
-                </div> */}
-              </div>
-            </div>
-            
-            <div className="neu-pressed rounded-xl px-6 py-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="neu-pressed rounded-full p-3">
-                  <AlertCircle className="h-5 w-5 text-primary" />
-                </div>
-                <h4 className="font-semibold text-primary text-lg">접근성 테스트</h4>
-              </div>
-              <div className="space-y-2">
-                {/* <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">axe-core</span>
-                </div>
-                <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Pa11y</span>
-                </div> */}
-              </div>
-            </div>
-            
-            <div className="neu-pressed rounded-xl px-6 py-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="neu-pressed rounded-full p-3">
-                  <SettingsIcon className="h-5 w-5 text-primary" />
-                </div>
-                <h4 className="font-semibold text-primary text-lg">통합 모니터링</h4>
-              </div>
-              <div className="space-y-2">
-                {/* <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Prometheus</span>
-                </div>
-                <div className="neu-pressed rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-muted-foreground">Grafana</span>
-                </div> */}
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-8">
-            <Alert className="neu-pressed rounded-xl border-none">
-              <Database className="h-5 w-5" />
-              <AlertDescription className="text-muted-foreground">
-                각 MCP 도구는 해당 테스트 타입의 특성에 맞춰 별도로 구성됩니다. 
-                실제 테스트 실행 시 선택된 도구가 자동으로 사용됩니다.
-              </AlertDescription>
-            </Alert>
-          </div>
-        </div>
+
       </div>
+
+      {/* 테스트 타입 모달 */}
+      <TestTypeModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTestType(null);
+        }}
+        mode={modalMode}
+        testType={editingTestType}
+        onSave={handleSaveTestType}
+      />
     </div>
   );
 }

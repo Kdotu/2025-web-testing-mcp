@@ -85,9 +85,9 @@ export class LighthouseService {
               title: 'SEO',
               description: 'SEO audit'
             }
-          }
+        }
         };
-        
+
         console.log('Mock Lighthouse result generated');
         resolve(JSON.stringify(mockResult));
       }, 2000); // 2초 후 결과 반환
