@@ -196,16 +196,57 @@ export function TestResults({ onNavigate }: TestResultsProps) {
         
         <div className="neu-card rounded-3xl px-6 py-8">
           <div className="flex items-center justify-between mb-4">
-            <div className="text-foreground font-semibold text-lg">평균 점수</div>
+            <div className="text-foreground font-semibold text-lg">최다 실행 테스트</div>
             <BarChart3 className="h-8 w-8 text-primary" />
           </div>
           <div className="text-4xl font-bold text-primary mb-2">
-                {testResults.length > 0 
-                  ? Math.round(testResults.reduce((acc, r) => acc + r.score, 0) / testResults.length)
-                  : 0
-                }
+                {(() => {
+                  if (testResults.length === 0) return 0;
+                  
+                  // 테스트 유형별 실행 횟수 계산
+                  const testTypeCounts: { [key: string]: number } = {};
+                  testResults.forEach(result => {
+                    const testType = result.testType || result.type || 'unknown';
+                    testTypeCounts[testType] = (testTypeCounts[testType] || 0) + 1;
+                  });
+                  
+                  // 가장 많이 실행된 테스트 유형 찾기
+                  const mostFrequentType = Object.entries(testTypeCounts)
+                    .sort(([,a], [,b]) => b - a)[0];
+                  
+                  return mostFrequentType ? mostFrequentType[1] : 0;
+                })()}
           </div>
-          <p className="text-muted-foreground">전체 평균</p>
+          <p className="text-muted-foreground">
+                {(() => {
+                  if (testResults.length === 0) return '테스트 없음';
+                  
+                  // 테스트 유형별 실행 횟수 계산
+                  const testTypeCounts: { [key: string]: number } = {};
+                  testResults.forEach(result => {
+                    const testType = result.testType || result.type || 'unknown';
+                    testTypeCounts[testType] = (testTypeCounts[testType] || 0) + 1;
+                  });
+                  
+                  // 가장 많이 실행된 테스트 유형 찾기
+                  const mostFrequentType = Object.entries(testTypeCounts)
+                    .sort(([,a], [,b]) => b - a)[0];
+                  
+                  if (!mostFrequentType) return '테스트 없음';
+                  
+                  // 테스트 유형 이름 매핑
+                  const typeNames: { [key: string]: string } = {
+                    'load': '부하테스트',
+                    'lighthouse': 'Lighthouse',
+                    'performance': '성능테스트',
+                    'security': '보안테스트',
+                    'accessibility': '접근성테스트',
+                    'unknown': '알 수 없음'
+                  };
+                  
+                  return typeNames[mostFrequentType[0]] || mostFrequentType[0];
+                })()}
+          </p>
         </div>
         
         <div className="neu-card rounded-3xl px-6 py-8">
@@ -214,10 +255,19 @@ export function TestResults({ onNavigate }: TestResultsProps) {
             <BarChart3 className="h-8 w-8 text-primary" />
           </div>
               <div className="text-4xl font-bold text-primary mb-2">
-                {testResults.length > 0 
-                  ? Math.round((testResults.filter(r => r.status === '완료').length / testResults.length) * 100)
-                  : 0
-                }%
+                {(() => {
+                  if (testResults.length === 0) return 0;
+                  
+                  // 완료된 테스트 수 계산 (다양한 상태값 고려)
+                  const completedTests = testResults.filter(r => 
+                    r.status === '완료' || 
+                    r.status === 'completed' || 
+                    r.status === 'success' ||
+                    r.status === 'complete'
+                  ).length;
+                  
+                  return Math.round((completedTests / testResults.length) * 100);
+                })()}%
               </div>
           <p className="text-muted-foreground">완료된 테스트</p>
         </div>
@@ -228,12 +278,21 @@ export function TestResults({ onNavigate }: TestResultsProps) {
             <Calendar className="h-8 w-8 text-primary" />
           </div>
               <div className="text-4xl font-bold text-primary mb-2">
-                {testResults.filter(r => {
+                {(() => {
                   const today = new Date().toISOString().split('T')[0];
-                  return r.date === today;
-                }).length}
+                  
+                  return testResults.filter(r => {
+                    // 다양한 날짜 필드 확인
+                    const testDate = r.date || 
+                                   r.createdAt?.split('T')[0] || 
+                                   r.created_at?.split('T')[0] ||
+                                   r.startTime?.split('T')[0];
+                    
+                    return testDate === today;
+                  }).length;
+                })()}
               </div>
-          <p className="text-muted-foreground">최근 테스트</p>
+          <p className="text-muted-foreground">오늘 실행된 테스트</p>
         </div>
       </div>
 

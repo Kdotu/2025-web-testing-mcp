@@ -1063,7 +1063,7 @@ export default function () {
           testId,
           testType: 'load',
           url: config?.url || '',
-          name: config?.name || 'k6 Test',
+          name: '', // name 필드는 비워두고 description만 사용
           status: 'completed', // 테스트 완료 시에만 completed로 설정
           metrics: {
             http_req_duration: { avg: 0, min: 0, max: 0, p95: 0 },

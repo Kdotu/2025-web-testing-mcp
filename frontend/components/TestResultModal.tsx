@@ -181,7 +181,17 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
           <div className="space-y-8">
             {/* 기본 정보 */}
             <div className="neu-flat rounded-2xl px-6 py-8">
-              <h4 className="font-semibold mb-6 text-primary text-xl">기본 정보</h4>
+              <div className="flex items-center justify-between mb-6">
+                <h4 className="font-semibold text-primary text-xl">기본 정보</h4>
+                {result.testId && (
+                  <div className="neu-pressed rounded-lg px-3 py-2">
+                    <span className="text-xs text-muted-foreground mr-2">Test ID:</span>
+                    <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded">
+                      {result.testId}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="flex justify-between items-center py-4 px-6 neu-pressed rounded-xl">
                 <div className="flex items-center justify-between w-full">
                   <div className="text-center flex-1">
@@ -204,6 +214,110 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
                   </div>
                 </div>
               </div>
+              
+              {/* 테스트 설정 정보 */}
+              {result.config && (
+                <div className="mt-6 neu-pressed rounded-xl px-6 py-6">
+                  <h5 className="font-semibold mb-4 text-primary text-lg">테스트 설정</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {result.testType === 'lighthouse' && result.config.categories && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">검사 카테고리</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {Array.isArray(result.config.categories) 
+                            ? result.config.categories.join(', ')
+                            : result.config.categories}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.testType === 'lighthouse' && result.config.device && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">디바이스</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {result.config.device === 'desktop' ? '데스크톱' : '모바일'}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.testType === 'load' && result.config.detailedConfig && (
+                      <>
+                        <div className="neu-flat rounded-lg px-4 py-3">
+                          <span className="text-sm text-muted-foreground">실행 모드</span>
+                          <div className="font-semibold text-primary text-sm mt-1">
+                            {result.config.detailedConfig.settings.executor || 'N/A'}
+                          </div>
+                        </div>
+                        
+                        <div className="neu-flat rounded-lg px-4 py-3">
+                          <span className="text-sm text-muted-foreground">최대 VU</span>
+                          <div className="font-semibold text-primary text-sm mt-1">
+                            {result.config.detailedConfig.settings.maxVUs || result.config.vus || 'N/A'}
+                          </div>
+                        </div>
+                        
+                        <div className="neu-flat rounded-lg px-4 py-3">
+                          <span className="text-sm text-muted-foreground">지속 시간</span>
+                          <div className="font-semibold text-primary text-sm mt-1">
+                            {result.config.duration || 'N/A'}
+                          </div>
+                        </div>
+                        
+                        {result.config.detailedConfig.settings.preset && (
+                          <div className="neu-flat rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">프리셋</span>
+                            <div className="font-semibold text-primary text-sm mt-1">
+                              {result.config.detailedConfig.settings.preset === 'low' ? 'Low' :
+                               result.config.detailedConfig.settings.preset === 'medium' ? 'Medium' :
+                               result.config.detailedConfig.settings.preset === 'high' ? 'High' :
+                               result.config.detailedConfig.settings.preset === 'custom' ? 'Custom' :
+                               result.config.detailedConfig.settings.preset}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {result.config.detailedConfig.stages && Array.isArray(result.config.detailedConfig.stages) && (
+                          <div className="neu-flat rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">테스트 단계</span>
+                            <div className="font-semibold text-primary text-sm mt-1">
+                              {result.config.detailedConfig.stages.length}개 단계
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {result.testType === 'performance' && result.config.metrics && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">측정 메트릭</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {Array.isArray(result.config.metrics) 
+                            ? result.config.metrics.join(', ')
+                            : result.config.metrics}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.config.timeout && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">타임아웃</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {result.config.timeout}초
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.config.retries && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">재시도 횟수</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {result.config.retries}회
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {/* 다운로드 버튼 */}
               <div className="mt-6 flex flex-wrap gap-4 justify-end">

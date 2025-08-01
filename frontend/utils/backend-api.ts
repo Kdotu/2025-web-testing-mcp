@@ -85,9 +85,16 @@ class BackendApiClient {
   }
 
   /**
-   * 테스트 상태 조회
+   * 테스트 상태 조회 (기본)
    */
   async getTestStatus(testId: string): Promise<BackendApiResponse> {
+    return this.request(`/api/load-tests/${testId}`);
+  }
+
+  /**
+   * k6 테스트 상태 조회
+   */
+  async getK6TestStatus(testId: string): Promise<BackendApiResponse> {
     return this.request(`/api/load-tests/${testId}`);
   }
 
@@ -185,6 +192,58 @@ class BackendApiClient {
       body: JSON.stringify(params),
     });
   }
+
+  /**
+   * 기본 테스트 실행 (미구현 테스트 유형용)
+   */
+  async executeDefaultTest(params: {
+    url: string;
+    name: string;
+    description?: string;
+    testType: string;
+  }): Promise<BackendApiResponse> {
+    return this.request('/api/default-test/run', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /**
+   * Lighthouse 테스트 실행
+   */
+  async runLighthouseTest(params: {
+    url: string;
+    device?: string;
+    categories?: string[];
+  }): Promise<BackendApiResponse> {
+    return this.request('/api/lighthouse/run', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /**
+   * Lighthouse 테스트 상태 조회
+   */
+  async getLighthouseTestStatus(testId: string): Promise<BackendApiResponse> {
+    return this.request(`/api/lighthouse/status/${testId}`);
+  }
+
+  /**
+   * Lighthouse 테스트 취소
+   */
+  async cancelLighthouseTest(testId: string): Promise<BackendApiResponse> {
+    return this.request(`/api/lighthouse/cancel/${testId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * 실행 중인 Lighthouse 테스트 목록 조회
+   */
+  async getRunningLighthouseTests(): Promise<BackendApiResponse> {
+    return this.request('/api/lighthouse/running');
+  }
 }
 
 // 기본 API 클라이언트 인스턴스
@@ -194,6 +253,7 @@ export const backendApi = new BackendApiClient();
 export const checkBackendHealth = () => backendApi.checkHealth();
 export const createLoadTest = (config: LoadTestConfig) => backendApi.createLoadTest(config);
 export const getTestStatus = (testId: string) => backendApi.getTestStatus(testId);
+export const getK6TestStatus = (testId: string) => backendApi.getK6TestStatus(testId);
 export const getTestResults = (testId: string) => backendApi.getTestResults(testId);
 export const cancelTest = (testId: string) => backendApi.cancelTest(testId);
 export const getAllTestResults = (page?: number, limit?: number, status?: string) => 
@@ -226,6 +286,26 @@ export const executeK6MCPTest = (params: {
     detailedConfig?: any;
   };
 }) => backendApi.executeK6MCPTest(params);
+
+export const executeDefaultTest = (params: {
+  url: string;
+  name: string;
+  description?: string;
+  testType: string;
+}) => backendApi.executeDefaultTest(params);
+
+// Lighthouse API 함수들
+export const runLighthouseTest = (params: {
+  url: string;
+  device?: string;
+  categories?: string[];
+}) => backendApi.runLighthouseTest(params);
+
+export const getLighthouseTestStatus = (testId: string) => backendApi.getLighthouseTestStatus(testId);
+
+export const cancelLighthouseTest = (testId: string) => backendApi.cancelLighthouseTest(testId);
+
+export const getRunningLighthouseTests = () => backendApi.getRunningLighthouseTests();
 
 // 타입 내보내기
 export type { BackendApiResponse, LoadTestConfig, LoadTestResult }; 

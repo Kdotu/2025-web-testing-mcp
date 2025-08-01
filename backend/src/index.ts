@@ -4,6 +4,7 @@ import { loadTestRoutes } from './routes/load-tests';
 import { testResultRoutes } from './routes/test-results';
 import { testTypeRoutes } from './routes/test-types';
 import testMetricRoutes from './routes/test-metrics';
+import lighthouseRoutes from './routes/lighthouse';
 
 // 타임존 설정
 process.env.TZ = 'Asia/Seoul';
@@ -23,6 +24,7 @@ app.use('/api/load-tests', loadTestRoutes);
 app.use('/api/test-results', testResultRoutes);
 app.use('/api/test-types', testTypeRoutes);
 app.use('/api/test-metrics', testMetricRoutes);
+app.use('/api/lighthouse', lighthouseRoutes);
 
 // 헬스 체크
 app.get('/health', (_req, res) => {

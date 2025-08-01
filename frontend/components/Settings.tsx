@@ -283,7 +283,7 @@ export function Settings({ onNavigate }: SettingsProps) {
                           <Switch
                             checked={testType.enabled}
                             onCheckedChange={() => handleToggleTestType(testType)}
-                            className="data-[state=checked]:bg-primary"
+                            className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
                           />
                           <div>
                             <h4 className="font-semibold text-primary text-lg mb-2">{testType.name}</h4>
@@ -348,7 +348,7 @@ export function Settings({ onNavigate }: SettingsProps) {
                                     <Switch
                                       checked={editingTestType.enabled}
                                       onCheckedChange={(checked) => setEditingTestType({...editingTestType, enabled: checked})}
-                                      className="data-[state=checked]:bg-primary"
+                                      className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
                                     />
                                   </div>
                                 </div>

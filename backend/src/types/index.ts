@@ -6,7 +6,10 @@ export interface LoadTestConfig {
   url: string;
   name?: string;
   description?: string;
-  stages: LoadTestStage[];
+  stages?: LoadTestStage[]; // Lighthouse 테스트에서는 선택적
+  testType?: string; // 테스트 유형 (load, lighthouse, playwright 등)
+  device?: string; // Lighthouse용 디바이스 설정 (desktop, mobile)
+  categories?: string[]; // Lighthouse용 카테고리 설정
   createdAt?: string;
   updatedAt?: string;
 }

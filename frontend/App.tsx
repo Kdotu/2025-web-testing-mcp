@@ -159,7 +159,7 @@ function AppContent() {
       {/* 메인 콘텐츠 영역 - 사이드바 오른쪽에 위치 */}
       <div className={`flex flex-col min-h-screen flex-1 transition-all duration-300 ease-in-out ${
         isMobile ? 'ml-0' : 
-        state === 'collapsed' ? 'ml-0' : 'md:ml-64'
+        state === 'collapsed' ? 'ml-0' : 'md:ml-60'
       }`}>
         {/* 헤더 */}
         <header className="neu-flat border-b border-white/10 w-full shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
