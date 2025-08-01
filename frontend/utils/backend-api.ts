@@ -216,7 +216,7 @@ class BackendApiClient {
     device?: string;
     categories?: string[];
   }): Promise<BackendApiResponse> {
-    return this.request('/api/lighthouse/run', {
+    return this.request('/make-server-96e41890/api/lighthouse/run', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -226,14 +226,14 @@ class BackendApiClient {
    * Lighthouse 테스트 상태 조회
    */
   async getLighthouseTestStatus(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/lighthouse/status/${testId}`);
+    return this.request(`/make-server-96e41890/api/lighthouse/status/${testId}`);
   }
 
   /**
    * Lighthouse 테스트 취소
    */
   async cancelLighthouseTest(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/lighthouse/cancel/${testId}`, {
+    return this.request(`/make-server-96e41890/api/lighthouse/cancel/${testId}`, {
       method: 'DELETE',
     });
   }
@@ -242,7 +242,7 @@ class BackendApiClient {
    * 실행 중인 Lighthouse 테스트 목록 조회
    */
   async getRunningLighthouseTests(): Promise<BackendApiResponse> {
-    return this.request('/api/lighthouse/running');
+    return this.request('/make-server-96e41890/api/lighthouse/running');
   }
 
   /**

@@ -405,7 +405,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                 <p className="text-muted-foreground">다른 검색어나 필터를 시도해보세요</p>
               </div>
             ) : (
-                <div className="neu-pressed rounded-2xl p-2">
+        <div className="neu-pressed rounded-2xl p-2">
                   <div className="overflow-x-auto select-none" style={{ maxHeight: '400px', overflowY: 'auto' }}>
             <Table>
               <TableHeader className="sticky top-0 z-50 bg-card shadow-sm border-b">

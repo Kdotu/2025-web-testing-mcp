@@ -16,6 +16,7 @@ export const saveTestResult = async (testData: {
   logs: string[];
   startTime: string;
   endTime?: string;
+  raw_data?: string; // raw_data 필드 추가
 }) => {
   try {
     const { data, error } = await supabase
@@ -30,6 +31,7 @@ export const saveTestResult = async (testData: {
           logs: testData.logs,
           start_time: testData.startTime,
           end_time: testData.endTime,
+          raw_data: testData.raw_data, // raw_data 저장
           created_at: new Date().toISOString()
         }
       ])
@@ -176,8 +178,36 @@ const getMockTestResults = () => {
         performance: 92,
         accessibility: 88,
         bestPractices: 95,
-        seo: 89
-      }
+        seo: 89,
+        pwa: 85 // PWA 카테고리 추가
+      },
+      raw_data: JSON.stringify({
+        url: 'https://test.co.kr',
+        fetchTime: new Date().toISOString(),
+        version: '10.0.0',
+        scores: {
+          performance: { score: 0.92 },
+          accessibility: { score: 0.88 },
+          'best-practices': { score: 0.95 },
+          seo: { score: 0.89 },
+          pwa: { score: 0.85 } // PWA 카테고리 추가
+        },
+        metrics: {
+          'first-contentful-paint': { value: 1200 },
+          'largest-contentful-paint': { value: 2500 },
+          'total-blocking-time': { value: 150 },
+          'cumulative-layout-shift': { value: 0.05 },
+          'speed-index': { value: 1800 },
+          interactive: { value: 3200 }
+        },
+        categories: {
+          performance: { score: 0.92, title: 'Performance', description: 'Performance audit' },
+          accessibility: { score: 0.88, title: 'Accessibility', description: 'Accessibility audit' },
+          'best-practices': { score: 0.95, title: 'Best Practices', description: 'Best practices audit' },
+          seo: { score: 0.89, title: 'SEO', description: 'SEO audit' },
+          pwa: { score: 0.85, title: 'PWA', description: 'Progressive Web App audit' } // PWA 카테고리 추가
+        }
+      })
     },
     {
       id: 'mock-3',
@@ -216,18 +246,18 @@ const getMockTestResults = () => {
     {
       id: 'mock-5',
       test_id: 'accessibility-test-1',
-      url: 'https://mysite.org',
+      url: 'https://accessible.org',
       type: '접근성테스트',
-      score: 76,
+      score: 87,
       status: '완료',
       date: '2025-01-22',
-      time: '11:30:22',
+      time: '11:20:30',
       duration: '4분 15초',
       details: {
-        accessibilityScore: 76,
-        colorContrast: '양호',
-        altTexts: '부분적',
-        keyboardNavigation: '완전'
+        wcagCompliance: 'AA',
+        colorContrast: '통과',
+        keyboardNavigation: '완전',
+        screenReader: '호환'
       }
     }
   ];
@@ -410,5 +440,58 @@ export const addSampleTestResults = async () => {
   } catch (error) {
     console.error('Error in addSampleTestResults:', error);
     return { success: false, error };
+  }
+};
+
+// MCP 도구 목록을 가져오는 함수
+export const getMcpTools = async (testType: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('t2_test_types')
+      .select('mcp_tool')
+      .eq('name', testType)
+      .single();
+
+    if (error) {
+      console.error('Error fetching MCP tools:', error);
+      // 오류 시 기본값 반환
+      return getDefaultMcpTools(testType);
+    }
+
+    // mcp_tool이 JSON 배열인 경우 파싱
+    if (data?.mcp_tool) {
+      try {
+        const tools = typeof data.mcp_tool === 'string' 
+          ? JSON.parse(data.mcp_tool) 
+          : data.mcp_tool;
+        return Array.isArray(tools) ? tools : [tools];
+      } catch (parseError) {
+        console.error('Error parsing mcp_tool:', parseError);
+        return getDefaultMcpTools(testType);
+      }
+    }
+
+    return getDefaultMcpTools(testType);
+  } catch (error) {
+    console.error('Error in getMcpTools:', error);
+    return getDefaultMcpTools(testType);
+  }
+};
+
+// 기본 MCP 도구 목록 (fallback)
+const getDefaultMcpTools = (testType: string) => {
+  switch (testType) {
+    case "lighthouse":
+      return ["Lighthouse"];
+    case "load":
+      return ["k6"];
+    case "security":
+      return ["OWASP ZAP"];
+    case "accessibility":
+      return ["axe-core"];
+    case "e2e":
+      return ["Playwright"];
+    default:
+      return [];
   }
 };

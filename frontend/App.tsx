@@ -157,12 +157,12 @@ function AppContent() {
       />
 
       {/* 메인 콘텐츠 영역 - 사이드바 오른쪽에 위치 */}
-      <div className={`flex flex-col min-h-screen flex-1 transition-all duration-300 ease-in-out ${
+      <div className={`flex flex-col min-h-screen w-full transition-all duration-300 ease-in-out ${
         isMobile ? 'ml-0' : 
         state === 'collapsed' ? 'ml-0' : 'md:ml-60'
       }`}>
         {/* 헤더 */}
-        <header className="neu-flat border-b border-white/10 w-full shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
+        <header className="neu-flat border-b border-white/10 w-full shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)] flex-shrink-0">
           <div className="flex items-center justify-between px-4 py-4 w-full">
             <div className="flex items-center space-x-4">
               <div className="neu-button rounded-lg p-2">
@@ -186,14 +186,14 @@ function AppContent() {
         </header>
 
         {/* 메인 콘텐츠 */}
-        <main className="flex-1 overflow-auto px-12 py-8 w-full">
-          <div className="w-full px-6">
+        <main className="flex-1 overflow-y-auto px-4 md:px-12 py-4 md:py-8 w-full">
+          <div className="w-full px-2 md:px-6">
             <ActiveComponent onNavigate={handleTabChange} />
           </div>
         </main>
 
         {/* 푸터 */}
-        <footer className="neu-flat border-t border-white/10 w-full">
+        <footer className="neu-flat border-t border-white/10 w-full flex-shrink-0">
           <div className="flex items-center justify-between text-sm text-muted-foreground px-4 py-4 w-full">
             <span>© 2025 MCP 웹사이트 테스터</span>
             <div className="flex items-center space-x-3">

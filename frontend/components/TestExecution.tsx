@@ -37,6 +37,10 @@ import {
   BarChart3,
   Wrench,
   TestTube,
+  XCircle,
+  Download,
+  Copy,
+  Check
 } from "lucide-react";
 import {
   executeTest,
@@ -49,6 +53,7 @@ import {
   type TestType,
 } from "../utils/api";
 import { getAllTestResults as getBackendTestResults } from "../utils/backend-api";
+import { getMcpTools } from "../utils/supabase/client";
 import {
   createLoadTest,
   getTestStatus as getBackendTestStatus,
@@ -62,6 +67,8 @@ import {
   type LoadTestConfig,
   type LoadTestResult,
 } from "../utils/backend-api";
+
+import { Progress } from "./ui/progress";
 
 interface RunningTest {
   id: number;
@@ -259,20 +266,38 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     fetchRecentTestResults();
   }, []);
 
-  // MCP 도구 매핑
-  const getMcpTools = (testType: string) => {
+  // MCP 도구 상태
+  const [mcpTools, setMcpTools] = useState<string[]>([]);
+  const [mcpToolsLoading, setMcpToolsLoading] = useState(false);
+
+  // MCP 도구 매핑 (데이터베이스에서 가져오기)
+  const fetchMcpTools = async (testType: string) => {
+    setMcpToolsLoading(true);
+    try {
+      const tools = await getMcpTools(testType);
+      setMcpTools(tools);
+    } catch (error) {
+      console.error('Error fetching MCP tools:', error);
+      // 오류 시 기본값 사용
+      const defaultTools = getDefaultMcpTools(testType);
+      setMcpTools(defaultTools);
+    } finally {
+      setMcpToolsLoading(false);
+    }
+  };
+
+  // 테스트 타입이 변경될 때 MCP 도구 가져오기
+  useEffect(() => {
+    if (selectedTestType) {
+      fetchMcpTools(selectedTestType);
+    }
+  }, [selectedTestType]);
+
+  // 기본 MCP 도구 목록 (fallback)
+  const getDefaultMcpTools = (testType: string) => {
     switch (testType) {
       case "performance":
-        return ["Lighthouse CLI", "WebPageTest"];
-      case "lighthouse":
-        return ["Google Lighthouse", "Lighthouse CI"];
-      case "load":
-        return ["k6"]; // "Artillery"
-      case "security":
-        return ["OWASP ZAP", "Nmap"];
-        
-      case "accessibility":
-        return ["axe-core", "Pa11y"];
+        return [""];
       default:
         return [];
     }
@@ -1811,19 +1836,30 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                   </Label>
                   {selectedTestType && (
                     <div className="flex gap-2">
-                      {getMcpTools(selectedTestType).map((tool) => (
-                        <div
-                          key={tool}
-                          className="neu-pressed rounded-lg px-3 py-2"
-                        >
+                      {mcpToolsLoading ? (
+                        <div className="neu-pressed rounded-lg px-3 py-2">
                           <Badge
                             variant="secondary"
                             className="font-semibold text-sm bg-transparent border-none text-muted-foreground"
                           >
-                            {tool}
+                            로딩 중...
                           </Badge>
                         </div>
-                      ))}
+                      ) : (
+                        mcpTools.map((tool) => (
+                          <div
+                            key={tool}
+                            className="neu-pressed rounded-lg px-3 py-2"
+                          >
+                            <Badge
+                              variant="secondary"
+                              className="font-semibold text-sm bg-transparent border-none text-muted-foreground"
+                            >
+                              {tool}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
@@ -2293,404 +2329,401 @@ test('성능 테스트 - ${url}', async ({ page }) => {
           ) : selectedTestType === 'lighthouse' ? (
             // Lighthouse 설정
             <div className="space-y-6">
-              {/* Categories 선택 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  검사 카테고리 <span className="text-xs text-muted-foreground ml-1">(Categories)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { id: 'performance', name: '성능', description: '페이지 로딩 속도 및 성능 측정' },
-                    { id: 'accessibility', name: '접근성', description: '웹 접근성 표준 준수 검사' },
-                    { id: 'best-practices', name: '모범 사례', description: '웹 개발 모범 사례 준수' },
-                    { id: 'seo', name: 'SEO', description: '검색 엔진 최적화 검사' },
-                    { id: 'pwa', name: 'PWA', description: 'Progressive Web App 기능' }
-                  ].map((category) => {
-                    const isSelected = testSettings.lighthouse.categories.includes(category.id);
-                    
-                    return (
-                      <div
-                        key={category.id}
-                        onClick={() => {
-                          const newCategories = isSelected
-                            ? testSettings.lighthouse.categories.filter(c => c !== category.id)
-                            : [...testSettings.lighthouse.categories, category.id];
-                          updateTestSetting('lighthouse', 'categories', newCategories);
-                        }}
-                        className={`neu-button rounded-xl p-4 text-left transition-all duration-200 cursor-pointer ${
-                          isSelected ? "neu-button-active" : ""
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="flex items-center space-x-2">
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                              isSelected 
-                                ? "bg-primary border-primary" 
-                                : "border-muted-foreground"
-                            }`}>
-                              {isSelected && (
-                                <svg className="w-3 h-3 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                              )}
-                            </div>
-                            <span
-                              className={`font-semibold ${isSelected ? "text-primary-foreground" : "text-primary"}`}
-                            >
-                              {category.name}
-                            </span>
-                          </div>
-                        </div>
-                        <p
-                          className={`text-sm ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}
+              {/* 기본 설정 표시 */}
+
+              {/* 상세 설정 */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Categories 선택 */}
+                <div className="neu-subtle rounded-xl px-6 py-6">
+                  <Label className="text-foreground font-semibold text-lg mb-4 block">
+                    검사 카테고리 <span className="text-xs text-muted-foreground ml-1">(Categories)</span>
+                  </Label>
+                  <div className="space-y-3">
+                    {[
+                      { id: 'performance', name: '성능', description: '페이지 로딩 속도 및 성능 측정' },
+                      { id: 'accessibility', name: '접근성', description: '웹 접근성 표준 준수 검사' },
+                      { id: 'best-practices', name: '모범 사례', description: '웹 개발 모범 사례 준수' },
+                      { id: 'seo', name: 'SEO', description: '검색 엔진 최적화 검사' },
+                      { id: 'pwa', name: 'PWA', description: 'Progressive Web App 기능' }
+                    ].map((category) => {
+                      const isSelected = testSettings.lighthouse.categories.includes(category.id);
+                      
+                      return (
+                        <div
+                          key={category.id}
+                          onClick={() => {
+                            const newCategories = isSelected
+                              ? testSettings.lighthouse.categories.filter(c => c !== category.id)
+                              : [...testSettings.lighthouse.categories, category.id];
+                            updateTestSetting('lighthouse', 'categories', newCategories);
+                          }}
+                          className={`neu-button rounded-xl p-4 text-left transition-all duration-200 cursor-pointer ${
+                            isSelected ? "neu-button-active" : ""
+                          }`}
                         >
-                          {category.description}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-4 neu-pressed rounded-lg px-4 py-3">
-                  <div className="flex items-start space-x-2">
-                    <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-muted-foreground">
-                      <strong>선택된 카테고리:</strong> {testSettings.lighthouse.categories.join(', ')}
-                    </p>
+                          <div className="flex items-center space-x-3 mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                                isSelected 
+                                  ? "bg-primary border-primary" 
+                                  : "border-muted-foreground"
+                              }`}>
+                                {isSelected && (
+                                  <svg className="w-3 h-3 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span
+                                className={`font-semibold ${isSelected ? "text-primary-foreground" : "text-primary"}`}
+                              >
+                                {category.name}
+                              </span>
+                            </div>
+                          </div>
+                          <p
+                            className={`text-sm ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}
+                          >
+                            {category.description}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
 
-              {/* Device 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  디바이스 <span className="text-xs text-muted-foreground ml-1">(Device)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { id: 'desktop', name: '데스크톱', description: '데스크톱 환경에서 테스트' },
-                    { id: 'mobile', name: '모바일', description: '모바일 환경에서 테스트' }
-                  ].map((device) => {
-                    const isSelected = testSettings.lighthouse.device === device.id;
-                    
-                    return (
-                      <button
-                        key={device.id}
-                        onClick={() => updateTestSetting('lighthouse', 'device', device.id)}
-                        className={`neu-button rounded-xl p-4 text-left transition-all duration-200 ${
-                          isSelected ? "neu-button-active" : ""
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className={`w-3 h-3 rounded-full ${isSelected ? "bg-primary-foreground" : "bg-primary"}`} />
-                          <span
-                            className={`font-semibold ${isSelected ? "text-primary-foreground" : "text-primary"}`}
+                {/* Device 및 Throttling 설정 */}
+                <div className="space-y-6">
+                  {/* Device 설정 */}
+                  <div className="neu-subtle rounded-xl px-6 py-6">
+                    <Label className="text-foreground font-semibold text-lg mb-4 block">
+                      디바이스 <span className="text-xs text-muted-foreground ml-1">(Device)</span>
+                    </Label>
+                    <div className="flex gap-2">
+                      {[
+                        { id: 'desktop', name: '데스크톱', description: '데스크톱 환경에서 테스트' },
+                        { id: 'mobile', name: '모바일', description: '모바일 환경에서 테스트' }
+                      ].map((device) => {
+                        const isSelected = testSettings.lighthouse.device === device.id;
+                        
+                        return (
+                          <button
+                            key={device.id}
+                            onClick={() => updateTestSetting('lighthouse', 'device', device.id)}
+                            className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                              isSelected 
+                                ? "neu-accent text-primary-foreground" 
+                                : "neu-button text-foreground hover:text-primary"
+                            }`}
+                            title={device.description}
                           >
                             {device.name}
-                          </span>
-                        </div>
-                        <p
-                          className={`text-sm ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}
-                        >
-                          {device.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              {/* Throttling 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  네트워크 제한 <span className="text-xs text-muted-foreground ml-1">(Throttling)</span>
-                </Label>
-                <div className="neu-input rounded-xl px-3 py-2">
-                  <Select
-                    value={testSettings.lighthouse.throttling}
-                    onValueChange={(value) => updateTestSetting('lighthouse', 'throttling', value)}
-                  >
-                    <SelectTrigger className="border-none bg-transparent text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="neu-card rounded-xl border-none bg-card">
-                      <SelectItem value="4g">4G (고속)</SelectItem>
-                      <SelectItem value="3g">3G (중간)</SelectItem>
-                      <SelectItem value="2g">2G (저속)</SelectItem>
-                      <SelectItem value="none">제한 없음</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {/* Throttling 설정 */}
+                  <div className="neu-subtle rounded-xl px-6 py-6">
+                    <Label className="text-foreground font-semibold text-lg mb-4 block">
+                      네트워크 제한 <span className="text-xs text-muted-foreground ml-1">(Throttling)</span>
+                    </Label>
+                    <div className="neu-input rounded-xl px-3 py-2">
+                      <Select
+                        value={testSettings.lighthouse.throttling}
+                        onValueChange={(value) => updateTestSetting('lighthouse', 'throttling', value)}
+                      >
+                        <SelectTrigger className="border-none bg-transparent text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="neu-card rounded-xl border-none bg-card">
+                          <SelectItem value="4g">4G (고속)</SelectItem>
+                          <SelectItem value="3g">3G (중간)</SelectItem>
+                          <SelectItem value="2g">2G (저속)</SelectItem>
+                          <SelectItem value="none">제한 없음</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           ) : selectedTestType === 'e2e' ? (
             // E2E 테스트 설정
             <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
               {/* 브라우저 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  브라우저 설정 <span className="text-xs text-muted-foreground ml-1">(Browser Settings)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      브라우저 <span className="text-xs text-muted-foreground">(Browser)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Select
-                        value={testSettings.e2e.browser}
-                        onValueChange={(value) => updateTestSetting('e2e', 'browser', value)}
-                      >
-                        <SelectTrigger className="border-none bg-transparent text-foreground">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="neu-card rounded-xl border-none bg-card">
-                          <SelectItem value="chromium">Chromium</SelectItem>
-                          <SelectItem value="firefox">Firefox</SelectItem>
-                          <SelectItem value="webkit">Safari (WebKit)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                <div className="neu-subtle rounded-xl px-6 py-6">
+                  <Label className="text-foreground font-semibold text-lg mb-4 block">
+                    브라우저 설정 <span className="text-xs text-muted-foreground ml-1">(Browser Settings)</span>
+                  </Label>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-1 block">
+                        브라우저 <span className="text-xs text-muted-foreground">(Browser)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Select
+                          value={testSettings.e2e.browser}
+                          onValueChange={(value) => updateTestSetting('e2e', 'browser', value)}
+                        >
+                          <SelectTrigger className="border-none bg-transparent text-foreground">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="neu-card rounded-xl border-none bg-card">
+                            <SelectItem value="chromium">Chromium</SelectItem>
+                            <SelectItem value="firefox">Firefox</SelectItem>
+                            <SelectItem value="webkit">Safari (WebKit)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      헤드리스 모드 <span className="text-xs text-muted-foreground">(Headless)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Switch
-                        checked={testSettings.e2e.headless}
-                        onCheckedChange={(checked) => updateTestSetting('e2e', 'headless', checked)}
-                      />
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        헤드리스 모드 <span className="text-xs text-muted-foreground">(Headless)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Switch
+                          checked={testSettings.e2e.headless}
+                          onCheckedChange={(checked) => updateTestSetting('e2e', 'headless', checked)}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 뷰포트 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  뷰포트 설정 <span className="text-xs text-muted-foreground ml-1">(Viewport Settings)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      너비 <span className="text-xs text-muted-foreground">(Width)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Input
-                        type="number"
-                        value={testSettings.e2e.viewport.width}
-                        onChange={(e) => {
-                          const newViewport = { ...testSettings.e2e.viewport, width: Number(e.target.value) };
-                          updateTestSetting('e2e', 'viewport', newViewport);
-                        }}
-                        className="border-none bg-transparent text-center text-foreground"
-                        min="320"
-                        max="3840"
-                      />
+                {/* 뷰포트 설정 */}
+                <div className="neu-subtle rounded-xl px-6 py-6">
+                  <Label className="text-foreground font-semibold text-lg mb-4 block">
+                    뷰포트 설정 <span className="text-xs text-muted-foreground ml-1">(Viewport Settings)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        너비 <span className="text-xs text-muted-foreground">(Width)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="number"
+                          value={testSettings.e2e.viewport.width}
+                          onChange={(e) => {
+                            const newViewport = { ...testSettings.e2e.viewport, width: Number(e.target.value) };
+                            updateTestSetting('e2e', 'viewport', newViewport);
+                          }}
+                          className="border-none bg-transparent text-center text-foreground"
+                          min="320"
+                          max="3840"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      높이 <span className="text-xs text-muted-foreground">(Height)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Input
-                        type="number"
-                        value={testSettings.e2e.viewport.height}
-                        onChange={(e) => {
-                          const newViewport = { ...testSettings.e2e.viewport, height: Number(e.target.value) };
-                          updateTestSetting('e2e', 'viewport', newViewport);
-                        }}
-                        className="border-none bg-transparent text-center text-foreground"
-                        min="240"
-                        max="2160"
-                      />
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        높이 <span className="text-xs text-muted-foreground">(Height)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="number"
+                          value={testSettings.e2e.viewport.height}
+                          onChange={(e) => {
+                            const newViewport = { ...testSettings.e2e.viewport, height: Number(e.target.value) };
+                            updateTestSetting('e2e', 'viewport', newViewport);
+                          }}
+                          className="border-none bg-transparent text-center text-foreground"
+                          min="240"
+                          max="2160"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 타임아웃 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  타임아웃 설정 <span className="text-xs text-muted-foreground ml-1">(Timeout Settings)</span>
-                </Label>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      전체 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Input
-                        type="number"
-                        value={testSettings.e2e.timeout}
-                        onChange={(e) => updateTestSetting('e2e', 'timeout', Number(e.target.value))}
-                        className="border-none bg-transparent text-center text-foreground"
-                        min="1000"
-                        max="300000"
-                      />
+              {/* <div className="grid grid-cols-2 gap-6"> */}
+                <div className="neu-subtle rounded-xl px-6 py-6">
+                  <Label className="text-foreground font-semibold text-lg mb-4 block">
+                    타임아웃 설정 <span className="text-xs text-muted-foreground ml-1">(Timeout Settings)</span>
+                  </Label>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        전체 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="number"
+                          value={testSettings.e2e.timeout}
+                          onChange={(e) => updateTestSetting('e2e', 'timeout', Number(e.target.value))}
+                          className="border-none bg-transparent text-center text-foreground"
+                          min="1000"
+                          max="300000"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      네비게이션 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Input
-                        type="number"
-                        value={testSettings.e2e.navigationTimeout}
-                        onChange={(e) => updateTestSetting('e2e', 'navigationTimeout', Number(e.target.value))}
-                        className="border-none bg-transparent text-center text-foreground"
-                        min="1000"
-                        max="300000"
-                      />
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        네비게이션 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="number"
+                          value={testSettings.e2e.navigationTimeout}
+                          onChange={(e) => updateTestSetting('e2e', 'navigationTimeout', Number(e.target.value))}
+                          className="border-none bg-transparent text-center text-foreground"
+                          min="1000"
+                          max="300000"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      액션 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Input
-                        type="number"
-                        value={testSettings.e2e.actionTimeout}
-                        onChange={(e) => updateTestSetting('e2e', 'actionTimeout', Number(e.target.value))}
-                        className="border-none bg-transparent text-center text-foreground"
-                        min="1000"
-                        max="300000"
-                      />
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        액션 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="number"
+                          value={testSettings.e2e.actionTimeout}
+                          onChange={(e) => updateTestSetting('e2e', 'actionTimeout', Number(e.target.value))}
+                          className="border-none bg-transparent text-center text-foreground"
+                          min="1000"
+                          max="300000"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 녹화 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  녹화 설정 <span className="text-xs text-muted-foreground ml-1">(Recording Settings)</span>
-                </Label>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      스크린샷 (실패 시) <span className="text-xs text-muted-foreground">(Screenshot on Failure)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Switch
-                        checked={testSettings.e2e.screenshotOnFailure}
-                        onCheckedChange={(checked) => updateTestSetting('e2e', 'screenshotOnFailure', checked)}
-                      />
+                {/* 녹화 설정 */}
+                <div className="neu-subtle rounded-xl px-6 py-6">
+                  <Label className="text-foreground font-semibold text-lg mb-4 block">
+                    녹화 설정 <span className="text-xs text-muted-foreground ml-1">(Recording Settings)</span>
+                  </Label>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        스크린샷 (실패 시) <span className="text-xs text-muted-foreground">(Screenshot on Failure)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Switch
+                          checked={testSettings.e2e.screenshotOnFailure}
+                          onCheckedChange={(checked) => updateTestSetting('e2e', 'screenshotOnFailure', checked)}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      비디오 녹화 <span className="text-xs text-muted-foreground">(Video Recording)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Switch
-                        checked={testSettings.e2e.videoRecording}
-                        onCheckedChange={(checked) => updateTestSetting('e2e', 'videoRecording', checked)}
-                      />
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        비디오 녹화 <span className="text-xs text-muted-foreground">(Video Recording)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Switch
+                          checked={testSettings.e2e.videoRecording}
+                          onCheckedChange={(checked) => updateTestSetting('e2e', 'videoRecording', checked)}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      트레이스 녹화 <span className="text-xs text-muted-foreground">(Trace Recording)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Switch
-                        checked={testSettings.e2e.traceRecording}
-                        onCheckedChange={(checked) => updateTestSetting('e2e', 'traceRecording', checked)}
-                      />
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        트레이스 녹화 <span className="text-xs text-muted-foreground">(Trace Recording)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Switch
+                          checked={testSettings.e2e.traceRecording}
+                          onCheckedChange={(checked) => updateTestSetting('e2e', 'traceRecording', checked)}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              {/* </div> */}
 
               {/* 고급 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  고급 설정 <span className="text-xs text-muted-foreground ml-1">(Advanced Settings)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      슬로우 모션 <span className="text-xs text-muted-foreground">(Slow Motion)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Input
-                        type="number"
-                        value={testSettings.e2e.slowMo}
-                        onChange={(e) => updateTestSetting('e2e', 'slowMo', Number(e.target.value))}
-                        className="border-none bg-transparent text-center text-foreground"
-                        min="0"
-                        max="5000"
-                        step="100"
-                      />
+              <div className="grid grid-cols-2 gap-6">
+                <div className="neu-subtle rounded-xl px-6 py-6">
+                  <Label className="text-foreground font-semibold text-lg mb-4 block">
+                    고급 설정 <span className="text-xs text-muted-foreground ml-1">(Advanced Settings)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        슬로우 모션 <span className="text-xs text-muted-foreground">(Slow Motion)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="number"
+                          value={testSettings.e2e.slowMo}
+                          onChange={(e) => updateTestSetting('e2e', 'slowMo', Number(e.target.value))}
+                          className="border-none bg-transparent text-center text-foreground"
+                          min="0"
+                          max="5000"
+                          step="100"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 text-center">밀리초</p>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1 text-center">밀리초</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      사용자 에이전트 <span className="text-xs text-muted-foreground">(User Agent)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Input
-                        value={testSettings.e2e.userAgent}
-                        onChange={(e) => updateTestSetting('e2e', 'userAgent', e.target.value)}
-                        placeholder="기본값 사용"
-                        className="border-none bg-transparent text-center text-foreground"
-                      />
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        사용자 에이전트 <span className="text-xs text-muted-foreground">(User Agent)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          value={testSettings.e2e.userAgent}
+                          onChange={(e) => updateTestSetting('e2e', 'userAgent', e.target.value)}
+                          placeholder="기본값 사용"
+                          className="border-none bg-transparent text-center text-foreground"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 지역 설정 */}
-              <div className="neu-subtle rounded-xl px-6 py-6">
-                <Label className="text-foreground font-semibold text-lg mb-4 block">
-                  지역 설정 <span className="text-xs text-muted-foreground ml-1">(Locale Settings)</span>
-                </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      로케일 <span className="text-xs text-muted-foreground">(Locale)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Select
-                        value={testSettings.e2e.locale}
-                        onValueChange={(value) => updateTestSetting('e2e', 'locale', value)}
-                      >
-                        <SelectTrigger className="border-none bg-transparent text-foreground">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="neu-card rounded-xl border-none bg-card">
-                          <SelectItem value="ko-KR">한국어 (ko-KR)</SelectItem>
-                          <SelectItem value="en-US">English (en-US)</SelectItem>
-                          <SelectItem value="ja-JP">日本語 (ja-JP)</SelectItem>
-                          <SelectItem value="zh-CN">中文 (zh-CN)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                {/* 지역 설정 */}
+                <div className="neu-subtle rounded-xl px-6 py-6">
+                  <Label className="text-foreground font-semibold text-lg mb-4 block">
+                    지역 설정 <span className="text-xs text-muted-foreground ml-1">(Locale Settings)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        로케일 <span className="text-xs text-muted-foreground">(Locale)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Select
+                          value={testSettings.e2e.locale}
+                          onValueChange={(value) => updateTestSetting('e2e', 'locale', value)}
+                        >
+                          <SelectTrigger className="border-none bg-transparent text-foreground">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="neu-card rounded-xl border-none bg-card">
+                            <SelectItem value="ko-KR">한국어 (ko-KR)</SelectItem>
+                            <SelectItem value="en-US">English (en-US)</SelectItem>
+                            <SelectItem value="ja-JP">日本語 (ja-JP)</SelectItem>
+                            <SelectItem value="zh-CN">中文 (zh-CN)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">
-                      시간대 <span className="text-xs text-muted-foreground">(Timezone)</span>
-                    </Label>
-                    <div className="neu-input rounded-lg px-3 py-2">
-                      <Select
-                        value={testSettings.e2e.timezone}
-                        onValueChange={(value) => updateTestSetting('e2e', 'timezone', value)}
-                      >
-                        <SelectTrigger className="border-none bg-transparent text-foreground">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="neu-card rounded-xl border-none bg-card">
-                          <SelectItem value="Asia/Seoul">Asia/Seoul (KST)</SelectItem>
-                          <SelectItem value="America/New_York">America/New_York (EST)</SelectItem>
-                          <SelectItem value="Europe/London">Europe/London (GMT)</SelectItem>
-                          <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">
+                        시간대 <span className="text-xs text-muted-foreground">(Timezone)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Select
+                          value={testSettings.e2e.timezone}
+                          onValueChange={(value) => updateTestSetting('e2e', 'timezone', value)}
+                        >
+                          <SelectTrigger className="border-none bg-transparent text-foreground">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="neu-card rounded-xl border-none bg-card">
+                            <SelectItem value="Asia/Seoul">Asia/Seoul (KST)</SelectItem>
+                            <SelectItem value="America/New_York">America/New_York (EST)</SelectItem>
+                            <SelectItem value="Europe/London">Europe/London (GMT)</SelectItem>
+                            <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2749,6 +2782,179 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                           <SelectItem value="active">활성</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 네트워크 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  네트워크 설정 <span className="text-xs text-muted-foreground ml-1">(Network Settings)</span>
+                </Label>
+                
+                {/* HTTP 인증 설정 */}
+                <div className="mb-6">
+                  <Label className="text-sm text-muted-foreground mb-2 block">
+                    HTTP 인증 <span className="text-xs text-muted-foreground">(HTTP Credentials)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        사용자명 <span className="text-xs text-muted-foreground">(Username)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="text"
+                          value={testSettings.e2e.httpCredentials.username}
+                          onChange={(e) => {
+                            const newCredentials = { 
+                              ...testSettings.e2e.httpCredentials, 
+                              username: e.target.value 
+                            };
+                            updateTestSetting('e2e', 'httpCredentials', newCredentials);
+                          }}
+                          placeholder="사용자명"
+                          className="border-none bg-transparent text-center text-foreground"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        비밀번호 <span className="text-xs text-muted-foreground">(Password)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="password"
+                          value={testSettings.e2e.httpCredentials.password}
+                          onChange={(e) => {
+                            const newCredentials = { 
+                              ...testSettings.e2e.httpCredentials, 
+                              password: e.target.value 
+                            };
+                            updateTestSetting('e2e', 'httpCredentials', newCredentials);
+                          }}
+                          placeholder="비밀번호"
+                          className="border-none bg-transparent text-center text-foreground"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 프록시 설정 */}
+                <div className="mb-6">
+                  <Label className="text-sm text-muted-foreground mb-2 block">
+                    프록시 설정 <span className="text-xs text-muted-foreground">(Proxy Settings)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        프록시 서버 <span className="text-xs text-muted-foreground">(Proxy Server)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="text"
+                          value={testSettings.e2e.proxy.server}
+                          onChange={(e) => {
+                            const newProxy = { 
+                              ...testSettings.e2e.proxy, 
+                              server: e.target.value 
+                            };
+                            updateTestSetting('e2e', 'proxy', newProxy);
+                          }}
+                          placeholder="http://proxy.example.com:8080"
+                          className="border-none bg-transparent text-center text-foreground"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        우회 주소 <span className="text-xs text-muted-foreground">(Bypass)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="text"
+                          value={testSettings.e2e.proxy.bypass}
+                          onChange={(e) => {
+                            const newProxy = { 
+                              ...testSettings.e2e.proxy, 
+                              bypass: e.target.value 
+                            };
+                            updateTestSetting('e2e', 'proxy', newProxy);
+                          }}
+                          placeholder="localhost,127.0.0.1"
+                          className="border-none bg-transparent text-center text-foreground"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        프록시 사용자명 <span className="text-xs text-muted-foreground">(Proxy Username)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="text"
+                          value={testSettings.e2e.proxy.username}
+                          onChange={(e) => {
+                            const newProxy = { 
+                              ...testSettings.e2e.proxy, 
+                              username: e.target.value 
+                            };
+                            updateTestSetting('e2e', 'proxy', newProxy);
+                          }}
+                          placeholder="프록시 사용자명"
+                          className="border-none bg-transparent text-center text-foreground"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        프록시 비밀번호 <span className="text-xs text-muted-foreground">(Proxy Password)</span>
+                      </Label>
+                      <div className="neu-input rounded-lg px-3 py-2">
+                        <Input
+                          type="password"
+                          value={testSettings.e2e.proxy.password}
+                          onChange={(e) => {
+                            const newProxy = { 
+                              ...testSettings.e2e.proxy, 
+                              password: e.target.value 
+                            };
+                            updateTestSetting('e2e', 'proxy', newProxy);
+                          }}
+                          placeholder="프록시 비밀번호"
+                          className="border-none bg-transparent text-center text-foreground"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 기타 네트워크 설정 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      HTTPS 오류 무시 <span className="text-xs text-muted-foreground">(Ignore HTTPS Errors)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Switch
+                        checked={testSettings.e2e.ignoreHttpsErrors}
+                        onCheckedChange={(checked) => updateTestSetting('e2e', 'ignoreHttpsErrors', checked)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      CSP 우회 <span className="text-xs text-muted-foreground">(Bypass CSP)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Switch
+                        checked={testSettings.e2e.bypassCSP}
+                        onCheckedChange={(checked) => updateTestSetting('e2e', 'bypassCSP', checked)}
+                      />
                     </div>
                   </div>
                 </div>

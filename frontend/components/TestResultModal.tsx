@@ -123,62 +123,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const renderMetrics = () => {
-    if (loading) {
-      return (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground mt-2">메트릭 데이터를 불러오는 중...</p>
-        </div>
-      );
-    }
 
-    if (metrics.length === 0) {
-      return (
-        <div className="text-center py-8">
-          <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">상세 메트릭 데이터가 없습니다.</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {Object.entries(groupedMetrics).map(([metricType, metricsList]: [string, any]) => {
-          // metricsList가 배열인지 확인
-          const metricsArray = Array.isArray(metricsList) ? metricsList : [];
-          
-          if (metricsArray.length === 0) {
-            return null; // 빈 배열이면 렌더링하지 않음
-          }
-
-          return (
-            <div key={metricType} className="neu-flat rounded-2xl px-6 py-8">
-              <h4 className="font-semibold mb-6 text-primary text-xl capitalize">{metricType} 메트릭</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {metricsArray.map((metric: TestMetric) => (
-                  <div key={metric.id} className="neu-pressed rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h5 className="font-medium text-sm">{metric.metric_name}</h5>
-                      <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
-                        {metric.unit}
-                      </span>
-                    </div>
-                    <div className="text-2xl font-bold text-primary">
-                      {metric.value.toLocaleString()}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {metric.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-30 flex items-center justify-center z-50" onClick={onClose}>
@@ -369,12 +314,55 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
             </div>
 
             {/* 성능 메트릭 */}
-            {metrics.length > 0 && (
-              <div>
+            <div className="neu-flat rounded-2xl px-6 py-8">
                 <h4 className="font-semibold mb-6 text-primary text-xl">성능 메트릭</h4>
-                {renderMetrics()}
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-muted-foreground mt-2">메트릭 데이터를 불러오는 중...</p>
+                </div>
+              ) : metrics.length === 0 ? (
+                <div className="text-center py-8">
+                  <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">상세 메트릭 데이터가 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(groupedMetrics).map(([metricType, metricsList]: [string, any]) => {
+                    // metricsList가 배열인지 확인
+                    const metricsArray = Array.isArray(metricsList) ? metricsList : [];
+                    
+                    if (metricsArray.length === 0) {
+                      return null; // 빈 배열이면 렌더링하지 않음
+                    }
+
+                    return (
+                      <div key={metricType} className="neu-pressed rounded-xl px-6 py-6">
+                        <h5 className="font-semibold mb-4 text-primary text-lg capitalize">{metricType} 메트릭</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {metricsArray.map((metric: TestMetric) => (
+                            <div key={metric.id} className="neu-flat rounded-lg px-4 py-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-muted-foreground">{metric.metric_name}</span>
+                                <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
+                                  {metric.unit}
+                                </span>
+                              </div>
+                              <div className="font-semibold text-primary text-sm">
+                                {metric.value.toLocaleString()}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {metric.description}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             )}
+            </div>
           </div>
 
           {/* 실행 로그 - 우측 */}
@@ -401,7 +389,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
                 </button>
               </div>
               <div className="p-4 rounded-xl font-mono text-sm overflow-x-auto overflow-y-auto" 
-                   style={{ backgroundColor: '#5d5d5f', color: '#a5b4fc', height: 'calc(70vh - 10px)' }}>
+                   style={{ backgroundColor: '#5d5d5f', color: '#a5b4fc', height: 'calc(65vh - 10px)' }}>
                 <pre className="whitespace-pre-wrap">{result.raw_data}</pre>
               </div>
             </div>

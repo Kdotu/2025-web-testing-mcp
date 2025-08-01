@@ -631,11 +631,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         </div>
                       )}
                       <div className={`neu-pressed rounded-full px-4 py-2 ${getStatusColor(test.status)}`}>
-                        <span className="font-semibold">
-                          {test.status === 'completed' ? '완료' : 
-                           test.status === 'running' ? '실행중' : 
-                           test.status === 'failed' ? '실패' : '대기중'}
-                        </span>
+                      <span className={`font-semibold ${
+                            test.status === 'completed' ? 'text-[var(--primary)]' : 
+                            test.status === 'failed' ? 'text-gray-500' : 
+                            test.status === 'running' ? 'text-white' : 
+                            test.status === 'cancelled' ? 'text-gray-500' : 
+                            test.status === 'pending' ? 'text-gray-500' : 'text-gray-500'
+                          }`}>
+                            {test.status === 'completed' ? '성공' : 
+                             test.status === 'failed' ? '실패' : 
+                             test.status === 'running' ? '실행중' : 
+                             test.status === 'cancelled' ? '취소됨' : 
+                             test.status === 'pending' ? '대기중' : test.status}
+                          </span>
                       </div>
                     </div>
                   </div>
