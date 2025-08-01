@@ -9,6 +9,7 @@ export interface TestType {
   icon?: string;
   color?: string;
   config_template?: any;
+  mcp_tool?: string;
   created_at?: string;
   updated_at?: string;
 }

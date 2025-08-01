@@ -48,7 +48,7 @@ export class TestTypeController {
    */
   async addTestType(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id, name, description, enabled, category, icon, color, config_template } = req.body;
+      const { id, name, description, enabled, category, icon, color, config_template, mcp_tool } = req.body;
 
       // 기본 검증
       if (!id || !name) {
@@ -63,7 +63,8 @@ export class TestTypeController {
         category: category || 'custom',
         icon: icon || 'Settings',
         color: color || '#A9B5DF',
-        config_template: config_template || {}
+        config_template: config_template || {},
+        mcp_tool: mcp_tool || ''
       };
 
       const result = await this.testTypeService.addTestType(newTestType);

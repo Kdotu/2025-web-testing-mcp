@@ -58,6 +58,7 @@ import {
   executeK6MCPTest,
   getLighthouseTestStatus,
   runLighthouseTest,
+  executeE2ETest,
   type LoadTestConfig,
   type LoadTestResult,
 } from "../utils/backend-api";
@@ -128,6 +129,47 @@ interface TestSettings {
     level: string;
     includeWarnings: boolean;
     checkImages: boolean;
+  };
+  e2e: {
+    browser: string;
+    headless: boolean;
+    viewport: {
+      width: number;
+      height: number;
+    };
+    timeout: number;
+    navigationTimeout: number;
+    actionTimeout: number;
+    screenshotOnFailure: boolean;
+    videoRecording: boolean;
+    traceRecording: boolean;
+    slowMo: number;
+    userAgent: string;
+    locale: string;
+    timezone: string;
+    permissions: string[];
+    geolocation: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+    };
+    colorScheme: string;
+    reducedMotion: boolean;
+    forcedColors: string;
+    acceptDownloads: boolean;
+    ignoreHttpsErrors: boolean;
+    bypassCSP: boolean;
+    extraHttpHeaders: Record<string, string>;
+    httpCredentials: {
+      username: string;
+      password: string;
+    };
+    proxy: {
+      server: string;
+      bypass: string;
+      username: string;
+      password: string;
+    };
   };
 }
 
@@ -417,6 +459,47 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         includeWarnings: true,
         checkImages: true,
       },
+      e2e: {
+        browser: "chromium",
+        headless: true,
+        viewport: {
+          width: 1280,
+          height: 720,
+        },
+        timeout: 30000,
+        navigationTimeout: 30000,
+        actionTimeout: 5000,
+        screenshotOnFailure: true,
+        videoRecording: false,
+        traceRecording: false,
+        slowMo: 0,
+        userAgent: "",
+        locale: "ko-KR",
+        timezone: "Asia/Seoul",
+        permissions: [],
+        geolocation: {
+          latitude: 37.5665,
+          longitude: 126.9780,
+          accuracy: 100,
+        },
+        colorScheme: "light",
+        reducedMotion: false,
+        forcedColors: "none",
+        acceptDownloads: true,
+        ignoreHttpsErrors: false,
+        bypassCSP: false,
+        extraHttpHeaders: {},
+        httpCredentials: {
+          username: "",
+          password: "",
+        },
+        proxy: {
+          server: "",
+          bypass: "",
+          username: "",
+          password: "",
+        },
+      },
     });
 
   // 설정 마이그레이션 함수 - 기존 설정을 새 k6 형식으로 변환
@@ -527,6 +610,12 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
                 description: "웹 접근성 표준 준수 검사",
                 enabled: true,
               },
+              {
+                id: "e2e",
+                name: "E2E 테스트",
+                description: "Playwright 기반 End-to-End 사용자 시나리오 테스트",
+                enabled: true,
+              },
             ];
             setTestTypes(
               defaultTestTypes.filter((type) => type.enabled),
@@ -544,6 +633,51 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
             loadedSettings.load = migrateLoadSettings(
               loadedSettings.load,
             );
+          }
+
+          // e2e 설정이 없으면 기본값 추가
+          if (!loadedSettings.e2e) {
+            loadedSettings.e2e = {
+              browser: "chromium",
+              headless: true,
+              viewport: {
+                width: 1280,
+                height: 720,
+              },
+              timeout: 30000,
+              navigationTimeout: 30000,
+              actionTimeout: 5000,
+              screenshotOnFailure: true,
+              videoRecording: false,
+              traceRecording: false,
+              slowMo: 0,
+              userAgent: "",
+              locale: "ko-KR",
+              timezone: "Asia/Seoul",
+              permissions: [],
+              geolocation: {
+                latitude: 37.5665,
+                longitude: 126.9780,
+                accuracy: 100,
+              },
+              colorScheme: "light",
+              reducedMotion: false,
+              forcedColors: "none",
+              acceptDownloads: true,
+              ignoreHttpsErrors: false,
+              bypassCSP: false,
+              extraHttpHeaders: {},
+              httpCredentials: {
+                username: "",
+                password: "",
+              },
+              proxy: {
+                server: "",
+                bypass: "",
+                username: "",
+                password: "",
+              },
+            };
           }
 
           setTestSettings(loadedSettings);
@@ -714,6 +848,17 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           "스크린 리더 호환성 검사 중...",
           "ARIA 속성 확인 중...",
           "접근성 점수 계산 중...",
+        ];
+      case "e2e":
+        return [
+          "브라우저 초기화 중...",
+          "페이지 로딩 중...",
+          "사용자 상호작용 테스트 중...",
+          "폼 입력 테스트 중...",
+          "네비게이션 테스트 중...",
+          "접근성 검사 중...",
+          "성능 메트릭 수집 중...",
+          "결과 분석 중...",
         ];
       default:
         return ["테스트 실행 중..."];
@@ -991,6 +1136,20 @@ export default function () {
         
         // Lighthouse MCP API 호출 (실제 구현 필요)
         result = await executeLighthouseTest(lighthouseParams);
+      } else if (selectedTestType === 'e2e') {
+        // E2E 테스트는 Playwright MCP 사용
+        const e2eParams = {
+          url: normalizedUrl,
+          name: testDescription || `E2E Test - ${normalizedUrl}`,
+          description: testDescription,
+          config: {
+            testType: 'e2e',
+            settings: testSettings.e2e
+          }
+        };
+        
+        // Playwright MCP API 호출
+        result = await executeE2ETest(e2eParams);
       } else {
         // 다른 테스트 유형은 k6 사용
       const k6Script = generateTestScript(normalizedUrl, selectedTestType, testSettings);
@@ -1197,13 +1356,60 @@ export default function () {
     key: string,
     value: any,
   ) => {
-    setTestSettings((prev) => ({
-      ...prev,
-      [testType]: {
-        ...prev[testType],
-        [key]: value,
-      },
-    }));
+    setTestSettings((prev) => {
+      // e2e 설정이 없을 때 기본값 설정
+      if (testType === 'e2e' && !prev.e2e) {
+        prev.e2e = {
+          browser: "chromium",
+          headless: true,
+          viewport: {
+            width: 1280,
+            height: 720,
+          },
+          timeout: 30000,
+          navigationTimeout: 30000,
+          actionTimeout: 5000,
+          screenshotOnFailure: true,
+          videoRecording: false,
+          traceRecording: false,
+          slowMo: 0,
+          userAgent: "",
+          locale: "ko-KR",
+          timezone: "Asia/Seoul",
+          permissions: [],
+          geolocation: {
+            latitude: 37.5665,
+            longitude: 126.9780,
+            accuracy: 100,
+          },
+          colorScheme: "light",
+          reducedMotion: false,
+          forcedColors: "none",
+          acceptDownloads: true,
+          ignoreHttpsErrors: false,
+          bypassCSP: false,
+          extraHttpHeaders: {},
+          httpCredentials: {
+            username: "",
+            password: "",
+          },
+          proxy: {
+            server: "",
+            bypass: "",
+            username: "",
+            password: "",
+          },
+        };
+      }
+
+      return {
+        ...prev,
+        [testType]: {
+          ...prev[testType],
+          [key]: value,
+        },
+      };
+    });
   };
 
 
@@ -1221,6 +1427,8 @@ export default function () {
         return generateSecurityScript(url, settings.security);
       case 'accessibility':
         return generateAccessibilityScript(url, settings.accessibility);
+      case 'e2e':
+        return generateE2EScript(url, settings.e2e);
       default:
         return generateK6Script(url, settings.load);
     }
@@ -1363,6 +1571,181 @@ export default function () {
   errorRate.add(response.status !== 200);
   sleep(3);
 }
+`;
+  };
+
+  // E2E 테스트 스크립트 (Playwright 기반)
+  const generateE2EScript = (url: string, settings: any): string => {
+    const browserConfig = {
+      browser: settings.browser || 'chromium',
+      headless: settings.headless !== undefined ? settings.headless : true,
+      viewport: settings.viewport || { width: 1280, height: 720 },
+      timeout: settings.timeout || 30000,
+      navigationTimeout: settings.navigationTimeout || 30000,
+      actionTimeout: settings.actionTimeout || 5000,
+      screenshotOnFailure: settings.screenshotOnFailure !== undefined ? settings.screenshotOnFailure : true,
+      videoRecording: settings.videoRecording !== undefined ? settings.videoRecording : false,
+      traceRecording: settings.traceRecording !== undefined ? settings.traceRecording : false,
+      slowMo: settings.slowMo || 0,
+      userAgent: settings.userAgent || '',
+      locale: settings.locale || 'ko-KR',
+      timezone: settings.timezone || 'Asia/Seoul',
+      permissions: settings.permissions || [],
+      geolocation: settings.geolocation || { latitude: 37.5665, longitude: 126.9780, accuracy: 100 },
+      colorScheme: settings.colorScheme || 'light',
+      reducedMotion: settings.reducedMotion !== undefined ? settings.reducedMotion : false,
+      forcedColors: settings.forcedColors || 'none',
+      acceptDownloads: settings.acceptDownloads !== undefined ? settings.acceptDownloads : true,
+      ignoreHttpsErrors: settings.ignoreHttpsErrors !== undefined ? settings.ignoreHttpsErrors : false,
+      bypassCSP: settings.bypassCSP !== undefined ? settings.bypassCSP : false,
+      extraHttpHeaders: settings.extraHttpHeaders || {},
+      httpCredentials: settings.httpCredentials || { username: '', password: '' },
+      proxy: settings.proxy || { server: '', bypass: '', username: '', password: '' }
+    };
+
+    return `
+import { test, expect } from '@playwright/test';
+
+// Playwright 설정
+const config = {
+  testDir: './tests',
+  timeout: ${browserConfig.timeout},
+  expect: {
+    timeout: ${browserConfig.actionTimeout}
+  },
+  use: {
+    baseURL: '${url}',
+    headless: ${browserConfig.headless},
+    viewport: { width: ${browserConfig.viewport.width}, height: ${browserConfig.viewport.height} },
+    navigationTimeout: ${browserConfig.navigationTimeout},
+    actionTimeout: ${browserConfig.actionTimeout},
+    screenshot: 'only-on-failure',
+    video: ${browserConfig.videoRecording ? "'retain-on-failure'" : 'false'},
+    trace: ${browserConfig.traceRecording ? "'retain-on-failure'" : 'false'},
+    slowMo: ${browserConfig.slowMo},
+    ${browserConfig.userAgent ? `userAgent: '${browserConfig.userAgent}',` : ''}
+    locale: '${browserConfig.locale}',
+    timezoneId: '${browserConfig.timezone}',
+    permissions: ${JSON.stringify(browserConfig.permissions)},
+    geolocation: ${JSON.stringify(browserConfig.geolocation)},
+    colorScheme: '${browserConfig.colorScheme}',
+    reducedMotion: ${browserConfig.reducedMotion ? "'reduce'" : "'no-preference'"},
+    forcedColors: '${browserConfig.forcedColors}',
+    acceptDownloads: ${browserConfig.acceptDownloads},
+    ignoreHTTPSErrors: ${browserConfig.ignoreHttpsErrors},
+    bypassCSP: ${browserConfig.bypassCSP},
+    extraHTTPHeaders: ${JSON.stringify(browserConfig.extraHttpHeaders)},
+    ${browserConfig.httpCredentials.username ? `httpCredentials: { username: '${browserConfig.httpCredentials.username}', password: '${browserConfig.httpCredentials.password}' },` : ''}
+    ${browserConfig.proxy.server ? `proxy: { server: '${browserConfig.proxy.server}', bypass: '${browserConfig.proxy.bypass}', username: '${browserConfig.proxy.username}', password: '${browserConfig.proxy.password}' },` : ''}
+  },
+  projects: [
+    {
+      name: '${browserConfig.browser}',
+      use: { ...devices['${browserConfig.browser}'] },
+    },
+  ],
+};
+
+export default config;
+
+// E2E 테스트 스크립트
+test('E2E 테스트 - ${url}', async ({ page }) => {
+  // 페이지 로드
+  await page.goto('${url}');
+  
+  // 페이지 제목 확인
+  await expect(page).toHaveTitle(/./);
+  
+  // 페이지 로드 완료 대기
+  await page.waitForLoadState('networkidle');
+  
+  // 기본 상호작용 테스트
+  try {
+    // 링크 클릭 테스트 (첫 번째 링크가 있는 경우)
+    const firstLink = page.locator('a').first();
+    if (await firstLink.count() > 0) {
+      await firstLink.click();
+      await page.waitForLoadState('networkidle');
+      await page.goBack();
+    }
+    
+    // 폼 입력 테스트 (첫 번째 input이 있는 경우)
+    const firstInput = page.locator('input[type="text"], input[type="email"], input[type="password"]').first();
+    if (await firstInput.count() > 0) {
+      await firstInput.fill('test@example.com');
+      await expect(firstInput).toHaveValue('test@example.com');
+    }
+    
+    // 버튼 클릭 테스트 (첫 번째 button이 있는 경우)
+    const firstButton = page.locator('button').first();
+    if (await firstButton.count() > 0) {
+      await firstButton.click();
+      await page.waitForTimeout(1000);
+    }
+    
+    console.log('E2E 테스트 완료: 모든 기본 상호작용이 성공적으로 수행되었습니다.');
+  } catch (error) {
+    console.error('E2E 테스트 중 오류 발생:', error);
+    throw error;
+  }
+});
+
+// 접근성 테스트
+test('접근성 테스트 - ${url}', async ({ page }) => {
+  await page.goto('${url}');
+  
+  // 이미지 alt 텍스트 확인
+  const images = page.locator('img');
+  const imageCount = await images.count();
+  
+  for (let i = 0; i < imageCount; i++) {
+    const alt = await images.nth(i).getAttribute('alt');
+    if (!alt) {
+      console.warn('이미지에 alt 속성이 없습니다:', await images.nth(i).getAttribute('src'));
+    }
+  }
+  
+  // 링크 텍스트 확인
+  const links = page.locator('a');
+  const linkCount = await links.count();
+  
+  for (let i = 0; i < linkCount; i++) {
+    const text = await links.nth(i).textContent();
+    if (!text || text.trim() === '') {
+      console.warn('링크에 텍스트가 없습니다:', await links.nth(i).getAttribute('href'));
+    }
+  }
+  
+  console.log('접근성 테스트 완료');
+});
+
+// 성능 테스트
+test('성능 테스트 - ${url}', async ({ page }) => {
+  const startTime = Date.now();
+  
+  await page.goto('${url}');
+  await page.waitForLoadState('networkidle');
+  
+  const loadTime = Date.now() - startTime;
+  console.log('페이지 로드 시간:', loadTime + 'ms');
+  
+  // 성능 메트릭 수집
+  const metrics = await page.evaluate(() => {
+    const navigation = performance.getEntriesByType('navigation')[0];
+    return {
+      domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
+      loadComplete: navigation.loadEventEnd - navigation.loadEventStart,
+      firstPaint: performance.getEntriesByName('first-paint')[0]?.startTime || 0,
+      firstContentfulPaint: performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0,
+    };
+  });
+  
+  console.log('성능 메트릭:', metrics);
+  
+  // 성능 기준 확인
+  expect(loadTime).toBeLessThan(${browserConfig.timeout});
+  expect(metrics.domContentLoaded).toBeLessThan(3000);
+});
 `;
   };
 
@@ -2036,6 +2419,338 @@ export default function () {
                       <SelectItem value="none">제한 없음</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+            </div>
+          ) : selectedTestType === 'e2e' ? (
+            // E2E 테스트 설정
+            <div className="space-y-6">
+              {/* 브라우저 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  브라우저 설정 <span className="text-xs text-muted-foreground ml-1">(Browser Settings)</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      브라우저 <span className="text-xs text-muted-foreground">(Browser)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Select
+                        value={testSettings.e2e.browser}
+                        onValueChange={(value) => updateTestSetting('e2e', 'browser', value)}
+                      >
+                        <SelectTrigger className="border-none bg-transparent text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="neu-card rounded-xl border-none bg-card">
+                          <SelectItem value="chromium">Chromium</SelectItem>
+                          <SelectItem value="firefox">Firefox</SelectItem>
+                          <SelectItem value="webkit">Safari (WebKit)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      헤드리스 모드 <span className="text-xs text-muted-foreground">(Headless)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Switch
+                        checked={testSettings.e2e.headless}
+                        onCheckedChange={(checked) => updateTestSetting('e2e', 'headless', checked)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 뷰포트 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  뷰포트 설정 <span className="text-xs text-muted-foreground ml-1">(Viewport Settings)</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      너비 <span className="text-xs text-muted-foreground">(Width)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Input
+                        type="number"
+                        value={testSettings.e2e.viewport.width}
+                        onChange={(e) => {
+                          const newViewport = { ...testSettings.e2e.viewport, width: Number(e.target.value) };
+                          updateTestSetting('e2e', 'viewport', newViewport);
+                        }}
+                        className="border-none bg-transparent text-center text-foreground"
+                        min="320"
+                        max="3840"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      높이 <span className="text-xs text-muted-foreground">(Height)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Input
+                        type="number"
+                        value={testSettings.e2e.viewport.height}
+                        onChange={(e) => {
+                          const newViewport = { ...testSettings.e2e.viewport, height: Number(e.target.value) };
+                          updateTestSetting('e2e', 'viewport', newViewport);
+                        }}
+                        className="border-none bg-transparent text-center text-foreground"
+                        min="240"
+                        max="2160"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 타임아웃 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  타임아웃 설정 <span className="text-xs text-muted-foreground ml-1">(Timeout Settings)</span>
+                </Label>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      전체 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Input
+                        type="number"
+                        value={testSettings.e2e.timeout}
+                        onChange={(e) => updateTestSetting('e2e', 'timeout', Number(e.target.value))}
+                        className="border-none bg-transparent text-center text-foreground"
+                        min="1000"
+                        max="300000"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      네비게이션 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Input
+                        type="number"
+                        value={testSettings.e2e.navigationTimeout}
+                        onChange={(e) => updateTestSetting('e2e', 'navigationTimeout', Number(e.target.value))}
+                        className="border-none bg-transparent text-center text-foreground"
+                        min="1000"
+                        max="300000"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      액션 타임아웃 <span className="text-xs text-muted-foreground">(ms)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Input
+                        type="number"
+                        value={testSettings.e2e.actionTimeout}
+                        onChange={(e) => updateTestSetting('e2e', 'actionTimeout', Number(e.target.value))}
+                        className="border-none bg-transparent text-center text-foreground"
+                        min="1000"
+                        max="300000"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 녹화 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  녹화 설정 <span className="text-xs text-muted-foreground ml-1">(Recording Settings)</span>
+                </Label>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      스크린샷 (실패 시) <span className="text-xs text-muted-foreground">(Screenshot on Failure)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Switch
+                        checked={testSettings.e2e.screenshotOnFailure}
+                        onCheckedChange={(checked) => updateTestSetting('e2e', 'screenshotOnFailure', checked)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      비디오 녹화 <span className="text-xs text-muted-foreground">(Video Recording)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Switch
+                        checked={testSettings.e2e.videoRecording}
+                        onCheckedChange={(checked) => updateTestSetting('e2e', 'videoRecording', checked)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      트레이스 녹화 <span className="text-xs text-muted-foreground">(Trace Recording)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Switch
+                        checked={testSettings.e2e.traceRecording}
+                        onCheckedChange={(checked) => updateTestSetting('e2e', 'traceRecording', checked)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 고급 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  고급 설정 <span className="text-xs text-muted-foreground ml-1">(Advanced Settings)</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      슬로우 모션 <span className="text-xs text-muted-foreground">(Slow Motion)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Input
+                        type="number"
+                        value={testSettings.e2e.slowMo}
+                        onChange={(e) => updateTestSetting('e2e', 'slowMo', Number(e.target.value))}
+                        className="border-none bg-transparent text-center text-foreground"
+                        min="0"
+                        max="5000"
+                        step="100"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 text-center">밀리초</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      사용자 에이전트 <span className="text-xs text-muted-foreground">(User Agent)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Input
+                        value={testSettings.e2e.userAgent}
+                        onChange={(e) => updateTestSetting('e2e', 'userAgent', e.target.value)}
+                        placeholder="기본값 사용"
+                        className="border-none bg-transparent text-center text-foreground"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 지역 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  지역 설정 <span className="text-xs text-muted-foreground ml-1">(Locale Settings)</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      로케일 <span className="text-xs text-muted-foreground">(Locale)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Select
+                        value={testSettings.e2e.locale}
+                        onValueChange={(value) => updateTestSetting('e2e', 'locale', value)}
+                      >
+                        <SelectTrigger className="border-none bg-transparent text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="neu-card rounded-xl border-none bg-card">
+                          <SelectItem value="ko-KR">한국어 (ko-KR)</SelectItem>
+                          <SelectItem value="en-US">English (en-US)</SelectItem>
+                          <SelectItem value="ja-JP">日本語 (ja-JP)</SelectItem>
+                          <SelectItem value="zh-CN">中文 (zh-CN)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      시간대 <span className="text-xs text-muted-foreground">(Timezone)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Select
+                        value={testSettings.e2e.timezone}
+                        onValueChange={(value) => updateTestSetting('e2e', 'timezone', value)}
+                      >
+                        <SelectTrigger className="border-none bg-transparent text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="neu-card rounded-xl border-none bg-card">
+                          <SelectItem value="Asia/Seoul">Asia/Seoul (KST)</SelectItem>
+                          <SelectItem value="America/New_York">America/New_York (EST)</SelectItem>
+                          <SelectItem value="Europe/London">Europe/London (GMT)</SelectItem>
+                          <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 접근성 설정 */}
+              <div className="neu-subtle rounded-xl px-6 py-6">
+                <Label className="text-foreground font-semibold text-lg mb-4 block">
+                  접근성 설정 <span className="text-xs text-muted-foreground ml-1">(Accessibility Settings)</span>
+                </Label>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      색상 스키마 <span className="text-xs text-muted-foreground">(Color Scheme)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Select
+                        value={testSettings.e2e.colorScheme}
+                        onValueChange={(value) => updateTestSetting('e2e', 'colorScheme', value)}
+                      >
+                        <SelectTrigger className="border-none bg-transparent text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="neu-card rounded-xl border-none bg-card">
+                          <SelectItem value="light">라이트 모드</SelectItem>
+                          <SelectItem value="dark">다크 모드</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      모션 감소 <span className="text-xs text-muted-foreground">(Reduced Motion)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Switch
+                        checked={testSettings.e2e.reducedMotion}
+                        onCheckedChange={(checked) => updateTestSetting('e2e', 'reducedMotion', checked)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">
+                      강제 색상 <span className="text-xs text-muted-foreground">(Forced Colors)</span>
+                    </Label>
+                    <div className="neu-input rounded-lg px-3 py-2">
+                      <Select
+                        value={testSettings.e2e.forcedColors}
+                        onValueChange={(value) => updateTestSetting('e2e', 'forcedColors', value)}
+                      >
+                        <SelectTrigger className="border-none bg-transparent text-foreground">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="neu-card rounded-xl border-none bg-card">
+                          <SelectItem value="none">없음</SelectItem>
+                          <SelectItem value="active">활성</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

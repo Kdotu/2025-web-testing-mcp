@@ -532,6 +532,55 @@ export class LighthouseService {
   }
 
   /**
+   * Lighthouse 테스트용 raw_data 생성
+   */
+  private generateLighthouseRawData(testId: string, output: string, config?: LoadTestConfig): string {
+    // 현재 시간을 한국 시간으로 포맷팅
+    const now = new Date();
+    const koreanTime = now.toLocaleString('ko-KR', { 
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).replace(/\./g, '-').replace(/\s/g, ' ');
+
+    const timestampLine = `====TEST START DATE ${koreanTime}====\n\n`;
+    
+    // 설정 정보 추가
+    let configInfo = '';
+    if (config) {
+      configInfo = `------------------------------------\n-------TEST CONFIG-------\n`;
+      configInfo += `Test Type: Lighthouse Test\n`;
+      configInfo += `URL: ${(config as any).url || (config as any).targetUrl || 'Unknown'}\n`;
+      configInfo += `Device: ${(config as any).device || 'desktop'}\n`;
+      if ((config as any).categories) {
+        configInfo += `Categories: ${(config as any).categories.join(', ')}\n`;
+      }
+      if ((config as any).detailedConfig) {
+        configInfo += `Test Type: ${(config as any).detailedConfig.testType || 'lighthouse'}\n`;
+        if ((config as any).detailedConfig.settings) {
+          configInfo += `Settings: ${JSON.stringify((config as any).detailedConfig.settings, null, 2)}\n`;
+        }
+      }
+      configInfo += `------------------------------------\n\n`;
+    }
+    
+    // 테스트 결과 요약
+    const resultSummary = `------------------------------------\n-------TEST RESULT-------\n`;
+    const resultSummary2 = `Status: completed\n`;
+    const resultSummary3 = `Test ID: ${testId}\n`;
+    const resultSummary4 = `------------------------------------\n\n`;
+    
+    // Lighthouse 결과 내용
+    const lighthouseContent = output;
+    
+    return timestampLine + configInfo + resultSummary + resultSummary2 + resultSummary3 + resultSummary4 + lighthouseContent;
+  }
+
+  /**
    * Lighthouse 결과 저장
    */
   private async saveLighthouseResult(
@@ -561,7 +610,7 @@ export class LighthouseService {
         metrics: metrics,
         details: details,
         config: config || {},
-        raw_data: rawData.replace(/\\n/g, ' ').replace(/\n/g, ' '),
+        raw_data: this.generateLighthouseRawData(testId, rawData, config),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

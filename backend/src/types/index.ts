@@ -63,6 +63,39 @@ export interface LoadTestResult {
 }
 
 /**
+ * E2E 테스트 결과 인터페이스
+ */
+export interface E2ETestResult {
+  id: string;
+  testId: string;
+  testType: 'e2e';
+  url: string;
+  name: string;
+  description?: string;
+  config?: any;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  currentStep?: string;
+  metrics: {
+    totalSteps: number;
+    completedSteps: number;
+    failedSteps: number;
+    successRate: number;
+  };
+  summary: {
+    totalSteps: number;
+    completedSteps: number;
+    failedSteps: number;
+    duration: number;
+    startTime: string;
+    endTime?: string;
+  };
+  details?: any;
+  raw_data?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * API 응답 인터페이스
  */
 export interface ApiResponse<T = any> {

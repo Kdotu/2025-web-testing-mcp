@@ -243,10 +243,10 @@ export function TestResults({ onNavigate }: TestResultsProps) {
         <div className="neu-accent rounded-3xl px-6 py-8">
           <div className="flex items-center justify-between mb-4">
             <div className="text-primary-foreground font-semibold text-lg">총 테스트</div>
-            <BarChart3 className="h-8 w-8 text-primary-foreground/90" />
+            <BarChart3 className="h-8 w-8 text-white" />
           </div>
           <div className="text-4xl font-bold text-primary-foreground mb-2">{testResults.length}</div>
-          <p className="text-primary-foreground/80">실행된 테스트</p>
+          <p className="text-white">실행된 테스트</p>
         </div>
         
         <div className="neu-card rounded-3xl px-6 py-8">
@@ -412,7 +412,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                 <TableRow className="neu-subtle rounded-xl">
                   <TableHead className="w-[80px] px-6 py-6 text-primary font-semibold text-lg text-center">작업</TableHead>
                   <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">웹사이트</TableHead>
-                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">테스트 유형</TableHead>
+                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">실행 테스트</TableHead>
                   <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">실행 일시</TableHead>
                   <TableHead className="w-[80px] px-6 py-6 text-primary font-semibold text-lg text-center">상태</TableHead>
                 </TableRow>
@@ -457,12 +457,12 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="px-6 py-6 w-[120px]">
+                      <TableCell className="px-6 py-6 w-[120px] text-center">
                         <div className="neu-subtle rounded-full px-4 py-2 inline-block" style={{ 
                           backgroundColor: badgeColor.bg, 
                           color: badgeColor.text
                         }}>
-                                  <span className="font-semibold">{result.testType || result.type || '부하테스트'}</span>
+                                  <span className="font-semibold">{result.testType || result.type || ''}</span>
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-6 w-[120px]">
@@ -471,13 +471,25 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                         </div>
                       </TableCell>
 
-                      <TableCell className="px-6 py-6 w-[80px]">
+                      <TableCell className="px-6 py-6 w-[80px] text-center">
                         <div className="neu-subtle rounded-full px-4 py-2 inline-block border-2" style={{ 
-                          borderColor: '#7886C7', 
-                          color: '#7886C7',
-                          backgroundColor: 'transparent'
+                          borderColor: result.status === 'running' ? '#a5b4fc' : '#7886C7', 
+                          color: result.status === 'running' ? '#a5b4fc' : '#7886C7',
+                          backgroundColor: result.status === 'running' ? '#a5b4fc' : 'transparent'
                         }}>
-                          <span className="font-semibold">{result.status}</span>
+                          <span className={`font-semibold ${
+                            result.status === 'completed' ? 'text-[var(--primary)]' : 
+                            result.status === 'failed' ? 'text-gray-500' : 
+                            result.status === 'running' ? 'text-white' : 
+                            result.status === 'cancelled' ? 'text-gray-500' : 
+                            result.status === 'pending' ? 'text-gray-500' : 'text-gray-500'
+                          }`}>
+                            {result.status === 'completed' ? '성공' : 
+                             result.status === 'failed' ? '실패' : 
+                             result.status === 'running' ? '실행중' : 
+                             result.status === 'cancelled' ? '취소됨' : 
+                             result.status === 'pending' ? '대기중' : result.status}
+                          </span>
                         </div>
                       </TableCell>
 

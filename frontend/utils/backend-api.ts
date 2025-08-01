@@ -244,6 +244,40 @@ class BackendApiClient {
   async getRunningLighthouseTests(): Promise<BackendApiResponse> {
     return this.request('/api/lighthouse/running');
   }
+
+  /**
+   * E2E 테스트 실행 (Playwright MCP)
+   */
+  async executeE2ETest(params: {
+    url: string;
+    name: string;
+    description?: string;
+    config: {
+      testType: string;
+      settings: any;
+    };
+  }): Promise<BackendApiResponse<LoadTestResult>> {
+    return this.request('/api/e2e-tests', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  /**
+   * E2E 테스트 상태 조회
+   */
+  async getE2ETestStatus(testId: string): Promise<BackendApiResponse> {
+    return this.request(`/api/e2e-tests/${testId}`);
+  }
+
+  /**
+   * E2E 테스트 취소
+   */
+  async cancelE2ETest(testId: string): Promise<BackendApiResponse> {
+    return this.request(`/api/e2e-tests/${testId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // 기본 API 클라이언트 인스턴스
@@ -306,6 +340,20 @@ export const getLighthouseTestStatus = (testId: string) => backendApi.getLightho
 export const cancelLighthouseTest = (testId: string) => backendApi.cancelLighthouseTest(testId);
 
 export const getRunningLighthouseTests = () => backendApi.getRunningLighthouseTests();
+
+export const executeE2ETest = (params: {
+  url: string;
+  name: string;
+  description?: string;
+  config: {
+    testType: string;
+    settings: any;
+  };
+}) => backendApi.executeE2ETest(params);
+
+export const getE2ETestStatus = (testId: string) => backendApi.getE2ETestStatus(testId);
+
+export const cancelE2ETest = (testId: string) => backendApi.cancelE2ETest(testId);
 
 // 타입 내보내기
 export type { BackendApiResponse, LoadTestConfig, LoadTestResult }; 

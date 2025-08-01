@@ -73,7 +73,8 @@ export function Settings({ onNavigate }: SettingsProps) {
         const result = await updateTestType(editingTestType.id, {
           name: testTypeData.name!,
           description: testTypeData.description!,
-          enabled: testTypeData.enabled!
+          enabled: testTypeData.enabled!,
+          mcp_tool: testTypeData.mcp_tool || ''
         });
         
         if (result.success) {
@@ -174,6 +175,13 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <Activity className="h-4 w-4 mr-2" />
                 테스트 타입
               </TabsTrigger>
+              <TabsTrigger 
+                value="test-settings"
+                className="flex items-center justify-center rounded-lg px-4 py-4 font-semibold text-base transition-all duration-200 data-[state=active]:neu-button-active data-[state=active]:text-primary-foreground data-[state=active]:bg-primary h-14"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                테스트 설정
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="test-types" className="space-y-6">
@@ -234,11 +242,6 @@ export function Settings({ onNavigate }: SettingsProps) {
                           </div>
                         </div>
                         <div className="flex items-center space-x-3">
-                          <div className="neu-pressed rounded-full px-4 py-2">
-                            <Badge variant={testType.enabled ? "default" : "secondary"} className="font-semibold">
-                              {testType.enabled ? "활성화" : "비활성화"}
-                            </Badge>
-                          </div>
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -277,7 +280,7 @@ export function Settings({ onNavigate }: SettingsProps) {
               )}
             </TabsContent>
 
-            <TabsContent value="general" className="space-y-6">
+            <TabsContent value="test-settings" className="space-y-6">
               <div>
                 <h3 className="text-2xl font-semibold text-primary mb-2">일반 설정</h3>
                 <p className="text-muted-foreground text-lg">기본 테스트 설정을 구성하세요</p>

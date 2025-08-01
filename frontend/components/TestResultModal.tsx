@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Download, BarChart3 } from 'lucide-react';
+import { X, Download, BarChart3, Copy, Check } from 'lucide-react';
 import { getTestMetrics, getGroupedTestMetrics, TestMetric } from '../utils/backend-api';
 
 interface TestResultModalProps {
@@ -13,7 +13,30 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
   const [metrics, setMetrics] = useState<TestMetric[]>([]);
   const [groupedMetrics, setGroupedMetrics] = useState<any>({});
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const loadedTestIdRef = useRef<string | null>(null);
+
+  // raw_data 복사 함수
+  const copyRawData = async () => {
+    if (!result.raw_data) return;
+    
+    try {
+      await navigator.clipboard.writeText(result.raw_data);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy raw data:', error);
+      // fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = result.raw_data;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const fetchMetrics = useCallback(async (testId: string) => {
     if (loadedTestIdRef.current === testId) return;
@@ -357,9 +380,28 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
           {/* 실행 로그 - 우측 */}
           {result.raw_data && (
             <div className="neu-flat rounded-2xl px-6 py-8">
-              <h4 className="font-semibold mb-6 text-primary text-xl">k6 실행 로그</h4>
+              <div className="flex items-center justify-between mb-6">
+                <h4 className="font-semibold text-primary text-xl">실행 로그</h4>
+                <button
+                  onClick={copyRawData}
+                  className="neu-button rounded-lg px-4 py-2 flex items-center space-x-2 transition-all duration-200 hover:text-primary"
+                  title="Raw Data 복사"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">복사됨</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      <span className="text-sm">복사</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <div className="p-4 rounded-xl font-mono text-sm overflow-x-auto overflow-y-auto" 
-                   style={{ backgroundColor: '#5d5d5f', color: '#a5b4fc', height: 'calc(100vh - 10px)' }}>
+                   style={{ backgroundColor: '#5d5d5f', color: '#a5b4fc', height: 'calc(70vh - 10px)' }}>
                 <pre className="whitespace-pre-wrap">{result.raw_data}</pre>
               </div>
             </div>
