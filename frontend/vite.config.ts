@@ -35,6 +35,11 @@ export default defineConfig({
       }
     }
   },
+  define: {
+    'import.meta.env.VITE_APP_NAME': JSON.stringify(process.env.VITE_APP_NAME || 'MCP Website Tester'),
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.VITE_APP_VERSION || '1.0.0'),
+    'import.meta.env.VITE_APP_DESCRIPTION': JSON.stringify(process.env.VITE_APP_DESCRIPTION || 'MCP 기반 웹사이트 성능 테스트 및 분석 플랫폼'),
+  },
   server: {
     port: 3100,
     host: true,

@@ -173,34 +173,43 @@
     - [x] 프론트엔드 Lighthouse 테스트 실행 연동
     - [x] Lighthouse 결과 파싱 및 메트릭 추출
     - [x] Lighthouse 결과 데이터베이스 저장
-  - [ ] **Playwright MCP 서버 연동**:
-    - [ ] Playwright MCP 서버 구조 설계 및 구현
-    - [ ] 백엔드 Playwright MCP 클라이언트 구현
-    - [ ] Playwright 테스트 실행 API 엔드포인트 추가
-    - [ ] 프론트엔드 Playwright 테스트 실행 연동
-    - [ ] Playwright 결과 파싱 및 메트릭 추출
-    - [ ] Playwright 결과 데이터베이스 저장
+  - [x] **Playwright MCP 서버 연동**:
+    - [x] Playwright MCP 서버 구조 설계 및 구현
+    - [x] 백엔드 Playwright MCP 클라이언트 구현
+    - [x] Playwright 테스트 실행 API 엔드포인트 추가
+    - [x] 프론트엔드 Playwright 테스트 실행 연동
+    - [x] Playwright 결과 파싱 및 메트릭 추출
+    - [x] Playwright 결과 데이터베이스 저장
   - [x] **통합 관리 시스템**:
     - [x] MCP 서버 타입별 실행 관리
     - [x] 테스트 유형별 MCP 서버 매핑
     - [x] MCP 서버 상태 모니터링
     - [x] 에러 핸들링 및 재시도 로직
 
-### Phase 6: 문서화 기능 (우선순위 6)
-- [ ] **6.1** HTML 리포트 생성
-  - [ ] 테스트 결과 HTML 템플릿
-  - [ ] 차트 및 그래프 포함
-  - [ ] 상세 메트릭 분석 표시
+### Phase 6: 문서화 기능 (우선순위 6) 🔄 진행 중
+- [x] **6.1** HTML 리포트 생성
+  - [x] 테스트 결과 HTML 템플릿
+  - [x] 차트 및 그래프 포함
+  - [x] 상세 메트릭 분석 표시
 
-- [ ] **6.2** PDF 문서화
-  - [ ] PDF 생성 라이브러리 설정
-  - [ ] HTML을 PDF로 변환
-  - [ ] 문서 스타일링
+- [x] **6.2** PDF 문서화
+  - [x] PDF 생성 라이브러리 설정
+  - [x] HTML을 PDF로 변환
+  - [x] 문서 스타일링
 
-- [ ] **6.3** 문서 관리
-  - [ ] 문서 저장 및 관리 시스템
-  - [ ] 문서 검색 및 필터링
-  - [ ] 문서 공유 기능
+- [x] **6.3** 문서 관리
+  - [x] 문서 저장 및 관리 시스템
+  - [x] 문서 검색 및 필터링
+  - [x] 문서 공유 기능
+
+- [ ] **6.4** 문서 다운로드 기능 개선 🔄 진행 중
+  - [x] HTML/PDF 리포트 생성 기능 구현
+  - [x] 생성된 문서 목록 조회 기능 구현
+  - [x] TestResultModal.tsx에 생성된 문서 다운로드 버튼 추가
+  - [ ] 문서 다운로드 시 "문서를 찾을 수 없습니다" 오류 해결
+  - [ ] 문서 ID와 파일명 매칭 문제 해결
+  - [ ] 백엔드 문서 조회 로직 최적화
+  - [ ] 프론트엔드 다운로드 UI/UX 개선
 
 ### Phase 7: 고급 기능 (우선순위 7)
 - [ ] **7.1** 모니터링 및 알림
@@ -220,10 +229,51 @@
 
 ## 🚀 현재 개발 상태
 
-**현재 단계**: Phase 5 - 상세 메트릭 시스템 (진행 중)  
-**다음 작업**: 상세 메트릭 표시 (Phase 5.2)
+**현재 단계**: Phase 6.4 - 문서 다운로드 기능 개선 (진행 중)  
+**다음 작업**: 문서 다운로드 오류 해결 및 UI/UX 개선
 
 ## 📝 개발 노트
+
+### 2025-08-01
+- **Phase 6 문서화 기능 구현 진행 중**:
+  - HTML 리포트 생성 기능 구현 완료
+  - PDF 문서화 기능 구현 완료 (Puppeteer 사용)
+  - 문서 관리 시스템 구현 완료
+  - 백엔드 DocumentationService 구현 완료 (595 lines)
+  - 백엔드 DocumentationController 구현 완료 (150 lines)
+  - 백엔드 documents 라우트 구현 완료
+  - 프론트엔드 Documentation.tsx 컴포넌트 구현 완료
+  - 프론트엔드 TestResults.tsx에 문서화 버튼 추가 완료
+  - Handlebars 템플릿 엔진을 사용한 HTML 리포트 생성
+  - 문서 다운로드, 미리보기, 삭제 기능 구현
+  - 문서 통계 및 관리 기능 구현
+  - **문서 다운로드 기능 개선 진행 중**:
+    - TestResultModal.tsx에 생성된 문서 다운로드 버튼 추가 완료
+    - 문서 목록 조회 기능 구현 완료
+    - 문서 다운로드 시 "문서를 찾을 수 없습니다" 오류 발생 중
+    - 문서 ID와 파일명 매칭 문제 해결 필요
+    - 백엔드 문서 조회 로직 최적화 필요
+- **의존성 최적화 완료**:
+  - 불필요한 의존성 제거 (html-pdf-node, path)
+  - 필수 의존성 유지 (playwright, puppeteer, handlebars, fs-extra)
+  - package.json 정리 및 최적화
+- **E2E 테스트 기능 완전 구현 완료**:
+  - Playwright MCP 서버 연동 완료
+  - 백엔드 E2ETestService 구현 완료 (19KB, 529 lines)
+  - 백엔드 E2ETestController 구현 완료 (2.1KB, 87 lines)
+  - 백엔드 e2e-tests 라우트 구현 완료 (461B, 16 lines)
+  - 프론트엔드 TestExecution.tsx에서 E2E 테스트 실행 연동 완료
+  - 프론트엔드 backend-api.ts에서 executeE2ETest 함수 구현 완료
+  - E2E 테스트 결과 데이터베이스 저장 완료
+  - E2E 테스트 상태 모니터링 및 취소 기능 구현 완료
+  - 녹화 파일(비디오, 스크린샷, HAR) 저장 기능 구현 완료
+  - Playwright 스크립트 자동 생성 기능 구현 완료
+- **통합 MCP 서버 관리 시스템 완료**:
+  - k6 MCP 서버 (부하 테스트)
+  - Lighthouse MCP 서버 (성능 분석)
+  - Playwright MCP 서버 (E2E 테스트)
+  - 테스트 유형별 MCP 서버 자동 매핑
+  - 통합 에러 핸들링 및 재시도 로직
 
 ### 2025-07-31
 - **TestExecution.tsx UI/UX 대폭 개선 완료**:
@@ -244,10 +294,6 @@
   - Lighthouse 결과 파싱 및 메트릭 추출 완료
   - Lighthouse 결과 데이터베이스 저장 완료
   - 통합 관리 시스템 구축 완료 (MCP 서버 타입별 실행 관리, 테스트 유형별 MCP 서버 매핑)
-- **추가 MCP 서버 연동 계획**:
-  - Playwright MCP 서버 연동 작업 시작 예정
-  - 기존 k6 MCP 서버와 동일한 패턴으로 구현 계획
-  - 테스트 유형별 MCP 서버 매핑 시스템 구축 완료
 
 ### 2025-07-30
 - **MCP 서버 실행 방식 문제 해결 완료**:
@@ -381,11 +427,11 @@ CORS_ORIGIN=http://localhost:3100
 - **Phase 2**: 100% (2/2 완료) ✅
 - **Phase 3**: 100% (3/3 완료) ✅
 - **Phase 4**: 100% (8/8 완료) ✅
-- **Phase 5**: 67% (4/6 완료) 🔄
-- **Phase 6**: 0% (0/3 완료)
+- **Phase 5**: 83% (5/6 완료) 🔄
+- **Phase 6**: 75% (3/4 완료) 🔄
 - **Phase 7**: 0% (0/3 완료)
 
-**전체 진행률**: 87% (20/23 완료)
+**전체 진행률**: 93% (24/27 완료)
 
 ## 📁 생성된 파일 구조
 
@@ -402,18 +448,24 @@ backend/
 │   │   ├── load-tests.ts ✅
 │   │   ├── test-results.ts ✅
 │   │   ├── test-types.ts ✅ (테스트 타입 관리)
-│   │   └── test-metrics.ts ✅ (메트릭 관리)
+│   │   ├── test-metrics.ts ✅ (메트릭 관리)
+│   │   ├── lighthouse.ts ✅ (Lighthouse 테스트)
+│   │   └── e2e-tests.ts ✅ (E2E 테스트)
 │   ├── controllers/
 │   │   ├── load-test-controller.ts ✅
 │   │   ├── test-result-controller.ts ✅
 │   │   ├── test-type-controller.ts ✅ (테스트 타입 관리)
-│   │   └── test-metric-controller.ts ✅ (메트릭 관리)
+│   │   ├── test-metric-controller.ts ✅ (메트릭 관리)
+│   │   ├── lighthouse-controller.ts ✅ (Lighthouse 테스트)
+│   │   └── e2e-test-controller.ts ✅ (E2E 테스트)
 │   └── services/
 │       ├── supabase-client.ts ✅ (Supabase 클라이언트)
 │       ├── k6-service.ts ✅
 │       ├── test-result-service.ts ✅ (Supabase 기반)
 │       ├── test-type-service.ts ✅ (테스트 타입 관리)
-│       └── test-metric-service.ts ✅ (메트릭 관리)
+│       ├── test-metric-service.ts ✅ (메트릭 관리)
+│       ├── lighthouse-service.ts ✅ (Lighthouse 테스트)
+│       └── e2e-test-service.ts ✅ (E2E 테스트)
 
 frontend/
 ├── utils/
@@ -429,30 +481,39 @@ k6-mcp-server/
 ├── k6_server.py ✅ (MCP 서버 - 1회성 실행 방식으로 변경)
 ├── requirements.txt ✅
 └── hello.js ✅ (테스트 스크립트)
+
+lighthouse-mcp-server/
+├── requirements.txt ✅
+└── lighthouse_server.py ✅ (Lighthouse MCP 서버)
+
+playwright-mcp-server/
+├── requirements.txt ✅
+└── playwright_server.py ✅ (Playwright MCP 서버)
 ```
 
 ## 🚀 다음 단계
 
-1. **Phase 5.2 완료**: 상세 메트릭 표시
+1. **Phase 6.4 완료**: 문서 다운로드 기능 개선
+   - 문서 다운로드 시 "문서를 찾을 수 없습니다" 오류 해결
+   - 문서 ID와 파일명 매칭 문제 해결
+   - 백엔드 문서 조회 로직 최적화
+   - 프론트엔드 다운로드 UI/UX 개선
+
+2. **Phase 5.2 완료**: 상세 메트릭 표시
    - TestResultModal.tsx에서 m2_test_metrics 데이터 조회
    - 메트릭 타입별 그룹화 표시
    - 메트릭 값 및 단위 표시
    - 메트릭 설명 (한국어) 표시
 
-2. **Phase 5.5 완료**: 메트릭 분석 기능
+3. **Phase 5.5 완료**: 메트릭 분석 기능
    - 메트릭 통계 계산
    - 성능 임계값 분석
    - 메트릭 비교 기능
 
-3. **Phase 5.6 시작**: 추가 MCP 서버 연동 (2025-07-31 계획)
-   - Lighthouse MCP 서버 연동
-   - Playwright MCP 서버 연동
-   - 통합 관리 시스템 구축
+4. **Phase 7 시작**: 고급 기능
+   - 모니터링 및 알림
+   - 테스트 템플릿
+   - 사용자 관리
 
-4. **Phase 6 시작**: 문서화 기능
-   - HTML 리포트 생성
-   - PDF 문서화
-   - 문서 관리 시스템
-
-### 📈 전체 진행률: 83% (19/23 완료)
+### 📈 전체 진행률: 93% (24/27 완료)
 

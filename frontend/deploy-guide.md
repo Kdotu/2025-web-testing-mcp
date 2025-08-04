@@ -38,7 +38,7 @@ VITE_API_BASE_URL=your_api_base_url
 
 # 기타 설정
 VITE_APP_VERSION=1.0.0
-VITE_APP_NAME="MCP 웹사이트 테스터"
+VITE_APP_NAME=your_app_name
 ```
 
 ### 4. 개발 서버 실행
