@@ -8,7 +8,12 @@ const app = new Hono();
 
 // CORS 설정
 app.use('*', cors({
-  origin: ['http://localhost:3100', 'https://ihubdmrqggwusivtopsi.supabase.co'],
+  origin: [
+    'http://localhost:3100', 
+    'https://ihubdmrqggwusivtopsi.supabase.co',
+    'https://2025-web-testing-mcp.netlify.app',
+    'https://*.netlify.app'
+  ],
   credentials: true,
 }));
 
