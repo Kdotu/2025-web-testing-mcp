@@ -10,7 +10,7 @@ const app = new Hono();
 app.use('*', cors({
   origin: [
     'http://localhost:3100', 
-    'https://ihubdmrqggwusivtopsi.supabase.co',
+    'https://*.supabase.co',
     'https://2025-web-testing-mcp.netlify.app',
     'https://*.netlify.app'
   ],

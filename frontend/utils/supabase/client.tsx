@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 // 환경 변수에서 Supabase 설정 가져오기
-const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://ihubdmrqggwusivtopsi.supabase.co';
-const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJodWJkbXJxZ2d3dXNpdnRvcHNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc2NzAzNTcsImV4cCI6MjA1MzI0NjM1N30.sb_publishable_H0d2-OOCuKe7RQF9_6fZJg_YAatqCnQ';
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// 환경 변수가 없으면 에러를 발생시키지 않고 null을 반환
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 // 테스트 결과를 저장하는 함수
 export const saveTestResult = async (testData: {
@@ -18,6 +21,11 @@ export const saveTestResult = async (testData: {
   endTime?: string;
   raw_data?: string; // raw_data 필드 추가
 }) => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
   try {
     const { data, error } = await supabase
       .from('m2_test_results')
@@ -50,7 +58,12 @@ export const saveTestResult = async (testData: {
 };
 
 // 테스트 결과를 불러오는 함수 (m2_test_results 테이블 구조에 맞게 수정)
-export const getTestResults = async (limit: number = 50) => {
+export const getTestResults = async (limit: number = 1000) => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
   try {
     // Supabase 연결 테스트
     const { data, error } = await supabase
@@ -265,6 +278,11 @@ const getMockTestResults = () => {
 
 // 특정 테스트 결과를 삭제하는 함수
 export const deleteTestResult = async (id: number) => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
   try {
     const { error } = await supabase
       .from('m2_test_results')
@@ -285,6 +303,11 @@ export const deleteTestResult = async (id: number) => {
 
 // 테스트 설정을 저장하는 함수
 export const saveTestSettings = async (settings: any) => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
   try {
     const { data, error } = await supabase
       .from('test_settings')
@@ -311,6 +334,11 @@ export const saveTestSettings = async (settings: any) => {
 
 // 테스트 설정을 불러오는 함수
 export const getTestSettings = async () => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return { success: false, error: 'Supabase client not initialized', data: null };
+  }
+
   try {
     const { data, error } = await supabase
       .from('test_settings')
@@ -332,6 +360,11 @@ export const getTestSettings = async () => {
 
 // 테스트를 위한 샘플 데이터 추가 함수
 export const addSampleTestResults = async () => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
   try {
     const sampleData = [
       {
@@ -445,6 +478,11 @@ export const addSampleTestResults = async () => {
 
 // MCP 도구 목록을 가져오는 함수
 export const getMcpTools = async (testType: string) => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return getDefaultMcpTools(testType);
+  }
+
   try {
     const { data, error } = await supabase
       .from('t2_test_types')
