@@ -21,11 +21,17 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     minify: 'esbuild',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['@radix-ui/react-accordion', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+          utils: ['date-fns', 'clsx', 'class-variance-authority']
+        }
       }
     }
   },
@@ -41,7 +47,7 @@ export default defineConfig({
     cors: true
   },
   css: {
-    devSourcemap: true
+    devSourcemap: false
   },
   optimizeDeps: {
     include: [
