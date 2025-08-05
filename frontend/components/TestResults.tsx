@@ -501,7 +501,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
                   const badgeColor = getBadgeColor(result.type);
                   return (
                     <TableRow 
-                      key={result.id} 
+                      key={`${result.id}-${result.createdAt}-${index}`} 
                       className="hover:neu-flat cursor-pointer transition-all duration-300 rounded-xl"
                               onClick={() => openModal(result)}
                     >

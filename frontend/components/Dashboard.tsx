@@ -809,7 +809,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {(testResults.length > 0 ? testResults.slice(0, 5) : mockData.recentTests).map((test, index) => {
               const StatusIcon = getStatusIcon(test.status);
               return (
-                <div key={test.id || index} className="neu-flat rounded-2xl px-6 py-6">
+                <div key={`${test.id}-${test.startTime}-${index}`} className="neu-flat rounded-2xl px-6 py-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${

@@ -44,6 +44,7 @@ app.use('/api/e2e-tests', e2eTestRoutes);
 // 설정 라우트 (프론트엔드 호환성을 위해 루트 경로에 추가)
 app.use('/get-settings', settingsRoutes);
 app.use('/test-results', testResultRoutes);
+app.use('/test-types', testTypeRoutes);
 app.use('/db-status', dbStatusRoutes);
 app.use('/save-settings', saveSettingsRoutes);
 

@@ -3185,7 +3185,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
 
               return (
                 <div
-                  key={test.id || index}
+                  key={`${test.id}-${test.createdAt || test.testStartTime}-${index}`}
                   className="neu-flat rounded-xl px-4 py-4 flex items-center space-x-4 cursor-pointer hover:neu-button transition-all duration-200"
                   onClick={() => onNavigate?.('test-results')}
                 >
