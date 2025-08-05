@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { LighthouseController } from '../controllers/lighthouse-controller';
 
 const router = Router();
@@ -8,7 +8,7 @@ const lighthouseController = new LighthouseController();
  * Lighthouse 테스트 실행
  * POST /api/lighthouse/run
  */
-router.post('/run', async (req, res) => {
+router.post('/run', async (req: Request, res: Response) => {
   await lighthouseController.runLighthouseTest(req, res);
 });
 
@@ -16,7 +16,7 @@ router.post('/run', async (req, res) => {
  * Lighthouse 테스트 상태 조회
  * GET /api/lighthouse/status/:testId
  */
-router.get('/status/:testId', async (req, res) => {
+router.get('/status/:testId', async (req: Request, res: Response) => {
   await lighthouseController.getLighthouseTestStatus(req, res);
 });
 
@@ -24,7 +24,7 @@ router.get('/status/:testId', async (req, res) => {
  * Lighthouse 테스트 취소
  * DELETE /api/lighthouse/cancel/:testId
  */
-router.delete('/cancel/:testId', async (req, res) => {
+router.delete('/cancel/:testId', async (req: Request, res: Response) => {
   await lighthouseController.cancelLighthouseTest(req, res);
 });
 
@@ -32,7 +32,7 @@ router.delete('/cancel/:testId', async (req, res) => {
  * 실행 중인 Lighthouse 테스트 목록 조회
  * GET /api/lighthouse/running
  */
-router.get('/running', async (req, res) => {
+router.get('/running', async (req: Request, res: Response) => {
   await lighthouseController.getRunningLighthouseTests(req, res);
 });
 
