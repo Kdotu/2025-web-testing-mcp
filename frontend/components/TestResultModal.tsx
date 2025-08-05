@@ -329,7 +329,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
                         <div className="neu-flat rounded-lg px-4 py-3">
                           <span className="text-sm text-muted-foreground">실행 모드</span>
                           <div className="font-semibold text-primary text-sm mt-1">
-                            {result.config.detailedConfig.settings.executor || 'N/A'}
+                            {result.config?.detailedConfig?.settings?.executor || 'N/A'}
                           </div>
                         </div>
                         

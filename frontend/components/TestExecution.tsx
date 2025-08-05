@@ -971,16 +971,16 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         description: testDescription,
         script: k6Script,
         config: {
-          duration: testSettings.load.timeUnit,
-          vus: testSettings.load.maxVUs,
+                        duration: testSettings.load?.timeUnit || "1s",
+              vus: testSettings.load?.maxVUs || 500,
           detailedConfig: {
-            executor: testSettings.load.executor,
+            executor: testSettings.load?.executor || "ramping-vus",
             preset: testSettings.load?.preset || "custom",
-            startRate: testSettings.load.startRate,
-            timeUnit: testSettings.load.timeUnit,
-            preAllocatedVUs: testSettings.load.preAllocatedVUs,
-            maxVUs: testSettings.load.maxVUs,
-            stages: testSettings.load.stages,
+                          startRate: testSettings.load?.startRate || 0,
+              timeUnit: testSettings.load?.timeUnit || "1s",
+              preAllocatedVUs: testSettings.load?.preAllocatedVUs || 0,
+              maxVUs: testSettings.load?.maxVUs || 500,
+            stages: testSettings.load?.stages || [],
             thresholds: {
               http_req_duration: ['p(95)<2000'],
               errors: ['rate<0.1']
@@ -1185,8 +1185,8 @@ export default function () {
         description: testDescription,
         script: k6Script,
         config: {
-          duration: selectedTestType === 'load' ? testSettings.load.timeUnit : '30s',
-          vus: selectedTestType === 'load' ? testSettings.load.maxVUs : 10,
+                      duration: selectedTestType === 'load' ? testSettings.load?.timeUnit || '30s' : '30s',
+            vus: selectedTestType === 'load' ? testSettings.load?.maxVUs || 10 : 10,
           detailedConfig: {
             testType: selectedTestType,
             settings: testSettings[selectedTestType as keyof TestSettings]
@@ -2002,7 +2002,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                   </Label>
                   <div className="neu-pressed rounded-lg px-3 py-1">
                     <span className="text-xs text-muted-foreground">
-                        Executor: {testSettings.load.executor}
+                        Executor: {testSettings.load?.executor || "ramping-vus"}
                     </span>
                   </div>
                 </div>
@@ -2013,10 +2013,10 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="flex flex-col">
                       <span className="text-foreground font-semibold">
-                          {testSettings.load.startRate} 요청 / {testSettings.load.timeUnit}
+                          {testSettings.load?.startRate || 0} 요청 / {testSettings.load?.timeUnit || "1s"}
                       </span>
                       <span className="text-xs text-foreground">
-                          ≈ {Math.round((testSettings.load.startRate / parseInt(testSettings.load.timeUnit)) * 100) / 100} TPS
+                          ≈ {Math.round(((testSettings.load?.startRate || 0) / parseInt(testSettings.load?.timeUnit || "1")) * 100) / 100} TPS
                       </span>
                     </div>
                   </div>
@@ -2072,7 +2072,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="neu-input rounded-xl px-3 py-2">
                       <Select
-                          value={testSettings.load.executor}
+                          value={testSettings.load?.executor || "ramping-vus"}
                         onValueChange={(value) =>
                             updateTestSetting("load", "executor", value)
                         }
