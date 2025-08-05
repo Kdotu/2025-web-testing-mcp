@@ -4,10 +4,8 @@ from pathlib import Path
 import sys
 import json
 import os
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Environment variables are already available in the process environment
 
 def run_k6_script(script_file: str, duration: str = "30s", vus: int = 10) -> str:
     """Run a k6 load test script.
@@ -88,6 +86,11 @@ def main():
         if not request_line:
             print(json.dumps({"error": "No request received"}), file=sys.stderr)
             sys.exit(1)
+        
+        # 디버깅을 위한 환경 정보 출력
+        print(f"Python version: {sys.version}", file=sys.stderr)
+        print(f"Current working directory: {os.getcwd()}", file=sys.stderr)
+        print(f"K6_BIN environment: {os.getenv('K6_BIN', 'not set')}", file=sys.stderr)
         
         # JSON 파싱
         request = json.loads(request_line)

@@ -34,7 +34,7 @@ export class DocumentationService {
     this.testMetricService = new TestMetricService();
     
     // 문서 저장 디렉토리 설정
-    this.reportsDir = path.join(__dirname, '../../reports');
+    this.reportsDir = path.join(__dirname, '../../data/reports');
     this.templatesDir = path.join(__dirname, '../../templates');
     
     this.ensureDirectories();

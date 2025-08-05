@@ -1,0 +1,81 @@
+name: web-testing-mcp-2025
+services:
+  - name: backend
+    source:
+      type: git
+      repository: https://github.com/kdotu.lloll/2025-web-testing-mcp
+      branch: main
+      directory: backend
+    build:
+      command: npm install && npm run build
+    run:
+      command: npm start
+      port: 3000
+    env:
+      - name: NODE_ENV
+        value: production
+      - name: PORT
+        value: "3000"
+      - name: SUPABASE_URL
+        value: ${SUPABASE_URL}
+      - name: SUPABASE_ANON_KEY
+        value: ${SUPABASE_ANON_KEY}
+      - name: SUPABASE_SERVICE_ROLE_KEY
+        value: ${SUPABASE_SERVICE_ROLE_KEY}
+    volumes:
+      - name: persistent-data
+        mountPath: /app/data
+        size: 1Gi
+    resources:
+      cpu: 0.5
+      memory: 512Mi
+    scaling:
+      min: 1
+      max: 1
+    healthCheck:
+      path: /health
+      port: 3000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
+  - name: frontend
+    source:
+      type: git
+      repository: https://github.com/kdotu.lloll/2025-web-testing-mcp
+      branch: main
+      directory: frontend
+    build:
+      command: npm install && npm run build
+    run:
+      command: npm run preview
+      port: 4173
+    env:
+      - name: VITE_SUPABASE_URL
+        value: ${SUPABASE_URL}
+      - name: VITE_SUPABASE_ANON_KEY
+        value: ${SUPABASE_ANON_KEY}
+    resources:
+      cpu: 0.25
+      memory: 256Mi
+    scaling:
+      min: 1
+      max: 1
+
+domains:
+  - name: web-testing-mcp-2025.cloudtype.app
+    service: frontend
+    path: /
+  - name: api.web-testing-mcp-2025.cloudtype.app
+    service: backend
+    path: /
+
+environment:
+  - name: SUPABASE_URL
+    value: ${SUPABASE_URL}
+  - name: SUPABASE_ANON_KEY
+    value: ${SUPABASE_ANON_KEY}
+  - name: SUPABASE_SERVICE_ROLE_KEY
+    value: ${SUPABASE_SERVICE_ROLE_KEY} 

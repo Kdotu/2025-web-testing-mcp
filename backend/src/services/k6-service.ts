@@ -242,9 +242,9 @@ export class K6Service {
    */
   private async generateK6Script(testId: string, config: LoadTestConfig): Promise<string> {
     const scriptContent = this.createK6ScriptContent(config);
-    const scriptPath = join(process.cwd(), 'temp', `${testId}.js`);
     
-    // 임시 디렉토리 생성
+    // 프리티어 환경에서는 임시 디렉토리 사용
+    const scriptPath = join(process.cwd(), 'temp', `${testId}.js`);
     const fs = await import('fs');
     const tempDir = join(process.cwd(), 'temp');
     
@@ -254,6 +254,29 @@ export class K6Service {
     
     // 스크립트 파일 작성
     fs.writeFileSync(scriptPath, scriptContent);
+    
+    // 프리티어 환경에서는 스크립트 내용을 Supabase에 백업
+    if (process.env['NODE_ENV'] === 'production') {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env['SUPABASE_URL']!,
+          process.env['SUPABASE_SERVICE_ROLE_KEY']!
+        );
+        
+        await supabase
+          .from('m2_test_scripts')
+          .upsert({
+            test_id: testId,
+            script_content: scriptContent,
+            created_at: new Date().toISOString()
+          });
+        
+        console.log(`Script backed up to Supabase for testId: ${testId}`);
+      } catch (error) {
+        console.error('Failed to backup script to Supabase:', error);
+      }
+    }
     
     return scriptPath;
   }
@@ -1135,11 +1158,15 @@ export default function () {
       const fs = await import('fs');
       const path = await import('path');
       
-      const tempDir = path.join(process.cwd(), 'temp');
+      const tempDir = path.join(process.cwd(), 'data', 'temp');
       const scriptPath = path.join(tempDir, `${testId}.js`);
       
-      if (fs.existsSync(scriptPath)) {
+      // 배포환경에서는 임시 파일 보존
+      if (fs.existsSync(scriptPath) && process.env['NODE_ENV'] !== 'production') {
         fs.unlinkSync(scriptPath);
+        console.log(`Cleaned up temp file: ${scriptPath}`);
+      } else if (process.env['NODE_ENV'] === 'production') {
+        console.log(`Keeping temp file in production: ${scriptPath}`);
       }
     } catch (error) {
       console.error('Failed to cleanup temp files:', error);
