@@ -262,21 +262,28 @@ const setOfflineData = (key: string, value: any) => {
   try {
     const data = getOfflineData();
     
-    // 데이터 크기 제한 (테스트 결과는 최대 50개만 저장)
-    if (key === 'testResults' && Array.isArray(value) && value.length > 50) {
-      value = value.slice(0, 50);
-      console.warn('로컬 스토리지 용량 제한: 테스트 결과를 최대 50개만 저장합니다.');
+    // 데이터 크기 제한 (테스트 결과는 최대 30개만 저장)
+    if (key === 'testResults' && Array.isArray(value) && value.length > 30) {
+      value = value.slice(0, 30);
+      console.warn('로컬 스토리지 용량 제한: 테스트 결과를 최대 30개만 저장합니다.');
     }
     
     data[key] = value;
     
-    // 전체 데이터 크기 확인
+    // 전체 데이터 크기 확인 (2MB로 제한)
     const dataString = JSON.stringify(data);
-    if (dataString.length > 5000000) { // 5MB 제한
+    if (dataString.length > 2000000) { // 2MB 제한
       console.warn('로컬 스토리지 용량 초과: 오래된 데이터를 정리합니다.');
       // 오래된 데이터 삭제
       if (data.testResults) {
-        data.testResults = data.testResults.slice(-20); // 최근 20개만 유지
+        data.testResults = data.testResults.slice(-10); // 최근 10개만 유지
+      }
+      // 다른 데이터도 정리
+      if (data.settings) {
+        delete data.settings;
+      }
+      if (data.testTypes) {
+        data.testTypes = data.testTypes.slice(0, 5); // 최대 5개만 유지
       }
     }
     
@@ -287,9 +294,17 @@ const setOfflineData = (key: string, value: any) => {
     try {
       const data = getOfflineData();
       if (data.testResults) {
-        data.testResults = data.testResults.slice(-10); // 최근 10개만 유지
+        data.testResults = data.testResults.slice(-5); // 최근 5개만 유지
         localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(data));
       }
+      // 다른 데이터도 정리
+      if (data.settings) {
+        delete data.settings;
+      }
+      if (data.testTypes) {
+        data.testTypes = data.testTypes.slice(0, 3); // 최대 3개만 유지
+      }
+      localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(data));
     } catch (cleanupError) {
       console.error('로컬 스토리지 정리 실패:', cleanupError);
     }

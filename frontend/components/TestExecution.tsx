@@ -532,7 +532,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     // 이미 새 형식이면 그대로 반환
     if (loadSettings.executor && loadSettings.stages) {
       // preset 속성이 없으면 custom으로 설정
-      if (!loadSettings.preset) {
+      if (!loadSettings?.preset) {
         loadSettings.preset = "custom";
       }
       // stages가 배열인지 확인하고 기본값으로 대체
@@ -975,7 +975,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
           vus: testSettings.load.maxVUs,
           detailedConfig: {
             executor: testSettings.load.executor,
-            preset: testSettings.load.preset,
+            preset: testSettings.load?.preset || "custom",
             startRate: testSettings.load.startRate,
             timeUnit: testSettings.load.timeUnit,
             preAllocatedVUs: testSettings.load.preAllocatedVUs,
@@ -1963,7 +1963,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                   <div className="grid grid-cols-2 gap-4">
                   {loadTestPresets.map((preset) => {
                     const IconComponent = preset.icon;
-                      const isSelected = testSettings.load.preset === preset.id;
+                      const isSelected = testSettings.load?.preset === preset.id;
 
                     return (
                       <button
@@ -2061,7 +2061,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
               </div>
 
               {/* Custom 모드일 때만 상세 설정 표시 */}
-              {testSettings.load.preset === "custom" && (
+              {testSettings.load?.preset === "custom" && (
                 <>
                   {/* 실행모드와 상세설정을 한 줄에 표시 */}
                   <div className="grid grid-cols-2 gap-6">
@@ -2225,15 +2225,15 @@ test('성능 테스트 - ${url}', async ({ page }) => {
               <div className="neu-subtle rounded-xl px-6 py-6">
                 <Label className="text-foreground font-semibold text-lg mb-4 block">
                   테스트 단계 <span className="text-xs text-muted-foreground ml-1">(Stages)</span>
-                  {testSettings.load.preset !== "custom" && (
+                  {testSettings.load?.preset !== "custom" && (
                     <span className="text-sm text-muted-foreground ml-2">
-                      • {loadTestPresets.find(p => p.id === testSettings.load.preset)?.name} 프리셋
+                                              • {loadTestPresets.find(p => p.id === testSettings.load?.preset)?.name} 프리셋
                     </span>
                   )}
                 </Label>
                 <div className="space-y-4">
                   {testSettings.load.stages.map((stage, index) => (
-                    <div key={index} className="neu-input rounded-xl p-4">
+                    <div key={`stage-${index}-${stage.target}-${stage.duration}`} className="neu-input rounded-xl p-4">
                         <div className="grid grid-cols-3 gap-4 items-center">
                           <div>
                             <Label className="text-sm text-muted-foreground mb-2 block">
@@ -2244,14 +2244,14 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                               type="number"
                               value={stage.target || 0}
                               onChange={(e) => {
-                              if (testSettings.load.preset !== "custom") return;
+                              if (testSettings.load?.preset !== "custom") return;
                               const newStages = [...testSettings.load.stages];
                               newStages[index] = { ...stage, target: Number(e.target.value) || 0 };
                               updateTestSetting("load", "stages", newStages);
                             }}
-                            disabled={testSettings.load.preset !== "custom"}
-                              className={`border-none bg-transparent text-foreground text-center font-semibold ${
-                              testSettings.load.preset !== "custom" ? "opacity-60" : ""
+                            disabled={testSettings.load?.preset !== "custom"}
+                                                              className={`border-none bg-transparent text-foreground text-center font-semibold ${
+                                testSettings.load?.preset !== "custom" ? "opacity-60" : ""
                               }`}
                               min="0"
                               max="50000"
@@ -2264,7 +2264,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                             <Label className="text-sm text-muted-foreground mb-2 block">
                               지속 시간 <span className="text-xs text-muted-foreground">(Duration)</span>
                             </Label>
-                          {testSettings.load.preset === "custom" ? (
+                          {testSettings.load?.preset === "custom" ? (
                               <Select
                                 value={stage.duration || "1m"}
                                 onValueChange={(value) => {
@@ -3045,7 +3045,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
               .filter((t) => t.status === "running" || t.status === "실행중")
               .map((test) => (
                 <div
-                  key={test.id}
+                  key={`running-${test.id}-${test.startTime}-${test.type}`}
                   className="neu-flat rounded-xl px-6 py-6"
                 >
                   <div className="flex items-center justify-between mb-4">

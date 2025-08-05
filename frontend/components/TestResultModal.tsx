@@ -347,15 +347,15 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
                           </div>
                         </div>
                         
-                        {result.config.detailedConfig.settings.preset && (
+                        {result.config?.detailedConfig?.settings?.preset && (
                           <div className="neu-flat rounded-lg px-4 py-3">
                             <span className="text-sm text-muted-foreground">프리셋</span>
                             <div className="font-semibold text-primary text-sm mt-1">
-                              {result.config.detailedConfig.settings.preset === 'low' ? 'Low' :
-                               result.config.detailedConfig.settings.preset === 'medium' ? 'Medium' :
-                               result.config.detailedConfig.settings.preset === 'high' ? 'High' :
-                               result.config.detailedConfig.settings.preset === 'custom' ? 'Custom' :
-                               result.config.detailedConfig.settings.preset}
+                              {result.config?.detailedConfig?.settings?.preset === 'low' ? 'Low' :
+                               result.config?.detailedConfig?.settings?.preset === 'medium' ? 'Medium' :
+                               result.config?.detailedConfig?.settings?.preset === 'high' ? 'High' :
+                               result.config?.detailedConfig?.settings?.preset === 'custom' ? 'Custom' :
+                               result.config?.detailedConfig?.settings?.preset}
                             </div>
                           </div>
                         )}
