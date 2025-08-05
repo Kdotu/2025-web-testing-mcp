@@ -9,6 +9,7 @@ import e2eTestRoutes from './routes/e2e-tests';
 import { settingsRoutes } from './routes/settings';
 import { dbStatusRoutes } from './routes/db-status';
 import { saveSettingsRoutes } from './routes/save-settings';
+import documentsRoutes from './routes/documents';
 
 // 타임존 설정
 process.env.TZ = 'Asia/Seoul';
@@ -40,6 +41,7 @@ app.use('/api/test-types', testTypeRoutes);
 app.use('/api/test-metrics', testMetricRoutes);
 app.use('/api/lighthouse', lighthouseRoutes);
 app.use('/api/e2e-tests', e2eTestRoutes);
+app.use('/api/documents', documentsRoutes);
 
 // 설정 라우트 (프론트엔드 호환성을 위해 루트 경로에 추가)
 app.use('/get-settings', settingsRoutes);
