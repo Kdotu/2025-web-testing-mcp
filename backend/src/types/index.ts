@@ -60,6 +60,7 @@ export interface LoadTestResult {
   raw_data?: string; // k6 실행 로그 저장 필드 추가
   createdAt: string;
   updatedAt: string;
+  rowNumber?: number; // 순차 번호 필드 추가
 }
 
 /**

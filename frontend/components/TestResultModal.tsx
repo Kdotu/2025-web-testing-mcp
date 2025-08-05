@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Download, BarChart3, Copy, Check } from 'lucide-react';
-import { getTestMetrics, getGroupedTestMetrics, TestMetric } from '../utils/backend-api';
+import { X, Download, BarChart3, Copy, Check, FileText, ChevronDown } from 'lucide-react';
+import { getTestMetrics, getGroupedTestMetrics, TestMetric, getDocuments } from '../utils/backend-api';
 
 interface TestResultModalProps {
   isOpen: boolean;
@@ -14,6 +14,11 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
   const [groupedMetrics, setGroupedMetrics] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showReportDropdown, setShowReportDropdown] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const [showDocumentsDropdown, setShowDocumentsDropdown] = useState(false);
+  const [availableDocuments, setAvailableDocuments] = useState<any[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
   const loadedTestIdRef = useRef<string | null>(null);
 
   // raw_data 복사 함수
@@ -35,6 +40,51 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
       document.body.removeChild(textArea);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // 문서 다운로드 함수
+  const handleDocumentDownload = async (doc: any) => {
+    try {
+      console.log('문서 다운로드 시작 - document:', doc);
+      const downloadUrl = `/api/documents/${doc.id}/download`;
+      console.log('다운로드 URL:', downloadUrl);
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = doc.filename;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // 다운로드 성공 메시지
+      setTimeout(() => {
+        alert(`${doc.type === 'html' ? 'HTML' : 'PDF'} 리포트가 다운로드되었습니다.`);
+      }, 1000);
+    } catch (error) {
+      console.error('문서 다운로드 오류:', error);
+      alert('문서 다운로드에 실패했습니다.');
+    }
+  };
+
+  // Report 생성 후 문서 목록 새로고침
+  const handleReportGeneration = async (format: string) => {
+    try {
+      const testId = result.testId || result.test_id || result.id;
+      console.log('Report 생성 시작 - format:', format, 'testId:', testId);
+      
+      // Report 생성
+      await onDownload(result, format);
+      
+      // 잠시 대기 후 문서 목록 새로고침
+      setTimeout(async () => {
+        console.log('문서 목록 새로고침 시작');
+        await fetchDocuments(testId);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Report 생성 오류:', error);
     }
   };
 
@@ -64,6 +114,45 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
     }
   }, []);
 
+  // 생성된 문서 목록 가져오기
+  const fetchDocuments = useCallback(async (testId: string) => {
+    try {
+      setDocumentsLoading(true);
+      console.log('문서 목록 가져오기 시작 - testId:', testId);
+      const response = await getDocuments(testId);
+      console.log('문서 목록 응답:', response);
+      if (response.success && response.data) {
+        console.log('사용 가능한 문서들:', response.data);
+        
+        // 중복 제거 (같은 ID를 가진 문서 중 가장 최신 것만 유지)
+        const uniqueDocuments = response.data.reduce((acc: any[], current: any) => {
+          const existingIndex = acc.findIndex(doc => doc.id === current.id);
+          if (existingIndex === -1) {
+            acc.push(current);
+          } else {
+            // 기존 문서보다 현재 문서가 더 최신이면 교체
+            const existing = acc[existingIndex];
+            if (new Date(current.createdAt) > new Date(existing.createdAt)) {
+              acc[existingIndex] = current;
+            }
+          }
+          return acc;
+        }, []);
+        
+        console.log('중복 제거 후 문서들:', uniqueDocuments);
+        setAvailableDocuments(uniqueDocuments);
+      } else {
+        console.log('문서가 없거나 응답 실패');
+        setAvailableDocuments([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
+      setAvailableDocuments([]);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }, []);
+
   // 메트릭 데이터 조회
   useEffect(() => {
     if (isOpen && result) {
@@ -74,11 +163,12 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
       
       if (testId) {
         fetchMetrics(testId);
+        fetchDocuments(testId);
       } else {
         console.error('TestResultModal: No testId found in result:', result);
       }
     }
-  }, [isOpen, result, fetchMetrics]);
+  }, [isOpen, result, fetchMetrics, fetchDocuments]);
 
   // 모달이 닫힐 때 상태 초기화
   useEffect(() => {
@@ -87,8 +177,34 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
       setMetrics([]);
       setGroupedMetrics({});
       setLoading(false);
+      setShowReportDropdown(false);
+      setShowDownloadDropdown(false);
+      setShowDocumentsDropdown(false);
+      setAvailableDocuments([]);
+      setDocumentsLoading(false);
     }
   }, [isOpen]);
+
+  // 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showReportDropdown && !target.closest('.report-dropdown')) {
+        setShowReportDropdown(false);
+      }
+      if (showDownloadDropdown && !target.closest('.download-dropdown')) {
+        setShowDownloadDropdown(false);
+      }
+      if (showDocumentsDropdown && !target.closest('.documents-dropdown')) {
+        setShowDocumentsDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showReportDropdown, showDownloadDropdown, showDocumentsDropdown]);
 
   if (!isOpen || !result) return null;
 
@@ -288,29 +404,134 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
               )}
               
               {/* 다운로드 버튼 */}
-              {/* <div className="mt-6 flex flex-wrap gap-4 justify-end">
-                <button 
-                  className="neu-accent rounded-xl px-6 py-4 font-semibold text-primary-foreground transition-all duration-200 hover:neu-accent"
-                  onClick={() => onDownload(result, 'pdf')}
-                >
-                  <Download className="h-5 w-5 mr-3" />
-                  텍스트 다운로드
-                </button>
-                <button 
-                  className="neu-button rounded-xl px-6 py-4 font-medium text-foreground hover:text-primary transition-colors"
-                  onClick={() => onDownload(result, 'json')}
-                >
-                  <Download className="h-5 w-5 mr-3" />
-                  JSON 다운로드
-                </button>
-                <button 
-                  className="neu-button rounded-xl px-6 py-4 font-medium text-foreground hover:text-primary transition-colors"
-                  onClick={() => onDownload(result, 'csv')}
-                >
-                  <Download className="h-5 w-5 mr-3" />
-                  CSV 다운로드
-                </button>
-              </div> */}
+              <div className="mt-6 flex flex-wrap gap-4 justify-end">
+                <div className="relative download-dropdown">
+                  <button 
+                    className="neu-accent rounded-xl px-6 py-4 font-semibold text-primary-foreground transition-all duration-200 hover:neu-accent flex items-center"
+                    onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                  >
+                    <Download className="h-5 w-5 mr-3" />
+                    다운로드
+                    <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showDownloadDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showDownloadDropdown && (
+                    <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[200px]">
+                      <button 
+                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-t-xl flex items-center"
+                        onClick={() => {
+                          onDownload(result, 'text');
+                          setShowDownloadDropdown(false);
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-3" />
+                        텍스트 다운로드
+                      </button>
+                      <button 
+                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center"
+                        onClick={() => {
+                          onDownload(result, 'json');
+                          setShowDownloadDropdown(false);
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-3" />
+                        JSON 다운로드
+                      </button>
+                      <button 
+                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-b-xl flex items-center"
+                        onClick={() => {
+                          onDownload(result, 'csv');
+                          setShowDownloadDropdown(false);
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-3" />
+                        CSV 다운로드
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Report 생성 버튼 */}
+                <div className="relative report-dropdown">
+                  <button 
+                    className="neu-button rounded-xl px-6 py-4 font-medium text-foreground hover:text-primary transition-colors flex items-center"
+                    onClick={() => setShowReportDropdown(!showReportDropdown)}
+                  >
+                    <FileText className="h-5 w-5 mr-3" />
+                    Report 생성
+                    <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showReportDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showReportDropdown && (
+                    <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[200px]">
+                      <button 
+                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-t-xl flex items-center"
+                        onClick={() => {
+                          handleReportGeneration('html');
+                          setShowReportDropdown(false);
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-3" />
+                        HTML Report
+                      </button>
+                      <button 
+                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-b-xl flex items-center"
+                        onClick={() => {
+                          handleReportGeneration('pdf');
+                          setShowReportDropdown(false);
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-3" />
+                        PDF Report
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* 생성된 문서 다운로드 버튼 */}
+                {documentsLoading ? (
+                  <div className="neu-button rounded-xl px-6 py-4 font-medium text-foreground flex items-center opacity-50">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-3"></div>
+                    문서 목록 로딩 중...
+                  </div>
+                ) : availableDocuments.length > 0 ? (
+                  <div className="relative documents-dropdown">
+                    <button 
+                      className="neu-accent rounded-xl px-6 py-4 font-semibold text-primary-foreground transition-all duration-200 hover:neu-accent flex items-center"
+                      onClick={() => setShowDocumentsDropdown(!showDocumentsDropdown)}
+                    >
+                      <Download className="h-5 w-5 mr-3" />
+                      생성된 문서 다운로드 ({availableDocuments.length})
+                      <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showDocumentsDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {showDocumentsDropdown && (
+                      <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[250px]">
+                        {availableDocuments.map((doc, index) => (
+                          <button 
+                            key={`${doc.id}-${doc.type}-${doc.createdAt}`}
+                            className={`w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center ${
+                              index === 0 ? 'rounded-t-xl' : ''
+                            } ${
+                              index === availableDocuments.length - 1 ? 'rounded-b-xl' : ''
+                            }`}
+                            onClick={() => {
+                              handleDocumentDownload(doc);
+                              setShowDocumentsDropdown(false);
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-3" />
+                            {doc.type === 'html' ? 'HTML' : 'PDF'} Report
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {new Date(doc.createdAt).toLocaleDateString()}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {/* 성능 메트릭 */}

@@ -128,42 +128,52 @@ export class TestResultService {
    * ID로 테스트 결과 조회
    */
   async getResultById(id: string): Promise<LoadTestResult | null> {
-    const { data, error } = await this.supabaseClient
-      .from('m2_test_results')
-      .select('*')
-      .eq('id', id)
-      .single();
+    try {
+      const { data, error } = await this.supabaseClient
+        .from('m2_test_results')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // 결과가 없음
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // 결과가 없음
+        }
+        console.error('Failed to get test result:', error);
+        return null; // 에러 대신 null 반환
       }
-      console.error('Failed to get test result:', error);
-      throw new Error('Failed to get test result');
-    }
 
-    return this.parseResultFromRow(data);
+      return this.parseResultFromRow(data);
+    } catch (error) {
+      console.error('Error in getResultById:', error);
+      return null; // 예외 발생 시 null 반환
+    }
   }
 
   /**
    * 테스트 ID로 결과 조회
    */
   async getResultByTestId(testId: string): Promise<LoadTestResult | null> {
-    const { data, error } = await this.supabaseClient
-      .from('m2_test_results')
-      .select('*')
-      .eq('test_id', testId)
-      .single();
+    try {
+      const { data, error } = await this.supabaseClient
+        .from('m2_test_results')
+        .select('*')
+        .eq('test_id', testId)
+        .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // 결과가 없음
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // 결과가 없음
+        }
+        console.error('Failed to get test result:', error);
+        return null; // 에러 대신 null 반환
       }
-      console.error('Failed to get test result:', error);
-      throw new Error('Failed to get test result');
-    }
 
-    return this.parseResultFromRow(data);
+      return this.parseResultFromRow(data);
+    } catch (error) {
+      console.error('Error in getResultByTestId:', error);
+      return null; // 예외 발생 시 null 반환
+    }
   }
 
   /**
@@ -196,12 +206,34 @@ export class TestResultService {
       throw new Error('Failed to get test results');
     }
 
-    const results = data?.map(row => this.parseResultFromRow(row)) || [];
+    // JavaScript에서 순차 번호 추가 (내림차순)
+    const results = data?.map((row, index) => {
+      const parsedResult = this.parseResultFromRow(row);
+      // 전체 개수에서 현재 인덱스를 빼서 내림차순으로 번호 매기기
+      parsedResult.rowNumber = (count || 0) - from - index;
+      return parsedResult;
+    }) || [];
 
     return { 
       results, 
       total: count || 0 
     };
+  }
+
+  /**
+   * 전체 테스트 결과 개수 조회
+   */
+  async getTotalCount(): Promise<number> {
+    const { count, error } = await this.supabaseClient
+      .from('m2_test_results')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      console.error('Failed to get total count:', error);
+      throw error;
+    }
+
+    return count || 0;
   }
 
   /**

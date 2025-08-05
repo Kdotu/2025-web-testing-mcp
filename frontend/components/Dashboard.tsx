@@ -17,11 +17,12 @@ import {
   WifiOff,
   ExternalLink,
   Info,
-  Sparkles
+  Sparkles,
+  Calendar
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { getTestResults, checkApiHealth, isDemoMode, setDemoMode } from "../utils/api";
-import { getAllTestResults } from "../utils/backend-api";
+import { getAllTestResults, getTotalTestCount } from "../utils/backend-api";
 
 // Mock 데이터 (오프라인/데모 모드용)
 const mockData = {
@@ -78,6 +79,7 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [testResults, setTestResults] = useState<any[]>([]);
+  const [totalTestCount, setTotalTestCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
@@ -121,30 +123,34 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           setConnectionStatus('connected');
           
           try {
-            // Supabase에서 최근 테스트 결과 불러오기
-            const results = await getAllTestResults(1, 10); // 최근 10개 테스트
-          if (results.success && results.data) {
-              // 테스트 결과를 Dashboard 형식에 맞게 변환
-              const formattedResults = results.data.map((test: any) => ({
-                id: test.id,
-                url: test.url,
-                testType: test.config?.stages ? 'load' : 'performance', // 부하테스트 여부로 판단
-                status: test.status,
-                score: test.metrics?.http_req_duration?.avg ? Math.round(100 - (test.metrics.http_req_duration.avg / 20)) : 85, // 응답시간 기반 점수
-                startTime: test.createdAt,
-                endTime: test.updatedAt,
-                duration: calculateElapsedTime(test.createdAt, test.updatedAt)
-              }));
-              setTestResults(formattedResults);
+            // Supabase에서 전체 테스트 결과와 전체 개수 불러오기
+            const [results, countResult] = await Promise.all([
+              getAllTestResults(1, 1000), // 전체 테스트 결과 (TestResults와 동일)
+              getTotalTestCount() // 전체 테스트 개수
+            ]);
+            
+            if (results.success && results.data) {
+              // TestResults와 동일하게 원본 데이터 사용
+              const resultsArray = Array.isArray(results.data) ? results.data : [];
+              setTestResults(resultsArray);
               setIsOfflineMode(false);
+              
+              // 전체 테스트 개수 설정
+              if (countResult.success && countResult.data) {
+                setTotalTestCount(countResult.data.total);
+              } else {
+                setTotalTestCount(resultsArray.length);
+              }
             } else {
               // 백엔드 API에서 가져오기 (기존 방식)
               const apiResults = await getTestResults();
               if (apiResults.success && apiResults.data) {
                 setTestResults(apiResults.data);
+                setTotalTestCount(apiResults.data.length);
                 setIsOfflineMode(false);
               } else {
                 setTestResults(mockData.recentTests);
+                setTotalTestCount(mockData.recentTests.length);
                 setIsOfflineMode(true);
               }
             }
@@ -154,16 +160,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             const apiResults = await getTestResults();
             if (apiResults.success && apiResults.data) {
               setTestResults(apiResults.data);
-            setIsOfflineMode(false);
-          } else {
-            setTestResults(mockData.recentTests);
-            setIsOfflineMode(true);
+              setTotalTestCount(apiResults.data.length);
+              setIsOfflineMode(false);
+            } else {
+              setTestResults(mockData.recentTests);
+              setTotalTestCount(mockData.recentTests.length);
+              setIsOfflineMode(true);
             }
           }
         } else {
           // 오프라인 모드
           setConnectionStatus(healthCheck.demo ? 'demo' : 'offline');
           setTestResults(mockData.recentTests);
+          setTotalTestCount(mockData.recentTests.length);
           setIsOfflineMode(true);
           
           if (healthCheck.demo) {
@@ -174,6 +183,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         console.error('Dashboard data loading error:', error);
         setConnectionStatus('offline');
         setTestResults(mockData.recentTests);
+        setTotalTestCount(mockData.recentTests.length);
         setIsOfflineMode(true);
       }
       
@@ -192,10 +202,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return () => clearInterval(timer);
   }, []);
 
-  // 통계 계산
-  const totalTests = isOfflineMode || isDemoModeActive ? 83 : testResults.length;
-  const passedTests = isOfflineMode || isDemoModeActive ? 75 : testResults.filter(test => test.status === 'completed').length;
-  const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
+  // 통계 계산 - TestResults.tsx와 동일한 방식으로 계산
+  const totalTests = isOfflineMode || isDemoModeActive ? 83 : totalTestCount;
+  
+  // 성공률 계산 - 다양한 상태값 고려
+  const completedTests = isOfflineMode || isDemoModeActive ? 75 : testResults.filter(r => 
+    r.status === '완료' || 
+    r.status === 'completed' || 
+    r.status === 'success' ||
+    r.status === 'complete'
+  ).length;
+  
+  const passRate = totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0;
+  
   const avgScore = isOfflineMode || isDemoModeActive ? 91 : testResults.length > 0 ? 
     Math.round(testResults.reduce((sum, test) => sum + (test.score || 85), 0) / testResults.length) : 0;
 
@@ -431,55 +450,115 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         {renderConnectionBanner()}
 
         {/* 주요 통계 카드 */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <div className="neu-card rounded-3xl px-8 py-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
-                <Activity className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <p className="text-muted-foreground font-medium">총 테스트</p>
-                <p className="text-4xl font-bold text-primary">{totalTests}</p>
-              </div>
+        <div className="grid gap-6 md:grid-cols-4">
+          <div className="neu-accent rounded-3xl px-6 py-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-primary-foreground font-semibold text-lg">총 테스트</div>
+              <BarChart3 className="h-8 w-8 text-white" />
             </div>
+            <div className="text-4xl font-bold text-primary-foreground mb-2">{totalTests}</div>
+            <p className="text-white">실행된 테스트</p>
           </div>
-
-          <div className="neu-card rounded-3xl px-8 py-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-secondary">
-                <CheckCircle className="h-6 w-6 text-secondary-foreground" />
-              </div>
-              <div>
-                <p className="text-muted-foreground font-medium">성공률</p>
-                <p className="text-4xl font-bold text-primary">{passRate}%</p>
-              </div>
+          
+          <div className="neu-card rounded-3xl px-6 py-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-foreground font-semibold text-lg">최다 실행 테스트</div>
+              <BarChart3 className="h-8 w-8 text-primary" />
             </div>
+            <div className="text-4xl font-bold text-primary mb-2">
+                {(() => {
+                  if (testResults.length === 0) return 0;
+                  
+                  // 테스트 유형별 실행 횟수 계산
+                  const testTypeCounts: { [key: string]: number } = {};
+                  testResults.forEach(result => {
+                    const testType = result.testType || result.type || 'unknown';
+                    testTypeCounts[testType] = (testTypeCounts[testType] || 0) + 1;
+                  });
+                  
+                  // 가장 많이 실행된 테스트 유형 찾기
+                  const mostFrequentType = Object.entries(testTypeCounts)
+                    .sort(([,a], [,b]) => b - a)[0];
+                  
+                  return mostFrequentType ? mostFrequentType[1] : 0;
+                })()}
+            </div>
+            <p className="text-muted-foreground">
+                {(() => {
+                  if (testResults.length === 0) return '테스트 없음';
+                  
+                  // 테스트 유형별 실행 횟수 계산
+                  const testTypeCounts: { [key: string]: number } = {};
+                  testResults.forEach(result => {
+                    const testType = result.testType || result.type || 'unknown';
+                    testTypeCounts[testType] = (testTypeCounts[testType] || 0) + 1;
+                  });
+                  
+                  // 가장 많이 실행된 테스트 유형 찾기
+                  const mostFrequentType = Object.entries(testTypeCounts)
+                    .sort(([,a], [,b]) => b - a)[0];
+                  
+                  if (!mostFrequentType) return '테스트 없음';
+                  
+                  // 테스트 유형 이름 매핑
+                  const typeNames: { [key: string]: string } = {
+                    'load': '부하테스트',
+                    'lighthouse': 'Lighthouse',
+                    'performance': '성능테스트',
+                    'security': '보안테스트',
+                    'accessibility': '접근성테스트',
+                    'unknown': '알 수 없음'
+                  };
+                  
+                  return typeNames[mostFrequentType[0]] || mostFrequentType[0];
+                })()}
+            </p>
           </div>
-
-          <div className="neu-card rounded-3xl px-8 py-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: '#9BA8E8' }}>
-                <TrendingUp className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-muted-foreground font-medium">평균 점수</p>
-                <p className="text-4xl font-bold text-primary">{avgScore}</p>
-              </div>
+          
+          <div className="neu-card rounded-3xl px-6 py-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-foreground font-semibold text-lg">성공률</div>
+              <BarChart3 className="h-8 w-8 text-primary" />
             </div>
+            <div className="text-4xl font-bold text-primary mb-2">
+              {(() => {
+                if (testResults.length === 0) return 0;
+                
+                // 완료된 테스트 수 계산 (다양한 상태값 고려)
+                const completedTests = testResults.filter(r => 
+                  r.status === '완료' || 
+                  r.status === 'completed' || 
+                  r.status === 'success' ||
+                  r.status === 'complete'
+                ).length;
+                
+                return Math.round((completedTests / testResults.length) * 100);
+              })()}%
+            </div>
+            <p className="text-muted-foreground">완료된 테스트</p>
           </div>
-
-          <div className="neu-card rounded-3xl px-8 py-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: '#6773C0' }}>
-                <Globe className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-muted-foreground font-medium">이번 주</p>
-                <p className="text-4xl font-bold text-primary">
-                  {isDemoModeActive || isOfflineMode ? 83 : mockData.weeklyStats.reduce((sum, day) => sum + day.tests, 0)}
-                </p>
-              </div>
+          
+          <div className="neu-card rounded-3xl px-6 py-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-foreground font-semibold text-lg">오늘 실행</div>
+              <Calendar className="h-8 w-8 text-primary" />
             </div>
+            <div className="text-4xl font-bold text-primary mb-2">
+              {(() => {
+                const today = new Date().toISOString().split('T')[0];
+                
+                return testResults.filter(r => {
+                  // 다양한 날짜 필드 확인
+                  const testDate = r.date || 
+                                 r.createdAt?.split('T')[0] || 
+                                 r.created_at?.split('T')[0] ||
+                                 r.startTime?.split('T')[0];
+                  
+                  return testDate === today;
+                }).length;
+              })()}
+            </div>
+            <p className="text-muted-foreground">오늘 실행된 테스트</p>
           </div>
         </div>
 
@@ -496,7 +575,41 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockData.weeklyStats}>
+                <BarChart data={(() => {
+                  // 지난 7일간의 데이터 생성
+                  const weeklyData: { name: string; tests: number; completed: number }[] = [];
+                  for (let i = 6; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    const dateStr = date.toISOString().split('T')[0];
+                    const dayName = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+                    
+                    // 해당 날짜의 테스트 수 계산
+                    const dayTests = testResults.filter(r => {
+                      const testDate = r.date || 
+                                     r.createdAt?.split('T')[0] || 
+                                     r.created_at?.split('T')[0] ||
+                                     r.startTime?.split('T')[0];
+                      return testDate === dateStr;
+                    });
+                    
+                    // 완료된 테스트 수 계산
+                    const completedTests = dayTests.filter(r => 
+                      r.status === '완료' || 
+                      r.status === 'completed' || 
+                      r.status === 'success' ||
+                      r.status === 'complete'
+                    );
+                    
+                    weeklyData.push({
+                      name: dayName,
+                      tests: dayTests.length,
+                      completed: completedTests.length
+                    });
+                  }
+                  
+                  return isOfflineMode || isDemoModeActive ? mockData.weeklyStats : weeklyData;
+                })()}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5DBE8" />
                   <XAxis dataKey="name" stroke="#5A6082" />
                   <YAxis stroke="#5A6082" />
@@ -509,7 +622,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     }}
                   />
                   <Bar dataKey="tests" fill="#7886C7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="passed" fill="#A9B5DF" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="completed" fill="#A9B5DF" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -528,7 +641,43 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={mockData.testTypeDistribution}
+                    data={(() => {
+                      if (isOfflineMode || isDemoModeActive) {
+                        return mockData.testTypeDistribution;
+                      }
+                      
+                      // 실제 테스트 유형별 분포 계산
+                      const testTypeCounts: { [key: string]: number } = {};
+                      testResults.forEach(result => {
+                        const testType = result.testType || result.type || 'unknown';
+                        testTypeCounts[testType] = (testTypeCounts[testType] || 0) + 1;
+                      });
+                      
+                      const totalTests = testResults.length;
+                      const typeColors = {
+                        'load': '#7886C7',
+                        'lighthouse': '#A9B5DF',
+                        'performance': '#9BA8E8',
+                        'security': '#6773C0',
+                        'accessibility': '#4F5BA3',
+                        'unknown': '#A9B5DF'
+                      };
+                      
+                      const typeNames = {
+                        'load': '부하테스트',
+                        'lighthouse': 'Lighthouse',
+                        'performance': '성능테스트',
+                        'security': '보안테스트',
+                        'accessibility': '접근성테스트',
+                        'unknown': '알 수 없음'
+                      };
+                      
+                      return Object.entries(testTypeCounts).map(([type, count]) => ({
+                        name: typeNames[type] || type,
+                        value: totalTests > 0 ? Math.round((count / totalTests) * 100) : 0,
+                        color: typeColors[type] || '#A9B5DF'
+                      }));
+                    })()}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -536,9 +685,46 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     outerRadius={100}
                     fill="#7886C7"
                   >
-                    {mockData.testTypeDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                    {(() => {
+                      const data = isOfflineMode || isDemoModeActive ? mockData.testTypeDistribution : (() => {
+                        const testTypeCounts: { [key: string]: number } = {};
+                        testResults.forEach(result => {
+                          const testType = result.testType || result.type || 'unknown';
+                          testTypeCounts[testType] = (testTypeCounts[testType] || 0) + 1;
+                        });
+                        
+                        const totalTests = testResults.length;
+                        const typeColors = {
+                          'load': '#7886C7',
+                          'lighthouse': '#A9B5DF',
+                          'e2e' : '#9BA8E8',
+                          'performance': '#9BA8E8',
+                          'security': '#6773C0',
+                          'accessibility': '#4F5BA3',
+                          'unknown': '#A9B5DF'
+                        };
+                        
+                        const typeNames = {
+                          'load': '부하테스트',
+                          'lighthouse': 'Lighthouse',
+                          'e2e' : '단위 테스트',
+                          'performance': '성능테스트',
+                          'security': '보안테스트',
+                          'accessibility': '접근성테스트',
+                          'unknown': '알 수 없음'
+                        };
+                        
+                        return Object.entries(testTypeCounts).map(([type, count]) => ({
+                          name: typeNames[type] || type,
+                          value: totalTests > 0 ? Math.round((count / totalTests) * 100) : 0,
+                          color: typeColors[type] || '#A9B5DF'
+                        }));
+                      })();
+                      
+                      return data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ));
+                    })()}
                   </Pie>
                   <Tooltip 
                     contentStyle={{ 
@@ -551,18 +737,54 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </ResponsiveContainer>
             </div>
             <div className="mt-6 space-y-3">
-              {mockData.testTypeDistribution.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: item.color }}
-                    ></div>
-                    <span className="font-medium text-foreground">{item.name}</span>
+              {(() => {
+                const data = isOfflineMode || isDemoModeActive ? mockData.testTypeDistribution : (() => {
+                  const testTypeCounts: { [key: string]: number } = {};
+                  testResults.forEach(result => {
+                    const testType = result.testType || result.type || 'unknown';
+                    testTypeCounts[testType] = (testTypeCounts[testType] || 0) + 1;
+                  });
+                  
+                  const totalTests = testResults.length;
+                  const typeColors = {
+                    'load': '#7886C7',
+                    'lighthouse': '#A9B5DF',
+                    'performance': '#9BA8E8',
+                    'security': '#6773C0',
+                    'accessibility': '#4F5BA3',
+                    'unknown': '#A9B5DF'
+                  };
+                  
+                  const typeNames = {
+                    'load': '부하테스트',
+                    'lighthouse': 'Lighthouse',
+                    'performance': '성능테스트',
+                    'e2e' : '단위 테스트',
+                    'security': '보안테스트',
+                    'accessibility': '접근성테스트',
+                    'unknown': '알 수 없음'
+                  };
+                  
+                  return Object.entries(testTypeCounts).map(([type, count]) => ({
+                    name: typeNames[type] || type,
+                    value: totalTests > 0 ? Math.round((count / totalTests) * 100) : 0,
+                    color: typeColors[type] || '#A9B5DF'
+                  }));
+                })();
+                
+                return data.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div 
+                        className="w-4 h-4 rounded-full" 
+                        style={{ backgroundColor: item.color }}
+                      ></div>
+                      <span className="font-medium text-foreground">{item.name}</span>
+                    </div>
+                    <span className="text-muted-foreground">{item.value}%</span>
                   </div>
-                  <span className="text-muted-foreground">{item.value}%</span>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </div>
         </div>

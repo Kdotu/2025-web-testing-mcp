@@ -68,6 +68,14 @@ export class TestResultController {
   }
 
   /**
+   * 전체 테스트 결과 개수 조회
+   */
+  async getTotalCount(): Promise<{ total: number }> {
+    const total = await this.testResultService.getTotalCount();
+    return { total };
+  }
+
+  /**
    * 테스트 결과 통계 조회
    */
   async getStatistics(): Promise<{

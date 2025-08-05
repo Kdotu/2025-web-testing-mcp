@@ -10,7 +10,7 @@ const testResultController = new TestResultController();
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page = '1', limit = '10', status } = req.query;
+    const { page = '1', limit = '1000', status } = req.query;
     const result = await testResultController.getAllResults({
       page: parseInt(page as string),
       limit: parseInt(limit as string),
@@ -24,6 +24,24 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       page: result.page,
       limit: result.limit,
       totalPages: result.totalPages,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/test-results/count
+ * 전체 테스트 결과 개수 조회
+ */
+router.get('/count', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await testResultController.getTotalCount();
+    
+    res.json({
+      success: true,
+      data: result,
       timestamp: new Date().toISOString()
     });
   } catch (error) {

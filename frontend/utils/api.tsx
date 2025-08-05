@@ -1,6 +1,24 @@
 import { projectId, publicAnonKey } from './supabase/info';
 
-const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-96e41890`;
+// 환경별 API URL 설정
+const getApiBaseUrl = () => {
+  // 환경 변수에서 API URL 가져오기
+  const envApiUrl = import.meta.env.VITE_API_BASE_URL;
+  
+  if (envApiUrl) {
+    return envApiUrl;
+  }
+  
+  // 개발 환경에서는 localhost 사용
+  if (import.meta.env.DEV) {
+    return 'http://localhost:3101';
+  }
+  
+  // 프로덕션 환경에서는 Supabase Edge Functions 사용
+  return `https://${projectId}.supabase.co/functions/v1/make-server-96e41890`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // 데모 모드 설정 (로컬 스토리지에서 관리)
 const DEMO_MODE_KEY = 'mcp_demo_mode';
@@ -400,7 +418,7 @@ export const getTestResults = async () => {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/test-results`, {
+    const response = await fetch(`${API_BASE_URL}/test-results?limit=1000`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -593,7 +611,7 @@ export const getTestTypes = async () => {
   ];
 
   // 백엔드 API URL (환경변수에서 가져오거나 기본값 사용)
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
+  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types`, {
@@ -655,7 +673,7 @@ export const updateTestTypes = async (testTypes: any[]) => {
 };
 
 export const addTestType = async (testType: any) => {
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
+  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types`, {
@@ -679,7 +697,7 @@ export const addTestType = async (testType: any) => {
 };
 
 export const updateTestType = async (id: string, testType: any) => {
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
+  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {
@@ -703,7 +721,7 @@ export const updateTestType = async (id: string, testType: any) => {
 };
 
 export const deleteTestType = async (id: string) => {
-  const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:3101';
+  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {
