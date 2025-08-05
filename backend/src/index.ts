@@ -14,8 +14,18 @@ const app = express();
 const PORT = process.env['PORT'] || 3101;
 
 // 미들웨어 설정
+const allowedOrigins = [
+  'http://localhost:3100',
+  'http://localhost:3000',
+  'https://2025-web-testing-mcp.netlify.app'
+];
+
+if (process.env['CORS_ORIGIN']) {
+  allowedOrigins.push(process.env['CORS_ORIGIN']);
+}
+
 app.use(cors({
-  origin: ['http://localhost:3100', 'http://localhost:3000'],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());
