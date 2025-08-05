@@ -8,14 +8,18 @@ const getApiBaseUrl = () => {
   if (envApiUrl) {
     return envApiUrl;
   }
-  
-  // 개발 환경에서는 localhost 사용
-  if (import.meta.env.DEV) {
-    return 'http://localhost:3101';
-  }
-  
+    
   // 프로덕션 환경에서는 Supabase Edge Functions 사용
   return `https://${projectId}.supabase.co/functions/v1/make-server-96e41890`;
+};
+
+// Supabase Functions용 API 경로 헬퍼
+const getSupabaseApiPath = (path: string) => {
+  if (import.meta.env.DEV) {
+    return path; // 개발 환경에서는 백엔드 경로 사용
+  }
+  // 프로덕션에서는 Supabase Functions 경로 사용
+  return `/make-server-96e41890${path}`;
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -135,7 +139,7 @@ export const checkApiHealth = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃으로 단축
     
-    const response = await fetch(`${API_BASE_URL}/health`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/health')}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -200,7 +204,7 @@ export const checkDatabaseStatus = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
-    const response = await fetch(`${API_BASE_URL}/db-status`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/db-status')}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -282,7 +286,7 @@ export const executeTest = async (url: string, testType: string, settings: any) 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
     
-    const response = await fetch(`${API_BASE_URL}/execute-test`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/execute-test')}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -354,7 +358,7 @@ export const getTestStatus = async (testId: string) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000); // 8초 타임아웃
     
-    const response = await fetch(`${API_BASE_URL}/test-status/${testId}`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath(`/test-status/${testId}`)}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -418,7 +422,7 @@ export const getTestResults = async () => {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/test-results?limit=1000`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/test-results?limit=1000')}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -468,7 +472,7 @@ export const stopTest = async (testId: string) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/stop-test/${testId}`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath(`/stop-test/${testId}`)}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -511,7 +515,7 @@ export const saveSettings = async (settings: any) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/save-settings`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/save-settings')}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -562,7 +566,7 @@ export const getSettings = async () => {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/get-settings`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/get-settings')}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
@@ -610,11 +614,8 @@ export const getTestTypes = async () => {
     { id: "accessibility", name: "접근성 테스트", description: "웹 접근성 준수 검사", enabled: true },
   ];
 
-  // 백엔드 API URL (환경변수에서 가져오거나 기본값 사용)
-  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
-
   try {
-    const response = await fetch(`${BACKEND_URL}/api/test-types`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/test-types')}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -673,10 +674,8 @@ export const updateTestTypes = async (testTypes: any[]) => {
 };
 
 export const addTestType = async (testType: any) => {
-  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
-
   try {
-    const response = await fetch(`${BACKEND_URL}/api/test-types`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/test-types')}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -697,10 +696,8 @@ export const addTestType = async (testType: any) => {
 };
 
 export const updateTestType = async (id: string, testType: any) => {
-  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
-
   try {
-    const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath(`/test-types/${id}`)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -721,10 +718,8 @@ export const updateTestType = async (id: string, testType: any) => {
 };
 
 export const deleteTestType = async (id: string) => {
-  const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101';
-
   try {
-    const response = await fetch(`${BACKEND_URL}/api/test-types/${id}`, {
+    const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath(`/test-types/${id}`)}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
