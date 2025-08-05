@@ -23,11 +23,20 @@ export class TestMetricService {
     const supabaseUrl = process.env['SUPABASE_URL'];
     const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
     
+    console.log('TestMetricService: Supabase URL:', supabaseUrl ? 'Set' : 'Not set');
+    console.log('TestMetricService: Supabase Service Role Key:', supabaseKey ? 'Set' : 'Not set');
+    
     if (!supabaseUrl || !supabaseKey) {
-      console.warn('Supabase credentials not found, using mock data');
+      console.warn('TestMetricService: Supabase credentials not found, using mock data');
       this.supabase = null;
     } else {
-      this.supabase = createClient(supabaseUrl, supabaseKey);
+      try {
+        this.supabase = createClient(supabaseUrl, supabaseKey);
+        console.log('TestMetricService: Supabase client created successfully');
+      } catch (error) {
+        console.error('TestMetricService: Failed to create Supabase client:', error);
+        this.supabase = null;
+      }
     }
   }
 
@@ -146,18 +155,34 @@ export class TestMetricService {
    */
   async saveMetrics(metrics: Partial<TestMetric>[]): Promise<void> {
     try {
+      // Supabase 클라이언트가 없으면 Mock 모드
+      if (!this.supabase) {
+        console.log('TestMetricService: Supabase not available, skipping metrics save');
+        return;
+      }
+
       const { error } = await this.supabase
         .from('m2_test_metrics')
         .insert(metrics);
 
       if (error) {
         console.error('Error saving metrics:', error);
+        // 프로덕션에서는 에러를 무시하고 계속 진행
+        if (process.env['NODE_ENV'] === 'production') {
+          console.warn('TestMetricService: Continuing without saving detailed metrics');
+          return;
+        }
         throw error;
       }
 
       console.log(`Saved ${metrics.length} metrics to database`);
     } catch (error) {
       console.error('Failed to save metrics:', error);
+      // 프로덕션에서는 에러를 무시하고 계속 진행
+      if (process.env['NODE_ENV'] === 'production') {
+        console.warn('TestMetricService: Continuing without saving detailed metrics due to error');
+        return;
+      }
       throw error;
     }
   }
