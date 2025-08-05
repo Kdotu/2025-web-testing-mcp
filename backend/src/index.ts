@@ -6,6 +6,7 @@ import { testTypeRoutes } from './routes/test-types';
 import testMetricRoutes from './routes/test-metrics';
 import lighthouseRoutes from './routes/lighthouse';
 import e2eTestRoutes from './routes/e2e-tests';
+import { settingsRoutes } from './routes/settings';
 
 // 타임존 설정
 process.env.TZ = 'Asia/Seoul';
@@ -37,6 +38,10 @@ app.use('/api/test-types', testTypeRoutes);
 app.use('/api/test-metrics', testMetricRoutes);
 app.use('/api/lighthouse', lighthouseRoutes);
 app.use('/api/e2e-tests', e2eTestRoutes);
+
+// 설정 라우트 (프론트엔드 호환성을 위해 루트 경로에 추가)
+app.use('/get-settings', settingsRoutes);
+app.use('/test-results', testResultRoutes);
 
 // 헬스 체크
 app.get('/health', (_req, res) => {
