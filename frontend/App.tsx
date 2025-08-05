@@ -8,6 +8,7 @@ import { TestResults } from "./components/TestResults";
 import { Settings } from "./components/Settings";
 import { Menu } from "lucide-react";
 import { checkApiHealth, checkDatabaseStatus, getConnectionInfo, isDemoMode, setDemoMode } from "./utils/api";
+import { initializeApp } from "./utils/supabase/client";
 
 const navigation = [
   { id: "dashboard", name: "메인", component: Dashboard },
@@ -22,6 +23,19 @@ function AppContent() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isInDemoMode, setIsInDemoMode] = useState(isDemoMode());
   const { isMobile, setOpenMobile, open, state } = useSidebar();
+
+  // 앱 초기화
+  useEffect(() => {
+    const initializeAppData = async () => {
+      try {
+        await initializeApp();
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+      }
+    };
+
+    initializeAppData();
+  }, []);
 
   // 연결 상태 확인
   useEffect(() => {

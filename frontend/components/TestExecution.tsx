@@ -438,7 +438,43 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
   const getDefaultLoadSettings = () => {
     const mediumPreset = loadTestPresets.find(
       (p) => p.id === "medium",
-    )!;
+    );
+    
+    // medium preset을 찾지 못한 경우 기본값 사용
+    if (!mediumPreset) {
+      console.warn('Medium preset not found, using default values');
+      return {
+        executor: "ramping-arrival-rate",
+        preset: "medium",
+        startRate: 100,
+        timeUnit: "20s",
+        preAllocatedVUs: 10,
+        maxVUs: 500,
+        stages: [
+          {
+            target: 100,
+            duration: "20s",
+            description: "초기 부하 단계",
+          },
+          {
+            target: 5000,
+            duration: "1m",
+            description: "점진적 증가",
+          },
+          {
+            target: 5000,
+            duration: "2m",
+            description: "중간 부하 유지",
+          },
+          {
+            target: 100,
+            duration: "30s",
+            description: "점진적 감소",
+          },
+        ],
+      };
+    }
+    
     return {
       executor: "ramping-arrival-rate",
       preset: "medium",
@@ -904,7 +940,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         url: testUrl,
         name: testDescription || `Load Test - ${testUrl}`,
         description: testDescription,
-        stages: testSettings.load.stages,
+        stages: testSettings.load?.stages || [],
       };
 
       console.log('백엔드 API로 부하 테스트 실행:', loadTestConfig);
@@ -1153,10 +1189,10 @@ export default function () {
         // Lighthouse 테스트는 Lighthouse MCP 사용
         const lighthouseParams = {
           url: normalizedUrl,
-          categories: testSettings.lighthouse.categories,
-          device: testSettings.lighthouse.device,
-          throttling: testSettings.lighthouse.throttling,
-          locale: testSettings.lighthouse.locale
+                  categories: testSettings.lighthouse?.categories || ["performance", "accessibility"],
+        device: testSettings.lighthouse?.device || "desktop",
+        throttling: testSettings.lighthouse?.throttling || "4g",
+        locale: testSettings.lighthouse?.locale || "ko"
         };
         
         // Lighthouse MCP API 호출 (실제 구현 필요)
@@ -1169,7 +1205,7 @@ export default function () {
           description: testDescription,
           config: {
             testType: 'e2e',
-            settings: testSettings.e2e
+            settings: testSettings.e2e || {}
           }
         };
         
@@ -2025,7 +2061,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       시간 단위 <span className="text-xs text-muted-foreground">(Time Unit)</span>
                     </Label>
                     <span className="text-foreground font-semibold">
-                        {testSettings.load.timeUnit}
+                        {testSettings.load?.timeUnit || "20s"}
                     </span>
                   </div>
                   <div className="neu-pressed rounded-lg px-4 py-3">
@@ -2033,7 +2069,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       사전 할당 VU <span className="text-xs text-muted-foreground">(Pre-allocated VUs)</span>
                     </Label>
                     <span className="text-foreground font-semibold">
-                        {testSettings.load.preAllocatedVUs}
+                        {testSettings.load?.preAllocatedVUs || 10}
                     </span>
                   </div>
                   <div className="neu-pressed rounded-lg px-4 py-3">
@@ -2041,7 +2077,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       최대 VU <span className="text-xs text-muted-foreground">(Max VUs)</span>
                     </Label>
                     <span className="text-foreground font-semibold">
-                        {testSettings.load.maxVUs}
+                        {testSettings.load?.maxVUs || 500}
                     </span>
                   </div>
                 </div>
@@ -2120,7 +2156,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                         <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
                           <Input
                             type="number"
-                              value={testSettings.load.startRate}
+                              value={testSettings.load?.startRate || 100}
                             onChange={(e) => {
                                 const value = Math.max(1, Math.min(10000, Number(e.target.value) || 1));
                                 updateTestSetting("load", "startRate", value);
@@ -2131,7 +2167,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                           />
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 text-center">
-                            per {testSettings.load.timeUnit} ≈ {Math.round((testSettings.load.startRate / parseInt(testSettings.load.timeUnit)) * 100) / 100} TPS
+                            per {testSettings.load?.timeUnit || "20s"} ≈ {Math.round(((testSettings.load?.startRate || 100) / parseInt(testSettings.load?.timeUnit || "20s")) * 100) / 100} TPS
                         </p>
                       </div>
 
@@ -2141,7 +2177,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                         </Label>
                         <div className="neu-input rounded-lg px-2 py-1 ring-1 ring-primary/20">
                           <Select
-                              value={testSettings.load.timeUnit}
+                              value={testSettings.load?.timeUnit || "20s"}
                             onValueChange={(value) =>
                                 updateTestSetting("load", "timeUnit", value)
                             }
@@ -2160,7 +2196,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                           </Select>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 text-center">
-                            {testSettings.load.timeUnit.includes('m') ? parseInt(testSettings.load.timeUnit) * 60 : parseInt(testSettings.load.timeUnit)}초
+                            {(testSettings.load?.timeUnit || "20s").includes('m') ? parseInt(testSettings.load?.timeUnit || "20s") * 60 : parseInt(testSettings.load?.timeUnit || "20s")}초
                         </p>
                       </div>
 
@@ -2171,7 +2207,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                         <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
                           <Input
                             type="number"
-                              value={testSettings.load.preAllocatedVUs}
+                              value={testSettings.load?.preAllocatedVUs || 10}
                             onChange={(e) => {
                                 const value = Math.max(1, Math.min(100, Number(e.target.value) || 1));
                                 updateTestSetting("load", "preAllocatedVUs", value);
@@ -2193,7 +2229,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                         <div className="neu-input rounded-lg px-3 py-2 ring-1 ring-primary/20">
                           <Input
                             type="number"
-                              value={testSettings.load.maxVUs}
+                              value={testSettings.load?.maxVUs || 500}
                             onChange={(e) => {
                                 const value = Math.max(1, Math.min(2000, Number(e.target.value) || 1));
                                 updateTestSetting("load", "maxVUs", value);
@@ -2232,20 +2268,20 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                   )}
                 </Label>
                 <div className="space-y-4">
-                  {testSettings.load.stages.map((stage, index) => (
+                                          {(testSettings.load?.stages || []).map((stage, index) => (
                     <div key={`stage-${index}-${stage.target}-${stage.duration}`} className="neu-input rounded-xl p-4">
                         <div className="grid grid-cols-3 gap-4 items-center">
                           <div>
                             <Label className="text-sm text-muted-foreground mb-2 block">
                               목표 요청 수 <span className="text-xs text-muted-foreground">(Target Requests)</span>
-                            <span className="text-xs ml-1">(per {testSettings.load.timeUnit})</span>
+                            <span className="text-xs ml-1">(per {testSettings.load?.timeUnit || "20s"})</span>
                             </Label>
                             <Input
                               type="number"
                               value={stage.target || 0}
                               onChange={(e) => {
                               if (testSettings.load?.preset !== "custom") return;
-                              const newStages = [...testSettings.load.stages];
+                              const newStages = [...(testSettings.load?.stages || [])];
                               newStages[index] = { ...stage, target: Number(e.target.value) || 0 };
                               updateTestSetting("load", "stages", newStages);
                             }}
@@ -2257,7 +2293,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                               max="50000"
                             />
                             <p className="text-xs text-muted-foreground mt-1 text-center">
-                            ≈ {Math.round((stage.target || 0) / parseInt(testSettings.load.timeUnit) * 100) / 100} TPS
+                            ≈ {Math.round((stage.target || 0) / parseInt(testSettings.load?.timeUnit || "20s") * 100) / 100} TPS
                             </p>
                           </div>
                           <div>
@@ -2268,7 +2304,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                               <Select
                                 value={stage.duration || "1m"}
                                 onValueChange={(value) => {
-                                const newStages = [...testSettings.load.stages];
+                                const newStages = [...(testSettings.load?.stages || [])];
                                 newStages[index] = { ...stage, duration: value };
                                 updateTestSetting("load", "stages", newStages);
                                 }}
@@ -2346,15 +2382,15 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       { id: 'seo', name: 'SEO', description: '검색 엔진 최적화 검사' },
                       { id: 'pwa', name: 'PWA', description: 'Progressive Web App 기능' }
                     ].map((category) => {
-                      const isSelected = testSettings.lighthouse.categories.includes(category.id);
+                      const isSelected = testSettings.lighthouse?.categories?.includes(category.id) || false;
                       
                       return (
                         <div
                           key={category.id}
                           onClick={() => {
                             const newCategories = isSelected
-                              ? testSettings.lighthouse.categories.filter(c => c !== category.id)
-                              : [...testSettings.lighthouse.categories, category.id];
+                                                          ? (testSettings.lighthouse?.categories || []).filter(c => c !== category.id)
+                            : [...(testSettings.lighthouse?.categories || []), category.id];
                             updateTestSetting('lighthouse', 'categories', newCategories);
                           }}
                           className={`neu-button rounded-xl p-4 text-left transition-all duration-200 cursor-pointer ${
@@ -2404,7 +2440,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                         { id: 'desktop', name: '데스크톱', description: '데스크톱 환경에서 테스트' },
                         { id: 'mobile', name: '모바일', description: '모바일 환경에서 테스트' }
                       ].map((device) => {
-                        const isSelected = testSettings.lighthouse.device === device.id;
+                        const isSelected = testSettings.lighthouse?.device === device.id;
                         
                         return (
                           <button
@@ -2431,7 +2467,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="neu-input rounded-xl px-3 py-2">
                       <Select
-                        value={testSettings.lighthouse.throttling}
+                                                    value={testSettings.lighthouse?.throttling || "4g"}
                         onValueChange={(value) => updateTestSetting('lighthouse', 'throttling', value)}
                       >
                         <SelectTrigger className="border-none bg-transparent text-foreground">
@@ -2465,7 +2501,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Select
-                          value={testSettings.e2e.browser}
+                                                      value={testSettings.e2e?.browser || "chromium"}
                           onValueChange={(value) => updateTestSetting('e2e', 'browser', value)}
                         >
                           <SelectTrigger className="border-none bg-transparent text-foreground">
@@ -2485,7 +2521,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Switch
-                          checked={testSettings.e2e.headless}
+                                                      checked={testSettings.e2e?.headless || true}
                           onCheckedChange={(checked) => updateTestSetting('e2e', 'headless', checked)}
                         />
                       </div>
@@ -2506,9 +2542,9 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="number"
-                          value={testSettings.e2e.viewport.width}
+                                                      value={testSettings.e2e?.viewport?.width || 1280}
                           onChange={(e) => {
-                            const newViewport = { ...testSettings.e2e.viewport, width: Number(e.target.value) };
+                                                          const newViewport = { ...(testSettings.e2e?.viewport || { width: 1280, height: 720 }), width: Number(e.target.value) };
                             updateTestSetting('e2e', 'viewport', newViewport);
                           }}
                           className="border-none bg-transparent text-center text-foreground"
@@ -2524,9 +2560,9 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="number"
-                          value={testSettings.e2e.viewport.height}
+                                                      value={testSettings.e2e?.viewport?.height || 720}
                           onChange={(e) => {
-                            const newViewport = { ...testSettings.e2e.viewport, height: Number(e.target.value) };
+                                                          const newViewport = { ...(testSettings.e2e?.viewport || { width: 1280, height: 720 }), height: Number(e.target.value) };
                             updateTestSetting('e2e', 'viewport', newViewport);
                           }}
                           className="border-none bg-transparent text-center text-foreground"
@@ -2553,7 +2589,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="number"
-                          value={testSettings.e2e.timeout}
+                                                      value={testSettings.e2e?.timeout || 30000}
                           onChange={(e) => updateTestSetting('e2e', 'timeout', Number(e.target.value))}
                           className="border-none bg-transparent text-center text-foreground"
                           min="1000"
@@ -2568,7 +2604,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="number"
-                          value={testSettings.e2e.navigationTimeout}
+                                                      value={testSettings.e2e?.navigationTimeout || 30000}
                           onChange={(e) => updateTestSetting('e2e', 'navigationTimeout', Number(e.target.value))}
                           className="border-none bg-transparent text-center text-foreground"
                           min="1000"
@@ -2583,7 +2619,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="number"
-                          value={testSettings.e2e.actionTimeout}
+                                                      value={testSettings.e2e?.actionTimeout || 5000}
                           onChange={(e) => updateTestSetting('e2e', 'actionTimeout', Number(e.target.value))}
                           className="border-none bg-transparent text-center text-foreground"
                           min="1000"
@@ -2606,7 +2642,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Switch
-                          checked={testSettings.e2e.screenshotOnFailure}
+                                                      checked={testSettings.e2e?.screenshotOnFailure || true}
                           onCheckedChange={(checked) => updateTestSetting('e2e', 'screenshotOnFailure', checked)}
                         />
                       </div>
@@ -2617,7 +2653,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Switch
-                          checked={testSettings.e2e.videoRecording}
+                                                      checked={testSettings.e2e?.videoRecording || false}
                           onCheckedChange={(checked) => updateTestSetting('e2e', 'videoRecording', checked)}
                         />
                       </div>
@@ -2628,7 +2664,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Switch
-                          checked={testSettings.e2e.traceRecording}
+                                                      checked={testSettings.e2e?.traceRecording || false}
                           onCheckedChange={(checked) => updateTestSetting('e2e', 'traceRecording', checked)}
                         />
                       </div>
@@ -2651,7 +2687,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="number"
-                          value={testSettings.e2e.slowMo}
+                                                      value={testSettings.e2e?.slowMo || 0}
                           onChange={(e) => updateTestSetting('e2e', 'slowMo', Number(e.target.value))}
                           className="border-none bg-transparent text-center text-foreground"
                           min="0"
@@ -2667,7 +2703,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
-                          value={testSettings.e2e.userAgent}
+                                                      value={testSettings.e2e?.userAgent || ""}
                           onChange={(e) => updateTestSetting('e2e', 'userAgent', e.target.value)}
                           placeholder="기본값 사용"
                           className="border-none bg-transparent text-center text-foreground"
@@ -2689,7 +2725,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Select
-                          value={testSettings.e2e.locale}
+                                                      value={testSettings.e2e?.locale || "ko-KR"}
                           onValueChange={(value) => updateTestSetting('e2e', 'locale', value)}
                         >
                           <SelectTrigger className="border-none bg-transparent text-foreground">
@@ -2710,7 +2746,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       </Label>
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Select
-                          value={testSettings.e2e.timezone}
+                                                      value={testSettings.e2e?.timezone || "Asia/Seoul"}
                           onValueChange={(value) => updateTestSetting('e2e', 'timezone', value)}
                         >
                           <SelectTrigger className="border-none bg-transparent text-foreground">
@@ -2741,7 +2777,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="neu-input rounded-lg px-3 py-2">
                       <Select
-                        value={testSettings.e2e.colorScheme}
+                                                    value={testSettings.e2e?.colorScheme || "light"}
                         onValueChange={(value) => updateTestSetting('e2e', 'colorScheme', value)}
                       >
                         <SelectTrigger className="border-none bg-transparent text-foreground">
@@ -2760,7 +2796,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="neu-input rounded-lg px-3 py-2">
                       <Switch
-                        checked={testSettings.e2e.reducedMotion}
+                                                    checked={testSettings.e2e?.reducedMotion || false}
                         onCheckedChange={(checked) => updateTestSetting('e2e', 'reducedMotion', checked)}
                       />
                     </div>
@@ -2771,7 +2807,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="neu-input rounded-lg px-3 py-2">
                       <Select
-                        value={testSettings.e2e.forcedColors}
+                                                    value={testSettings.e2e?.forcedColors || "none"}
                         onValueChange={(value) => updateTestSetting('e2e', 'forcedColors', value)}
                       >
                         <SelectTrigger className="border-none bg-transparent text-foreground">
@@ -2806,12 +2842,12 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="text"
-                          value={testSettings.e2e.httpCredentials.username}
+                                                      value={testSettings.e2e?.httpCredentials?.username || ""}
                           onChange={(e) => {
-                            const newCredentials = { 
-                              ...testSettings.e2e.httpCredentials, 
-                              username: e.target.value 
-                            };
+                                                          const newCredentials = { 
+                                ...(testSettings.e2e?.httpCredentials || { username: "", password: "" }),
+                                username: e.target.value 
+                              };
                             updateTestSetting('e2e', 'httpCredentials', newCredentials);
                           }}
                           placeholder="사용자명"
@@ -2826,12 +2862,12 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="password"
-                          value={testSettings.e2e.httpCredentials.password}
+                                                      value={testSettings.e2e?.httpCredentials?.password || ""}
                           onChange={(e) => {
-                            const newCredentials = { 
-                              ...testSettings.e2e.httpCredentials, 
-                              password: e.target.value 
-                            };
+                                                          const newCredentials = { 
+                                ...(testSettings.e2e?.httpCredentials || { username: "", password: "" }),
+                                password: e.target.value 
+                              };
                             updateTestSetting('e2e', 'httpCredentials', newCredentials);
                           }}
                           placeholder="비밀번호"
@@ -2855,12 +2891,12 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="text"
-                          value={testSettings.e2e.proxy.server}
+                                                      value={testSettings.e2e?.proxy?.server || ""}
                           onChange={(e) => {
-                            const newProxy = { 
-                              ...testSettings.e2e.proxy, 
-                              server: e.target.value 
-                            };
+                                                          const newProxy = { 
+                                ...(testSettings.e2e?.proxy || { server: "", bypass: "", username: "", password: "" }),
+                                server: e.target.value 
+                              };
                             updateTestSetting('e2e', 'proxy', newProxy);
                           }}
                           placeholder="http://proxy.example.com:8080"
@@ -2875,12 +2911,12 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="text"
-                          value={testSettings.e2e.proxy.bypass}
+                                                      value={testSettings.e2e?.proxy?.bypass || ""}
                           onChange={(e) => {
-                            const newProxy = { 
-                              ...testSettings.e2e.proxy, 
-                              bypass: e.target.value 
-                            };
+                                                          const newProxy = { 
+                                ...(testSettings.e2e?.proxy || { server: "", bypass: "", username: "", password: "" }),
+                                bypass: e.target.value 
+                              };
                             updateTestSetting('e2e', 'proxy', newProxy);
                           }}
                           placeholder="localhost,127.0.0.1"
@@ -2897,12 +2933,12 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="text"
-                          value={testSettings.e2e.proxy.username}
+                                                      value={testSettings.e2e?.proxy?.username || ""}
                           onChange={(e) => {
-                            const newProxy = { 
-                              ...testSettings.e2e.proxy, 
-                              username: e.target.value 
-                            };
+                                                          const newProxy = { 
+                                ...(testSettings.e2e?.proxy || { server: "", bypass: "", username: "", password: "" }),
+                                username: e.target.value 
+                              };
                             updateTestSetting('e2e', 'proxy', newProxy);
                           }}
                           placeholder="프록시 사용자명"
@@ -2917,12 +2953,12 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                       <div className="neu-input rounded-lg px-3 py-2">
                         <Input
                           type="password"
-                          value={testSettings.e2e.proxy.password}
+                                                      value={testSettings.e2e?.proxy?.password || ""}
                           onChange={(e) => {
-                            const newProxy = { 
-                              ...testSettings.e2e.proxy, 
-                              password: e.target.value 
-                            };
+                                                          const newProxy = { 
+                                ...(testSettings.e2e?.proxy || { server: "", bypass: "", username: "", password: "" }),
+                                password: e.target.value 
+                              };
                             updateTestSetting('e2e', 'proxy', newProxy);
                           }}
                           placeholder="프록시 비밀번호"
@@ -2941,7 +2977,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="neu-input rounded-lg px-3 py-2">
                       <Switch
-                        checked={testSettings.e2e.ignoreHttpsErrors}
+                                                    checked={testSettings.e2e?.ignoreHttpsErrors || false}
                         onCheckedChange={(checked) => updateTestSetting('e2e', 'ignoreHttpsErrors', checked)}
                       />
                     </div>
@@ -2952,7 +2988,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                     </Label>
                     <div className="neu-input rounded-lg px-3 py-2">
                       <Switch
-                        checked={testSettings.e2e.bypassCSP}
+                                                    checked={testSettings.e2e?.bypassCSP || false}
                         onCheckedChange={(checked) => updateTestSetting('e2e', 'bypassCSP', checked)}
                       />
                     </div>

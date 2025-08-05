@@ -8,6 +8,11 @@ const getApiBaseUrl = () => {
   if (envApiUrl) {
     return envApiUrl;
   }
+  
+  if (import.meta.env.DEV) {
+    // 개발 환경에서는 로컬 백엔드 서버 사용
+    return 'http://localhost:3101';
+  }
     
   // 프로덕션 환경에서는 Supabase Edge Functions 사용
   return `https://${projectId}.supabase.co/functions/v1/make-server-96e41890`;
@@ -661,11 +666,16 @@ export const getTestTypes = async () => {
     const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/test-types')}`, {
       method: 'GET',
       headers: {
+        'Authorization': `Bearer ${publicAnonKey}`,
         'Content-Type': 'application/json',
       },
     });
     
     if (!response.ok) {
+      if (response.status === 401) {
+        console.warn('Supabase 인증 실패, 오프라인 모드로 전환');
+        throw new Error('Unauthorized - switching to offline mode');
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
@@ -721,6 +731,7 @@ export const addTestType = async (testType: any) => {
     const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/test-types')}`, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${publicAnonKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(testType),
@@ -743,6 +754,7 @@ export const updateTestType = async (id: string, testType: any) => {
     const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath(`/test-types/${id}`)}`, {
       method: 'PUT',
       headers: {
+        'Authorization': `Bearer ${publicAnonKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(testType),
@@ -765,6 +777,7 @@ export const deleteTestType = async (id: string) => {
     const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath(`/test-types/${id}`)}`, {
       method: 'DELETE',
       headers: {
+        'Authorization': `Bearer ${publicAnonKey}`,
         'Content-Type': 'application/json',
       },
     });

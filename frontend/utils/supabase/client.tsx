@@ -484,24 +484,43 @@ export const getMcpTools = async (testType: string) => {
   }
 
   try {
+    // 먼저 테스트 타입이 존재하는지 확인
     const { data, error } = await supabase
       .from('m2_test_types')
       .select('mcp_tool')
       .eq('name', testType)
-      .single();
+      .limit(1);
 
     if (error) {
       console.error('Error fetching MCP tools:', error);
-      // 오류 시 기본값 반환
+      
+      // 데이터베이스 연결 오류인 경우 기본값 반환
+      if (error.code === 'PGRST116' || error.message?.includes('not found')) {
+        console.warn(`Test type '${testType}' not found, using default tools`);
+        return getDefaultMcpTools(testType);
+      }
+      
+      // 기타 오류의 경우 기본값 반환
+      return getDefaultMcpTools(testType);
+    }
+
+    // 데이터가 없으면 기본값 반환
+    if (!data || data.length === 0) {
+      console.warn(`Test type '${testType}' not found in database, using default tools`);
+      // 데이터베이스 초기화 시도 (비동기로 실행, 결과를 기다리지 않음)
+      initializeTestTypes().catch(initError => {
+        console.error('Failed to initialize test types:', initError);
+      });
       return getDefaultMcpTools(testType);
     }
 
     // mcp_tool이 JSON 배열인 경우 파싱
-    if (data?.mcp_tool) {
+    const testTypeData = data[0];
+    if (testTypeData?.mcp_tool) {
       try {
-        const tools = typeof data.mcp_tool === 'string' 
-          ? JSON.parse(data.mcp_tool) 
-          : data.mcp_tool;
+        const tools = typeof testTypeData.mcp_tool === 'string' 
+          ? JSON.parse(testTypeData.mcp_tool) 
+          : testTypeData.mcp_tool;
         return Array.isArray(tools) ? tools : [tools];
       } catch (parseError) {
         console.error('Error parsing mcp_tool:', parseError);
@@ -531,5 +550,105 @@ const getDefaultMcpTools = (testType: string) => {
       return ["Playwright"];
     default:
       return [];
+  }
+};
+
+// 기본 테스트 타입 데이터 추가 함수
+export const initializeTestTypes = async () => {
+  if (!supabase) {
+    console.error('Supabase client is not initialized.');
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    // 먼저 기존 데이터가 있는지 확인
+    const { data: existingData, error: checkError } = await supabase
+      .from('m2_test_types')
+      .select('name')
+      .limit(1);
+
+    if (checkError) {
+      console.error('Error checking existing test types:', checkError);
+      return { success: false, error: checkError };
+    }
+
+    // 이미 데이터가 있으면 성공으로 처리
+    if (existingData && existingData.length > 0) {
+      console.log('Test types already exist in database');
+      return { success: true, data: existingData };
+    }
+
+    const defaultTestTypes = [
+      {
+        name: 'lighthouse',
+        description: '웹페이지 품질 종합 분석',
+        enabled: true,
+        mcp_tool: JSON.stringify(['Lighthouse'])
+      },
+      {
+        name: 'load',
+        description: '동시 접속 및 부하 처리 능력 측정',
+        enabled: true,
+        mcp_tool: JSON.stringify(['k6'])
+      },
+      {
+        name: 'security',
+        description: '웹사이트 보안 취약점 검사',
+        enabled: true,
+        mcp_tool: JSON.stringify(['OWASP ZAP'])
+      },
+      {
+        name: 'accessibility',
+        description: '웹 접근성 준수 검사',
+        enabled: true,
+        mcp_tool: JSON.stringify(['axe-core'])
+      },
+      {
+        name: 'e2e',
+        description: '엔드투엔드 테스트',
+        enabled: true,
+        mcp_tool: JSON.stringify(['Playwright'])
+      }
+    ];
+
+    console.log('Initializing test types in database...');
+    const { data, error } = await supabase
+      .from('m2_test_types')
+      .upsert(defaultTestTypes, { onConflict: 'name' })
+      .select();
+
+    if (error) {
+      console.error('Error initializing test types:', error);
+      return { success: false, error };
+    }
+
+    console.log('Test types initialized successfully:', data?.length, 'records created');
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error in initializeTestTypes:', error);
+    return { success: false, error };
+  }
+};
+
+// 앱 초기화 시 테스트 타입 설정
+export const initializeApp = async () => {
+  if (!supabase) {
+    console.warn('Supabase client is not initialized. App will run in offline mode.');
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    // 테스트 타입 초기화
+    const initResult = await initializeTestTypes();
+    if (initResult.success) {
+      console.log('App initialized successfully with test types');
+    } else {
+      console.warn('Failed to initialize test types:', initResult.error);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error initializing app:', error);
+    return { success: false, error };
   }
 };
