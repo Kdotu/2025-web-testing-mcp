@@ -152,7 +152,7 @@ export class K6Service {
         cwd: k6ServerPath,
         env: {
           ...process.env,
-          K6_BIN: 'k6'
+          K6_BIN: '/app/k6'
         }
       });
 

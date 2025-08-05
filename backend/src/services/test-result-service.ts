@@ -20,24 +20,45 @@ export class TestResultService {
   }
 
   /**
-   * 연결 테스트
+   * 연결 테스트 (재시도 로직 포함)
    */
   private async testConnection(): Promise<void> {
-    try {
-      const { error } = await this.supabaseClient
-        .from('m2_test_results')
-        .select('count')
-        .limit(1);
-      
-      if (error) {
-        console.error('Supabase connection failed:', error);
-        throw new Error('Failed to connect to Supabase');
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2초
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Supabase connection attempt ${attempt}/${maxRetries}`);
+        
+        const { error } = await this.supabaseClient
+          .from('m2_test_results')
+          .select('count')
+          .limit(1);
+        
+        if (error) {
+          console.error(`Supabase connection failed (attempt ${attempt}):`, error);
+          if (attempt === maxRetries) {
+            throw new Error('Failed to connect to Supabase after multiple attempts');
+          }
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+        
+        console.log('✅ Supabase connection established');
+        return;
+      } catch (error) {
+        console.error(`Supabase connection test failed (attempt ${attempt}):`, error);
+        if (attempt === maxRetries) {
+          console.error('All connection attempts failed');
+          // 프로덕션에서는 연결 실패해도 계속 실행
+          if (process.env['NODE_ENV'] === 'production') {
+            console.warn('⚠️ Continuing without Supabase connection in production');
+            return;
+          }
+          throw error;
+        }
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
-      
-      console.log('✅ Supabase connection established');
-    } catch (error) {
-      console.error('Supabase connection test failed:', error);
-      throw error;
     }
   }
 
@@ -183,41 +204,56 @@ export class TestResultService {
     results: LoadTestResult[];
     total: number;
   }> {
-    const { page, limit, status } = options;
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+    try {
+      const { page, limit, status } = options;
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
 
-    // 조건 쿼리 생성
-    let query = this.supabaseClient
-      .from('m2_test_results')
-      .select('*', { count: 'exact' });
+      // 조건 쿼리 생성
+      let query = this.supabaseClient
+        .from('m2_test_results')
+        .select('*', { count: 'exact' });
 
-    if (status) {
-      query = query.eq('status', status);
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      // 페이지네이션 적용
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        console.error('Failed to get test results:', error);
+        // 프로덕션에서는 빈 결과 반환
+        if (process.env['NODE_ENV'] === 'production') {
+          console.warn('⚠️ Returning empty results due to database error');
+          return { results: [], total: 0 };
+        }
+        throw new Error('Failed to get test results');
+      }
+
+      // JavaScript에서 순차 번호 추가 (내림차순)
+      const results = data?.map((row, index) => {
+        const parsedResult = this.parseResultFromRow(row);
+        // 전체 개수에서 현재 인덱스를 빼서 내림차순으로 번호 매기기
+        parsedResult.rowNumber = (count || 0) - from - index;
+        return parsedResult;
+      }) || [];
+
+      return { 
+        results, 
+        total: count || 0 
+      };
+    } catch (error) {
+      console.error('Error in getAllResults:', error);
+      // 프로덕션에서는 빈 결과 반환
+      if (process.env['NODE_ENV'] === 'production') {
+        console.warn('⚠️ Returning empty results due to exception');
+        return { results: [], total: 0 };
+      }
+      throw error;
     }
-
-    // 페이지네이션 적용
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      console.error('Failed to get test results:', error);
-      throw new Error('Failed to get test results');
-    }
-
-    // JavaScript에서 순차 번호 추가 (내림차순)
-    const results = data?.map((row, index) => {
-      const parsedResult = this.parseResultFromRow(row);
-      // 전체 개수에서 현재 인덱스를 빼서 내림차순으로 번호 매기기
-      parsedResult.rowNumber = (count || 0) - from - index;
-      return parsedResult;
-    }) || [];
-
-    return { 
-      results, 
-      total: count || 0 
-    };
   }
 
   /**

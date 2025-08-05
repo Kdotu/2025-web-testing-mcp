@@ -34,7 +34,7 @@ export class DocumentationService {
     this.testMetricService = new TestMetricService();
     
     // 문서 저장 디렉토리 설정
-    this.reportsDir = path.join(__dirname, '../../data/reports');
+    this.reportsDir = path.join(__dirname, '../../reports');
     this.templatesDir = path.join(__dirname, '../../templates');
     
     this.ensureDirectories();
@@ -45,10 +45,21 @@ export class DocumentationService {
    * 필요한 디렉토리 생성
    */
   private ensureDirectories(): void {
-    fs.ensureDirSync(this.reportsDir);
-    fs.ensureDirSync(this.templatesDir);
-    fs.ensureDirSync(path.join(this.reportsDir, 'html'));
-    fs.ensureDirSync(path.join(this.reportsDir, 'pdf'));
+    try {
+      fs.ensureDirSync(this.reportsDir);
+      fs.ensureDirSync(this.templatesDir);
+      fs.ensureDirSync(path.join(this.reportsDir, 'html'));
+      fs.ensureDirSync(path.join(this.reportsDir, 'pdf'));
+      console.log(`Reports directory created: ${this.reportsDir}`);
+    } catch (error) {
+      console.error('Failed to create reports directory:', error);
+      // 대체 경로 사용
+      this.reportsDir = path.join(process.cwd(), 'reports');
+      fs.ensureDirSync(this.reportsDir);
+      fs.ensureDirSync(path.join(this.reportsDir, 'html'));
+      fs.ensureDirSync(path.join(this.reportsDir, 'pdf'));
+      console.log(`Using alternative reports directory: ${this.reportsDir}`);
+    }
   }
 
   /**
