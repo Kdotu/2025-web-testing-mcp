@@ -132,11 +132,17 @@ export class K6Service {
       console.log(`[MCP] Config: duration=${(config as any).duration}, vus=${(config as any).vus}`);
       
       // MCP 서버 경로 설정
-      const k6ServerPath = join(process.cwd(), '..', 'k6-mcp-server');
+      const k6ServerPath = join(process.cwd(), 'k6-mcp-server');
       const isWindows = process.platform === 'win32';
       const pythonPath = isWindows 
         ? join(k6ServerPath, '.venv', 'Scripts', 'python.exe')
-        : 'python';
+        : 'python3';
+      
+      // 배포환경에서 Python 경로 확인
+      console.log(`[MCP] Current working directory: ${process.cwd()}`);
+      console.log(`[MCP] k6ServerPath: ${k6ServerPath}`);
+      console.log(`[MCP] Python path: ${pythonPath}`);
+      console.log(`[MCP] Working directory: ${k6ServerPath}`);
       
       console.log(`[MCP] Python path: ${pythonPath}`);
       console.log(`[MCP] Working directory: ${k6ServerPath}`);
