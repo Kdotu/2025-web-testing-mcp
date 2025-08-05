@@ -485,7 +485,7 @@ export const getMcpTools = async (testType: string) => {
 
   try {
     const { data, error } = await supabase
-      .from('t2_test_types')
+      .from('m2_test_types')
       .select('mcp_tool')
       .eq('name', testType)
       .single();
