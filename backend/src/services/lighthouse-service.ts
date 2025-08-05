@@ -1,4 +1,6 @@
 import { LoadTestConfig, LoadTestResult } from '../types';
+import { join } from 'path';
+import { spawn } from 'child_process';
 
 /**
  * Lighthouse MCP 테스트 실행 서비스
@@ -12,16 +14,16 @@ export class LighthouseService {
   }
 
   /**
-   * Lighthouse 테스트 실행
+   * Lighthouse 테스트 실행 (MCP 서버 방식)
    */
   async executeTest(id: string, testId: string, config: LoadTestConfig): Promise<void> {
     try {
       // 테스트 시작 시 상태를 running으로 설정
       this.runningTests.set(testId, { status: 'running', startTime: new Date() });
       
-      // Lighthouse 테스트 실행
+      // Lighthouse MCP 서버를 통해 테스트 실행
       const result = await this.executeLighthouseViaMCP(config);
-      console.log('Lighthouse result:', result);
+      console.log('Lighthouse MCP result:', result);
 
       // 결과 처리
       await this.parseLighthouseOutput(id, testId, result, config);
@@ -30,7 +32,7 @@ export class LighthouseService {
       this.handleTestCompletion(testId, 'completed');
 
     } catch (error) {
-      console.error('Failed to execute Lighthouse test:', error);
+      console.error('Failed to execute Lighthouse test via MCP:', error);
       this.handleTestCompletion(testId, 'failed');
       throw error;
     }
@@ -40,57 +42,96 @@ export class LighthouseService {
    * Lighthouse MCP 서버를 통한 테스트 실행
    */
   private async executeLighthouseViaMCP(config: LoadTestConfig): Promise<string> {
-    return new Promise((resolve) => {
-      console.log(`Executing Lighthouse test via MCP`);
-      console.log(`Config: url=${(config as any).url}, device=${(config as any).device || 'desktop'}`);
+    return new Promise((resolve, reject) => {
+      console.log(`[MCP] Starting Lighthouse test via MCP server`);
+      console.log(`[MCP] Config: url=${(config as any).url}, device=${(config as any).device || 'desktop'}`);
       
-      // 임시로 모의 Lighthouse 결과 생성 (실제 MCP 서버 대신)
-      setTimeout(() => {
-        const mockResult = {
-          url: (config as any).url,
-          fetchTime: new Date().toISOString(),
-          version: '10.0.0',
-          scores: {
-            performance: { score: 0.85 },
-            accessibility: { score: 0.92 },
-            'best-practices': { score: 0.78 },
-            seo: { score: 0.88 }
-          },
-          metrics: {
-            'first-contentful-paint': { value: 1200 },
-            'largest-contentful-paint': { value: 2500 },
-            'total-blocking-time': { value: 150 },
-            'cumulative-layout-shift': { value: 0.05 },
-            'speed-index': { value: 1800 },
-            'interactive': { value: 3200 }
-          },
-          categories: {
-            performance: {
-              score: 0.85,
-              title: 'Performance',
-              description: 'Performance audit'
-            },
-            accessibility: {
-              score: 0.92,
-              title: 'Accessibility',
-              description: 'Accessibility audit'
-            },
-            'best-practices': {
-              score: 0.78,
-              title: 'Best Practices',
-              description: 'Best practices audit'
-            },
-            seo: {
-              score: 0.88,
-              title: 'SEO',
-              description: 'SEO audit'
-            }
+      // Lighthouse MCP 서버 경로 설정
+      const lighthouseServerPath = join(process.cwd(), '..', 'lighthouse-mcp-server');
+      const isWindows = process.platform === 'win32';
+      const nodePath = isWindows ? 'node' : 'node';
+      
+      console.log(`[MCP] Node path: ${nodePath}`);
+      console.log(`[MCP] Working directory: ${lighthouseServerPath}`);
+      
+      // Node.js Lighthouse MCP 서버 프로세스 시작 (1회성 실행)
+      const nodeProcess = spawn(nodePath, ['lighthouse_server.js'], {
+        cwd: lighthouseServerPath,
+        env: {
+          ...process.env,
+          LIGHTHOUSE_BIN: 'lighthouse'
         }
-        };
+      });
 
-        console.log('Mock Lighthouse result generated');
-        resolve(JSON.stringify(mockResult));
-      }, 2000); // 2초 후 결과 반환
+      console.log(`[MCP] Node process started with PID: ${nodeProcess.pid}`);
+
+      let output = '';
+      let errorOutput = '';
+
+      // MCP 서버 출력 처리
+      nodeProcess.stdout.on('data', (data) => {
+        const dataStr = data.toString();
+        output += dataStr;
+        console.log(`[MCP] stdout: ${dataStr.trim()}`);
+      });
+
+      nodeProcess.stderr.on('data', (data) => {
+        const dataStr = data.toString();
+        errorOutput += dataStr;
+        console.error(`[MCP] stderr: ${dataStr.trim()}`);
+      });
+
+      // MCP 서버 종료 처리
+      nodeProcess.on('close', (code) => {
+        console.log(`[MCP] Process exited with code: ${code}`);
+        console.log(`[MCP] Total stdout length: ${output.length}`);
+        console.log(`[MCP] Total stderr length: ${errorOutput.length}`);
+        
+        try {
+          // JSON 응답 파싱
+          const response = JSON.parse(output);
+          console.log(`[MCP] Parsed response:`, response);
+          
+          if (response.error) {
+            console.error(`[MCP] Server returned error: ${response.error}`);
+            reject(new Error(`MCP server error: ${response.error}`));
+          } else if (response.result) {
+            console.log(`[MCP] Successfully received result`);
+            resolve(response.result);
+          } else {
+            console.error(`[MCP] Invalid response format`);
+            reject(new Error('MCP server returned invalid response format'));
+          }
+        } catch (parseError) {
+          console.error('[MCP] Failed to parse response:', parseError);
+          console.error('[MCP] Raw output:', output);
+          reject(new Error(`Failed to parse MCP server response: ${output}`));
+        }
+      });
+
+      nodeProcess.on('error', (error) => {
+        console.error('[MCP] Process error:', error);
+        reject(error);
+      });
+
+      // MCP 서버에 테스트 요청 전송 (JSON 형태)
+      const testRequest = {
+        method: 'run_audit',
+        params: {
+          url: (config as any).url,
+          device: (config as any).device || 'desktop',
+          categories: (config as any).categories || ['performance', 'accessibility', 'best-practices', 'seo'],
+          throttling: true
+        }
+      };
+
+      console.log(`[MCP] Sending request:`, JSON.stringify(testRequest));
+      
+      // 요청을 JSON 형태로 전송
+      nodeProcess.stdin.write(JSON.stringify(testRequest) + '\n');
+      nodeProcess.stdin.end();
+      
+      console.log(`[MCP] Request sent, stdin closed`);
     });
   }
 

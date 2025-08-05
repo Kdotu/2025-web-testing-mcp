@@ -42,15 +42,15 @@ export class LighthouseController {
 
       console.log(`Lighthouse test config:`, config);
 
-      console.log(`Starting Lighthouse test for URL: ${url}`);
+      console.log(`Starting Lighthouse test via MCP for URL: ${url}`);
       console.log(`ID: ${id}`);
       console.log(`Test ID: ${testId}`);
       console.log(`Device: ${device}`);
       console.log(`Categories: ${categories.join(', ')}`);
 
-      // 비동기로 Lighthouse 테스트 실행
+      // 비동기로 Lighthouse MCP 테스트 실행
       this.lighthouseService.executeTest(id, testId, config).catch(error => {
-        console.error('Lighthouse test execution error:', error);
+        console.error('Lighthouse MCP test execution error:', error);
       });
 
       // 즉시 응답
