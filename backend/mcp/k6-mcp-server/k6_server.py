@@ -8,6 +8,36 @@ import os
 # Environment variables are already available from the parent process
 # No need to load dotenv
 
+def find_k6_binary() -> str:
+    """Find k6 binary path dynamically."""
+    import shutil
+    
+    # 1. 환경변수에서 확인
+    k6_bin = os.getenv('K6_BIN')
+    if k6_bin and shutil.which(k6_bin):
+        return k6_bin
+    
+    # 2. PATH에서 k6 찾기
+    k6_path = shutil.which('k6')
+    if k6_path:
+        return k6_path
+    
+    # 3. Windows에서 일반적인 설치 경로들 확인
+    if os.name == 'nt':  # Windows
+        possible_paths = [
+            'C:\\Program Files\\k6\\k6.exe',
+            'C:\\Program Files (x86)\\k6\\k6.exe',
+            os.path.expanduser('~\\AppData\\Local\\Programs\\k6\\k6.exe'),
+            'k6.exe'
+        ]
+        
+        for path in possible_paths:
+            if shutil.which(path):
+                return path
+    
+    # 4. 기본값
+    return 'k6'
+
 def run_k6_script(script_file: str, duration: str = "30s", vus: int = 10) -> str:
     """Run a k6 load test script.
 
@@ -29,8 +59,8 @@ def run_k6_script(script_file: str, duration: str = "30s", vus: int = 10) -> str
         if not script_file_path.suffix == '.js':
             return f"Error: Invalid file type. Expected .js file: {script_file}"
 
-        # Get k6 binary path from environment
-        k6_bin = os.getenv('K6_BIN', 'k6')
+        # Get k6 binary path dynamically
+        k6_bin = find_k6_binary()
         
         # Print the k6 binary path for debugging
         print(f"k6 binary path: {k6_bin}", file=sys.stderr)

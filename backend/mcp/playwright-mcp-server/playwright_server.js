@@ -18,15 +18,15 @@ const rl = readline.createInterface({
 });
 
 /**
- * Playwright 테스트 실행
+ * Playwright 테스트 실행 (직접 API 사용)
  */
 async function runPlaywrightTest(url, config = {}) {
   return new Promise((resolve, reject) => {
     console.error(`[Playwright] Starting test for URL: ${url}`);
     console.error(`[Playwright] Config:`, config);
     
-    // 임시 스크립트 파일 생성
-    const scriptContent = generatePlaywrightScript(url, config);
+    // 임시 스크립트 파일 생성 (Playwright API 직접 사용)
+    const scriptContent = generatePlaywrightAPIScript(url, config);
     const scriptPath = path.join(__dirname, `temp_script_${Date.now()}.js`);
     
     try {
@@ -37,12 +37,28 @@ async function runPlaywrightTest(url, config = {}) {
       return;
     }
     
-    // Playwright 프로세스 시작
-    const playwrightProcess = spawn('npx', ['playwright', 'test', scriptPath, '--reporter=json'], {
+    // Node.js로 직접 스크립트 실행 (npx 사용)
+    const isWindows = process.platform === 'win32';
+    let command;
+    let commandArgs;
+    
+    if (isWindows) {
+      command = 'cmd';
+      commandArgs = ['/c', 'npx', 'playwright', 'install', 'chromium', '&&', 'node', scriptPath];
+    } else {
+      command = 'bash';
+      commandArgs = ['-c', 'npx playwright install chromium && node ' + scriptPath];
+    }
+    
+    console.error(`[Playwright] Executing: ${command} ${commandArgs.join(' ')}`);
+    
+    const playwrightProcess = spawn(command, commandArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
+      shell: isWindows,
       env: {
         ...process.env,
-        CI: 'true'
+        CI: 'true',
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '0'
       }
     });
     
@@ -50,16 +66,21 @@ async function runPlaywrightTest(url, config = {}) {
     let errorOutput = '';
     
     playwrightProcess.stdout.on('data', (data) => {
-      output += data.toString();
+      const dataStr = data.toString();
+      output += dataStr;
+      console.error(`[Playwright] stdout: ${dataStr.trim()}`);
     });
     
     playwrightProcess.stderr.on('data', (data) => {
-      errorOutput += data.toString();
-      console.error(`[Playwright] stderr: ${data.toString().trim()}`);
+      const dataStr = data.toString();
+      errorOutput += dataStr;
+      console.error(`[Playwright] stderr: ${dataStr.trim()}`);
     });
     
     playwrightProcess.on('close', (code) => {
       console.error(`[Playwright] Process exited with code: ${code}`);
+      console.error(`[Playwright] Total stdout length: ${output.length}`);
+      console.error(`[Playwright] Total stderr length: ${errorOutput.length}`);
       
       // 임시 파일 정리
       try {
@@ -70,17 +91,26 @@ async function runPlaywrightTest(url, config = {}) {
       
       if (code === 0) {
         try {
-          const result = JSON.parse(output);
-          console.error(`[Playwright] Test completed successfully`);
-          resolve(result);
+          // JSON 결과 파싱
+          const lines = output.trim().split('\n');
+          const jsonLine = lines.find(line => line.startsWith('{') && line.endsWith('}'));
+          if (jsonLine) {
+            const result = JSON.parse(jsonLine);
+            console.error(`[Playwright] Test completed successfully`);
+            resolve(result);
+          } else {
+            reject(new Error('No JSON result found in output'));
+          }
         } catch (error) {
           console.error(`[Playwright] Failed to parse JSON output: ${error.message}`);
+          console.error(`[Playwright] Raw output: ${output}`);
           reject(new Error(`Failed to parse Playwright output: ${error.message}`));
         }
       } else {
         console.error(`[Playwright] Process failed with code: ${code}`);
         console.error(`[Playwright] Error output: ${errorOutput}`);
-        reject(new Error(`Playwright process failed with code: ${code}`));
+        console.error(`[Playwright] Stdout output: ${output}`);
+        reject(new Error(`Playwright process failed with code: ${code}. Error: ${errorOutput}`));
       }
     });
     
@@ -92,53 +122,112 @@ async function runPlaywrightTest(url, config = {}) {
 }
 
 /**
- * Playwright 스크립트 생성
+ * Playwright API 스크립트 생성
  */
-function generatePlaywrightScript(url, config) {
+function generatePlaywrightAPIScript(url, config) {
   const browser = config.browser || 'chromium';
   const headless = config.headless !== false;
   const timeout = config.timeout || 30000;
   
   return `
-const { test, expect } = require('@playwright/test');
+const { chromium, firefox, webkit } = require('playwright');
 
-test('E2E Test for ${url}', async ({ page }) => {
+(async () => {
   console.log('Starting E2E test for: ${url}');
   
-  // 페이지 로드
-  await page.goto('${url}', { waitUntil: 'networkidle', timeout: ${timeout} });
-  
-  // 기본 검증
-  await expect(page).toHaveTitle(/./);
-  
-  // 스크린샷 캡처
-  await page.screenshot({ path: 'screenshot.png', fullPage: true });
-  
-  // 성능 메트릭 수집
-  const performanceMetrics = await page.evaluate(() => {
-    const navigation = performance.getEntriesByType('navigation')[0];
-    return {
-      loadTime: navigation.loadEventEnd - navigation.loadEventStart,
-      domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
-      firstPaint: performance.getEntriesByName('first-paint')[0]?.startTime || 0,
-      firstContentfulPaint: performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0
-    };
-  });
-  
-  console.log('Performance metrics:', JSON.stringify(performanceMetrics));
-  
-  // 테스트 결과 반환
-  test.info().annotations.push({
-    type: 'test-result',
-    description: 'E2E Test Results',
-    data: {
+  let browser;
+  try {
+    // 브라우저 선택
+    const browserType = '${browser}';
+    console.log('Launching browser:', browserType);
+    
+    switch (browserType) {
+      case 'firefox':
+        browser = await firefox.launch({ headless: ${headless} });
+        break;
+      case 'webkit':
+        browser = await webkit.launch({ headless: ${headless} });
+        break;
+      default:
+        browser = await chromium.launch({ headless: ${headless} });
+    }
+    
+    console.log('Browser launched successfully');
+    
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    
+    // 페이지 로드
+    console.log('Navigating to: ${url}');
+    await page.goto('${url}', { waitUntil: 'networkidle', timeout: ${timeout} });
+    
+    // 기본 검증
+    const title = await page.title();
+    console.log('Page title:', title);
+    
+    // 스크린샷 캡처
+    await page.screenshot({ path: 'screenshot.png', fullPage: true });
+    console.log('Screenshot captured');
+    
+    // 성능 메트릭 수집
+    const performanceMetrics = await page.evaluate(() => {
+      const navigation = performance.getEntriesByType('navigation')[0];
+      return {
+        loadTime: navigation.loadEventEnd - navigation.loadEventStart,
+        domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
+        firstPaint: performance.getEntriesByName('first-paint')[0]?.startTime || 0,
+        firstContentfulPaint: performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0
+      };
+    });
+    
+    console.log('Performance metrics:', JSON.stringify(performanceMetrics));
+    
+    // 테스트 결과
+    const result = {
+      success: true,
       url: '${url}',
       browser: '${browser}',
       performanceMetrics,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      logs: [
+        'Starting E2E test for: ${url}',
+        'Launching browser: ${browser}',
+        'Browser launched successfully',
+        'Navigating to: ${url}',
+        'Page title: ' + title,
+        'Screenshot captured',
+        'Performance metrics collected',
+        'Test completed successfully'
+      ],
+      screenshot: 'screenshot.png',
+      pageTitle: title
+    };
+    
+    console.log('Test completed successfully');
+    console.log(JSON.stringify(result));
+    
+  } catch (error) {
+    console.error('Test failed:', error.message);
+    console.error('Error stack:', error.stack);
+    const errorResult = {
+      success: false,
+      error: error.message,
+      url: '${url}',
+      timestamp: new Date().toISOString(),
+      logs: [
+        'Starting E2E test for: ${url}',
+        'Test failed: ' + error.message
+      ],
+      errorStack: error.stack
+    };
+    console.log(JSON.stringify(errorResult));
+  } finally {
+    if (browser) {
+      await browser.close();
+      console.log('Browser closed');
     }
-  });
-});
+  }
+})();
 `;
 }
 

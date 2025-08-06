@@ -166,9 +166,36 @@ export class LighthouseService {
         lighthouseResult = output;
       }
       
+      console.log('Initial parsed result structure:', {
+        hasResult: !!lighthouseResult.result,
+        hasData: !!lighthouseResult.result?.data,
+        topLevelKeys: Object.keys(lighthouseResult)
+      });
+      
       // MCP 응답 구조 처리: result.data에서 실제 Lighthouse 데이터 추출
       if (lighthouseResult.result && lighthouseResult.result.data) {
+        console.log('Found result.data structure, extracting...');
         lighthouseResult = lighthouseResult.result.data;
+        console.log('Extracted data structure:', {
+          hasCategories: !!lighthouseResult.categories,
+          hasMetrics: !!lighthouseResult.metrics,
+          hasAudits: !!lighthouseResult.audits,
+          categoryKeys: lighthouseResult.categories ? Object.keys(lighthouseResult.categories) : [],
+          metricKeys: lighthouseResult.metrics ? Object.keys(lighthouseResult.metrics) : []
+        });
+      } else if (lighthouseResult.data) {
+        // 직접 data 필드에 Lighthouse 결과가 있는 경우
+        console.log('Found direct data structure, extracting...');
+        lighthouseResult = lighthouseResult.data;
+        console.log('Extracted data structure:', {
+          hasCategories: !!lighthouseResult.categories,
+          hasMetrics: !!lighthouseResult.metrics,
+          hasAudits: !!lighthouseResult.audits,
+          categoryKeys: lighthouseResult.categories ? Object.keys(lighthouseResult.categories) : [],
+          metricKeys: lighthouseResult.metrics ? Object.keys(lighthouseResult.metrics) : []
+        });
+      } else {
+        console.log('No result.data or data structure found, using original result');
       }
       
       console.log('Parsed Lighthouse result structure:', {
@@ -179,6 +206,33 @@ export class LighthouseService {
         metricKeys: lighthouseResult.metrics ? Object.keys(lighthouseResult.metrics) : [],
         categoryKeys: lighthouseResult.categories ? Object.keys(lighthouseResult.categories) : []
       });
+      
+      // 디버깅: 전체 구조 확인
+      console.log('Full lighthouseResult keys:', Object.keys(lighthouseResult));
+      
+      // 디버깅: categories 구조 확인
+      if (lighthouseResult.categories) {
+        console.log('Categories structure:', {
+          performance: lighthouseResult.categories.performance,
+          accessibility: lighthouseResult.categories.accessibility,
+          'best-practices': lighthouseResult.categories['best-practices'],
+          seo: lighthouseResult.categories.seo
+        });
+      } else {
+        console.log('No categories found in lighthouseResult');
+      }
+      
+      // 디버깅: metrics 구조 확인
+      if (lighthouseResult.metrics) {
+        console.log('Metrics structure:', {
+          fcp: lighthouseResult.metrics['first-contentful-paint'],
+          lcp: lighthouseResult.metrics['largest-contentful-paint'],
+          tbt: lighthouseResult.metrics['total-blocking-time'],
+          cls: lighthouseResult.metrics['cumulative-layout-shift']
+        });
+      } else {
+        console.log('No metrics found in lighthouseResult');
+      }
       
       // 메트릭 추출
       const metrics = this.extractLighthouseMetrics(lighthouseResult);
@@ -193,31 +247,32 @@ export class LighthouseService {
       let rawData: string;
       
       try {
-        // 파싱된 lighthouseResult를 사용하여 정돈된 JSON 생성
-        const cleanResult = {
-          url: lighthouseResult.requestedUrl || lighthouseResult.url,
+        // 전체 Lighthouse 결과를 raw_data로 저장 (모든 중요 정보 포함)
+        const rawResult = {
+          lighthouseVersion: lighthouseResult.lighthouseVersion,
+          requestedUrl: lighthouseResult.requestedUrl,
+          finalUrl: lighthouseResult.finalUrl,
           fetchTime: lighthouseResult.fetchTime,
-          version: lighthouseResult.lighthouseVersion || lighthouseResult.version,
+          userAgent: lighthouseResult.userAgent,
           categories: lighthouseResult.categories,
           metrics: lighthouseResult.metrics,
-          audits: lighthouseResult.audits
+          audits: lighthouseResult.audits,
+          configSettings: lighthouseResult.configSettings,
+          environment: lighthouseResult.environment,
+          categoryGroups: lighthouseResult.categoryGroups,
+          timing: lighthouseResult.timing,
+          i18n: lighthouseResult.i18n
         };
         
-        // 정돈된 JSON 문자열 생성 (이스케이프 문자 제거)
-        rawData = JSON.stringify(cleanResult, null, 2)
-          .replace(/\\n/g, ' ')     // 이스케이프된 \n을 공백으로 변경
-          .replace(/\\"/g, '"')     // 이스케이프된 따옴표를 정상 따옴표로 변경
-          .replace(/\\\\/g, '\\')   // 이중 백슬래시를 단일 백슬래시로 변경
-          .replace(/\n/g, ' ')      // 실제 줄바꿈을 공백으로 변경
-          .replace(/\s+/g, ' ')     // 연속된 공백을 단일 공백으로 변경
-          .trim();
-          
-        console.log('Clean raw data generated successfully');
+        // JSON 문자열로 변환 (압축 없이 가독성 유지)
+        rawData = JSON.stringify(rawResult, null, 2);
+        
+        console.log('Raw data generated successfully, length:', rawData.length);
+        console.log('Raw data preview:', rawData.substring(0, 500) + '...');
       } catch (e) {
-        // 파싱 실패 시 원본 데이터 사용 (기존 방식)
-        console.log('Clean parsing failed, using fallback format');
-        rawData = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
-        rawData = rawData.replace(/\\n/g, ' ').replace(/\n/g, ' ');
+        console.error('Failed to generate raw data:', e);
+        // 실패 시 원본 output 사용
+        rawData = typeof output === 'string' ? output : JSON.stringify(output);
       }
       
       // 결과 저장
@@ -246,31 +301,45 @@ export class LighthouseService {
       seo: {}
     };
 
+    console.log('Extracting metrics from result:', {
+      hasCategories: !!result.categories,
+      hasMetrics: !!result.metrics,
+      hasAudits: !!result.audits
+    });
+
     // categories 객체에서 점수 추출 (Lighthouse MCP 응답 구조)
     if (result.categories) {
+      console.log('Categories found:', Object.keys(result.categories));
+      
       // 성능 점수
-      if (result.categories.performance?.score) {
+      if (result.categories.performance?.score !== undefined) {
         metrics.performance.score = Math.round(result.categories.performance.score * 100);
+        console.log('Performance score:', result.categories.performance.score, '->', metrics.performance.score);
       }
 
       // 접근성 점수
-      if (result.categories.accessibility?.score) {
+      if (result.categories.accessibility?.score !== undefined) {
         metrics.accessibility.score = Math.round(result.categories.accessibility.score * 100);
+        console.log('Accessibility score:', result.categories.accessibility.score, '->', metrics.accessibility.score);
       }
 
       // 모범 사례 점수
-      if (result.categories['best-practices']?.score) {
+      if (result.categories['best-practices']?.score !== undefined) {
         metrics['best-practices'].score = Math.round(result.categories['best-practices'].score * 100);
+        console.log('Best practices score:', result.categories['best-practices'].score, '->', metrics['best-practices'].score);
       }
 
       // SEO 점수
-      if (result.categories.seo?.score) {
+      if (result.categories.seo?.score !== undefined) {
         metrics.seo.score = Math.round(result.categories.seo.score * 100);
+        console.log('SEO score:', result.categories.seo.score, '->', metrics.seo.score);
       }
     }
 
     // scores 객체에서 점수 추출 (기존 구조 지원)
     if (result.scores) {
+      console.log('Scores found:', Object.keys(result.scores));
+      
       // 성능 점수
       if (result.scores.performance?.score && !metrics.performance.score) {
         metrics.performance.score = Math.round(result.scores.performance.score * 100);
@@ -294,39 +363,49 @@ export class LighthouseService {
 
     // 성능 메트릭 (metrics 객체에서 추출)
     if (result.metrics) {
+      console.log('Performance metrics found:', Object.keys(result.metrics));
+      
       // First Contentful Paint
       if (result.metrics['first-contentful-paint']?.value) {
         metrics.performance.fcp = Math.round(result.metrics['first-contentful-paint'].value);
+        console.log('FCP:', result.metrics['first-contentful-paint'].value, '->', metrics.performance.fcp);
       }
 
       // Largest Contentful Paint
       if (result.metrics['largest-contentful-paint']?.value) {
         metrics.performance.lcp = Math.round(result.metrics['largest-contentful-paint'].value);
+        console.log('LCP:', result.metrics['largest-contentful-paint'].value, '->', metrics.performance.lcp);
       }
 
       // Total Blocking Time
       if (result.metrics['total-blocking-time']?.value) {
         metrics.performance.tbt = Math.round(result.metrics['total-blocking-time'].value);
+        console.log('TBT:', result.metrics['total-blocking-time'].value, '->', metrics.performance.tbt);
       }
 
       // Cumulative Layout Shift
       if (result.metrics['cumulative-layout-shift']?.value) {
         metrics.performance.cls = result.metrics['cumulative-layout-shift'].value;
+        console.log('CLS:', result.metrics['cumulative-layout-shift'].value, '->', metrics.performance.cls);
       }
 
       // Speed Index
       if (result.metrics['speed-index']?.value) {
         metrics.performance.speedIndex = Math.round(result.metrics['speed-index'].value);
+        console.log('Speed Index:', result.metrics['speed-index'].value, '->', metrics.performance.speedIndex);
       }
 
       // Time to Interactive
       if (result.metrics['interactive']?.value) {
         metrics.performance.tti = Math.round(result.metrics['interactive'].value);
+        console.log('TTI:', result.metrics['interactive'].value, '->', metrics.performance.tti);
       }
     }
 
     // 기존 audits 구조도 지원
     if (result.audits) {
+      console.log('Audits found for performance metrics');
+      
       // First Contentful Paint
       if (result.audits['first-contentful-paint']?.numericValue && !metrics.performance.fcp) {
         metrics.performance.fcp = Math.round(result.audits['first-contentful-paint'].numericValue);
@@ -353,6 +432,7 @@ export class LighthouseService {
       }
     }
 
+    console.log('Final extracted metrics:', metrics);
     return metrics;
   }
 
@@ -635,55 +715,6 @@ export class LighthouseService {
   }
 
   /**
-   * Lighthouse 테스트용 raw_data 생성
-   */
-  private generateLighthouseRawData(testId: string, output: string, config?: LoadTestConfig): string {
-    // 현재 시간을 한국 시간으로 포맷팅
-    const now = new Date();
-    const koreanTime = now.toLocaleString('ko-KR', { 
-      timeZone: 'Asia/Seoul',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }).replace(/\./g, '-').replace(/\s/g, ' ');
-
-    const timestampLine = `====TEST START DATE ${koreanTime}====\n\n`;
-    
-    // 설정 정보 추가
-    let configInfo = '';
-    if (config) {
-      configInfo = `------------------------------------\n-------TEST CONFIG-------\n`;
-      configInfo += `Test Type: Lighthouse Test\n`;
-      configInfo += `URL: ${(config as any).url || (config as any).targetUrl || 'Unknown'}\n`;
-      configInfo += `Device: ${(config as any).device || 'desktop'}\n`;
-      if ((config as any).categories) {
-        configInfo += `Categories: ${(config as any).categories.join(', ')}\n`;
-      }
-      if ((config as any).detailedConfig) {
-        configInfo += `Test Type: ${(config as any).detailedConfig.testType || 'lighthouse'}\n`;
-        if ((config as any).detailedConfig.settings) {
-          configInfo += `Settings: ${JSON.stringify((config as any).detailedConfig.settings, null, 2)}\n`;
-        }
-      }
-      configInfo += `------------------------------------\n\n`;
-    }
-    
-    // 테스트 결과 요약
-    const resultSummary = `------------------------------------\n-------TEST RESULT-------\n`;
-    const resultSummary2 = `Status: completed\n`;
-    const resultSummary3 = `Test ID: ${testId}\n`;
-    const resultSummary4 = `------------------------------------\n\n`;
-    
-    // Lighthouse 결과 내용
-    const lighthouseContent = output;
-    
-    return timestampLine + configInfo + resultSummary + resultSummary2 + resultSummary3 + resultSummary4 + lighthouseContent;
-  }
-
-  /**
    * Lighthouse 결과 저장
    */
   private async saveLighthouseResult(
@@ -700,6 +731,9 @@ export class LighthouseService {
       const { TestResultService } = await import('./test-result-service');
       const testResultService = new TestResultService();
 
+      console.log('Saving Lighthouse result with metrics:', metrics);
+      console.log('Raw data length:', rawData.length);
+
       const testResult: any = {
         id: id, // 전달받은 UUID 사용
         testId: testId, // Lighthouse 형식의 test_id 사용
@@ -713,7 +747,7 @@ export class LighthouseService {
         metrics: metrics,
         details: details,
         config: config || {},
-        raw_data: this.generateLighthouseRawData(testId, rawData, config),
+        raw_data: rawData, // 원본 Lighthouse 결과를 직접 사용
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

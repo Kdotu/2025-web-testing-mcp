@@ -8,7 +8,6 @@
 const { spawn } = require('child_process');
 const readline = require('readline');
 const path = require('path');
-const fs = require('fs');
 
 // stdin/stdout 인터페이스 설정
 const rl = readline.createInterface({
@@ -16,63 +15,6 @@ const rl = readline.createInterface({
   output: process.stdout,
   terminal: false
 });
-
-/**
- * Chrome 실행 파일 경로 확인
- */
-function findChromePath() {
-  const possiblePaths = [
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chrome',
-    '/usr/bin/chromium-browser-stable',
-    '/usr/bin/chromium-browser-unstable',
-    '/usr/bin/chromium-browser-dev',
-    '/usr/bin/chromium-browser-beta',
-    '/usr/bin/chromium-browser-alpha',
-    '/usr/bin/chromium-browser-nightly',
-    '/usr/bin/chromium-browser-snapshot',
-    '/usr/bin/chromium-browser-canary',
-    '/usr/bin/chromium-browser-ungoogled',
-    '/usr/bin/chromium-browser-ungoogled-stable',
-    '/usr/bin/chromium-browser-ungoogled-unstable',
-    '/usr/bin/chromium-browser-ungoogled-dev',
-    '/usr/bin/chromium-browser-ungoogled-beta',
-    '/usr/bin/chromium-browser-ungoogled-alpha',
-    '/usr/bin/chromium-browser-ungoogled-nightly',
-    '/usr/bin/chromium-browser-ungoogled-snapshot',
-    '/usr/bin/chromium-browser-ungoogled-canary',
-    process.env.CHROME_PATH,
-    process.env.CHROME_BIN,
-    process.env.PUPPETEER_EXECUTABLE_PATH
-  ].filter(Boolean);
-
-  console.error(`[Lighthouse] Checking Chrome paths: ${possiblePaths.join(', ')}`);
-
-  for (const chromePath of possiblePaths) {
-    if (fs.existsSync(chromePath)) {
-      console.error(`[Lighthouse] Found Chrome at: ${chromePath}`);
-      return chromePath;
-    }
-  }
-
-  // 추가로 which 명령어로 Chrome 찾기 시도
-  try {
-    const { execSync } = require('child_process');
-    const whichResult = execSync('which chromium-browser', { encoding: 'utf8' }).trim();
-    if (whichResult && fs.existsSync(whichResult)) {
-      console.error(`[Lighthouse] Found Chrome via which: ${whichResult}`);
-      return whichResult;
-    }
-  } catch (error) {
-    console.error(`[Lighthouse] which command failed: ${error.message}`);
-  }
-
-  console.error(`[Lighthouse] Chrome not found in any of the checked paths`);
-  return null;
-}
 
 /**
  * Lighthouse 감사 실행
@@ -83,19 +25,12 @@ async function runLighthouseAudit(url, device = 'desktop', categories = ['perfor
     console.error(`[Lighthouse] Device: ${device}`);
     console.error(`[Lighthouse] Categories: ${categories.join(', ')}`);
     
-    // Chrome 경로 확인
-    const chromePath = findChromePath();
-    if (!chromePath) {
-      reject(new Error('Chrome browser not found. Please ensure Chrome is installed and CHROME_PATH is set correctly.'));
-      return;
-    }
-    
     // Lighthouse CLI 명령어 구성
     const args = [
       url,
       '--output=json',
       '--only-categories=' + categories.join(','),
-      '--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage',
+      '--chrome-flags=--headless --no-sandbox --disable-gpu',
       '--port=0'
     ];
     
@@ -114,8 +49,45 @@ async function runLighthouseAudit(url, device = 'desktop', categories = ['perfor
     let commandArgs;
     
     if (isWindows) {
-      // Windows 환경: cmd를 통해 .cmd 파일 실행
-      lighthousePath = path.join(__dirname, '../../node_modules/.bin/lighthouse.cmd');
+      // Windows 환경: 동적으로 lighthouse 경로 찾기
+      const { execSync } = require('child_process');
+      let lighthousePath;
+      
+      try {
+        // 1. npx를 통해 lighthouse 찾기
+        lighthousePath = execSync('npx lighthouse --version', { encoding: 'utf8' }).trim();
+        if (lighthousePath.includes('lighthouse')) {
+          lighthousePath = 'npx lighthouse';
+        }
+      } catch (error) {
+        try {
+          // 2. 전역 설치된 lighthouse 찾기
+          lighthousePath = execSync('where lighthouse', { encoding: 'utf8' }).trim().split('\n')[0];
+        } catch (error2) {
+          // 3. 기본 경로들 시도
+          const possiblePaths = [
+            'C:\\nvm4w\\nodejs\\lighthouse.cmd',
+            'C:\\Program Files\\nodejs\\lighthouse.cmd',
+            'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Roaming\\npm\\lighthouse.cmd',
+            'lighthouse'
+          ];
+          
+          for (const path of possiblePaths) {
+            try {
+              execSync(`"${path}" --version`, { encoding: 'utf8' });
+              lighthousePath = path;
+              break;
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      }
+      
+      if (!lighthousePath) {
+        throw new Error('Lighthouse not found. Please install it with: npm install -g lighthouse');
+      }
+      
       command = 'cmd';
       commandArgs = ['/c', lighthousePath, ...args];
       console.error(`[Lighthouse] Windows Command: ${command} ${commandArgs.join(' ')}`);
@@ -127,30 +99,18 @@ async function runLighthouseAudit(url, device = 'desktop', categories = ['perfor
       console.error(`[Lighthouse] Linux/Mac Command: ${command} ${commandArgs.join(' ')}`);
     }
     
-    // 환경변수 설정
-    const env = {
-      ...process.env,
-      // Chrome 관련 환경변수
-      CHROME_PATH: chromePath,
-      CHROME_BIN: chromePath,
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true',
-      PUPPETEER_EXECUTABLE_PATH: chromePath,
-      // Linux 환경에서 필요한 환경변수
-      DISPLAY: process.env.DISPLAY || ':0',
-      // 추가 Chrome 플래그
-      CHROME_FLAGS: '--headless --no-sandbox --disable-gpu --disable-dev-shm-usage'
-    };
-    
-    console.error(`[Lighthouse] Environment variables:`, {
-      CHROME_PATH: env.CHROME_PATH,
-      CHROME_BIN: env.CHROME_BIN,
-      DISPLAY: env.DISPLAY
-    });
-    
     // Lighthouse 프로세스 시작
     const lighthouseProcess = spawn(command, commandArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: env
+      shell: isWindows, // Windows에서는 shell 옵션 사용
+      env: {
+        ...process.env,
+        // Linux 환경에서 필요한 환경변수 설정
+        DISPLAY: process.env.DISPLAY || ':0',
+        // Chrome 관련 환경변수
+        CHROME_PATH: process.env.CHROME_PATH,
+        CHROME_BIN: process.env.CHROME_BIN
+      }
     });
     
     let output = '';
@@ -274,4 +234,4 @@ main().catch((error) => {
   };
   console.log(JSON.stringify(errorResponse));
   process.exit(1);
-}); 
+});

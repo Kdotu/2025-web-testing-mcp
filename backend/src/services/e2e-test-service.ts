@@ -192,8 +192,19 @@ export class E2ETestService {
         testResult.logs.push(`E2E 테스트가 실패했습니다: ${testResult.error}`);
       }
 
+      // raw_data에 Playwright 결과 데이터 포함
+      const rawData = {
+        logs: testResult.logs,
+        config: config,
+        playwrightResult: output,
+        performanceMetrics: output.performanceMetrics || {},
+        browser: output.browser || 'chromium',
+        url: output.url || config.url,
+        timestamp: output.timestamp || new Date().toISOString()
+      };
+
       // DB 업데이트
-      await this.updateTestResult(testId, testResult.status, testResult.logs, config);
+      await this.updateTestResult(testId, testResult.status, testResult.logs, config, rawData);
       console.log(`[E2E Test ${testId}] 테스트 완료 - DB 업데이트 완료`);
 
     } catch (error) {
@@ -262,13 +273,16 @@ export class E2ETestService {
   /**
    * 테스트 결과 업데이트
    */
-  private async updateTestResult(testId: string, status: 'running' | 'completed' | 'failed' | 'cancelled', logs: string[], config: E2ETestConfig): Promise<void> {
+  private async updateTestResult(testId: string, status: 'running' | 'completed' | 'failed' | 'cancelled', logs: string[], config: E2ETestConfig, rawData?: any): Promise<void> {
     const result = this.runningTests.get(testId);
     if (!result) return;
 
     // 기존 결과를 가져와서 업데이트
     const existingResult = await this.testResultService.getResultByTestId(testId);
     if (!existingResult) return;
+
+    // raw_data 구성
+    const rawDataToSave = rawData || { logs, config };
 
     const updatedResult: LoadTestResult = {
       ...existingResult,
@@ -277,7 +291,7 @@ export class E2ETestService {
         ...existingResult.summary,
         endTime: new Date().toISOString()
       },
-      raw_data: JSON.stringify({ logs, config }),
+      raw_data: JSON.stringify(rawDataToSave),
       updatedAt: new Date().toISOString()
     };
 
@@ -329,13 +343,26 @@ export class E2ETestService {
       testResult.endTime = new Date().toISOString();
       testResult.logs.push('사용자에 의해 테스트가 취소되었습니다.');
       
+      // raw_data 구성
+      const rawData = {
+        logs: testResult.logs,
+        config: {
+          url: testResult.url,
+          name: testResult.name,
+          ...(testResult.description && { description: testResult.description }),
+          config: { testType: 'e2e', settings: {} }
+        },
+        cancelled: true,
+        cancelledAt: new Date().toISOString()
+      };
+      
       // DB 업데이트
       await this.updateTestResult(testId, 'cancelled', testResult.logs, {
         url: testResult.url,
         name: testResult.name,
         ...(testResult.description && { description: testResult.description }),
         config: { testType: 'e2e', settings: {} }
-      });
+      }, rawData);
     }
   }
 } 
