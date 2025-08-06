@@ -272,10 +272,42 @@ class SimpleMCPClient implements MCPClient {
       let childProcess;
       
       if (isPythonFile) {
-        const pythonPath = isWindows ? 'python' : 'python3';
+        // Python 경로 결정 (여러 가능한 경로 시도)
+        const possiblePythonPaths = [
+          process.env['PYTHON_PATH'],
+          '/usr/bin/python3',
+          '/usr/bin/python',
+          'python3',
+          'python'
+        ].filter(Boolean);
+        
+        let pythonPath = possiblePythonPaths[0] || 'python3';
+        
+        // 실제로 존재하는 Python 경로 찾기
+        for (const path of possiblePythonPaths) {
+          if (!path) continue;
+          try {
+            const { execSync } = require('child_process');
+            execSync(`${path} --version`, { stdio: 'ignore' });
+            pythonPath = path;
+            break;
+          } catch (error) {
+            // 이 경로는 사용할 수 없음, 다음 경로 시도
+            continue;
+          }
+        }
+        
+        console.log(`[Local MCP Client] Using Python path: ${pythonPath}`);
+        
         childProcess = spawn(pythonPath, [this.serverPath], {
           stdio: ['pipe', 'pipe', 'pipe'],
-          env: process.env
+          env: {
+            ...process.env,
+            // Python 관련 환경변수 설정
+            PYTHONPATH: process.env['PYTHONPATH'] || '',
+            PYTHONUNBUFFERED: '1',
+            PYTHON_PATH: pythonPath
+          }
         });
       } else if (isTypeScriptFile) {
         childProcess = isWindows 
