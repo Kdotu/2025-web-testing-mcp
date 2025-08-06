@@ -38,6 +38,9 @@ export const supabase = createClient(
 export const createServiceClient = () => {
   const serviceRoleKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
   
+  console.log('createServiceClient: Supabase URL:', supabaseUrl ? 'Set' : 'Not set');
+  console.log('createServiceClient: Service Role Key:', serviceRoleKey ? 'Set' : 'Not set');
+  
   if (!serviceRoleKey) {
     if (isDevelopment) {
       console.warn('⚠️ Supabase service role key not found. Using dummy client.');
@@ -56,16 +59,37 @@ export const createServiceClient = () => {
     }
   }
   
-  return createClient(
-    supabaseUrl || 'http://localhost:54321', 
-    serviceRoleKey, 
-    {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: false
+  try {
+    const client = createClient(
+      supabaseUrl || 'http://localhost:54321', 
+      serviceRoleKey, 
+      {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: false
+        }
       }
+    );
+    console.log('✅ Service client created successfully');
+    return client;
+  } catch (error) {
+    console.error('❌ Failed to create service client:', error);
+    if (isDevelopment) {
+      console.warn('⚠️ Using dummy client due to service client creation error');
+      return createClient(
+        supabaseUrl || 'http://localhost:54321',
+        'dummy-service-key',
+        {
+          auth: {
+            autoRefreshToken: true,
+            persistSession: false
+          }
+        }
+      );
+    } else {
+      throw error;
     }
-  );
+  }
 };
 
 /**
@@ -88,5 +112,22 @@ export const testSupabaseConnection = async (): Promise<boolean> => {
   } catch (error) {
     console.error('Supabase connection test failed:', error);
     return false;
+  }
+};
+
+/**
+ * 환경 변수 디버깅
+ */
+export const debugEnvironmentVariables = () => {
+  console.log('🔍 Environment Variables Debug:');
+  console.log('NODE_ENV:', process.env['NODE_ENV']);
+  console.log('SUPABASE_URL:', process.env['SUPABASE_URL'] ? 'Set' : 'Not set');
+  console.log('SUPABASE_ANON_KEY:', process.env['SUPABASE_ANON_KEY'] ? 'Set' : 'Not set');
+  console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env['SUPABASE_SERVICE_ROLE_KEY'] ? 'Set' : 'Not set');
+  
+  if (process.env['SUPABASE_SERVICE_ROLE_KEY']) {
+    const key = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+    console.log('Service Role Key length:', key.length);
+    console.log('Service Role Key starts with:', key.substring(0, 10) + '...');
   }
 }; 

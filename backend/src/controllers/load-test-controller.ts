@@ -137,6 +137,13 @@ export class LoadTestController {
   }
 
   /**
+   * 타임아웃 테스트 (개발용)
+   */
+  async testTimeout(testId: string, timeoutMs: number = 30000): Promise<void> {
+    await this.k6Service.testTimeout(testId, timeoutMs);
+  }
+
+  /**
    * 테스트 상태 업데이트 (내부 메서드)
    */
   private async updateTestStatus(

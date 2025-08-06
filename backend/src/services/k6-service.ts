@@ -2,6 +2,7 @@ import { LoadTestConfig, LoadTestResult } from '../types';
 import { join } from 'path';
 import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
+import { MCPServiceWrapper } from './mcp-service-wrapper';
 
 /**
  * k6 MCP 테스트 실행 서비스
@@ -9,18 +10,26 @@ import { v4 as uuidv4 } from 'uuid';
 export class K6Service {
   private runningTests: Map<string, any> = new Map();
   private testResults: Map<string, any> = new Map();
+  private timeoutTimers: Map<string, NodeJS.Timeout> = new Map();
+  private readonly TIMEOUT_DURATION = 10 * 60 * 1000; // 10분 (밀리초)
+  private mcpWrapper: MCPServiceWrapper;
 
   constructor() {
     // MCP 서버는 별도 프로세스로 실행
+    this.mcpWrapper = new MCPServiceWrapper();
   }
 
   /**
    * k6 테스트 실행 (기본: 직접 실행 방식)
    */
   async executeTest(testId: string, config: LoadTestConfig): Promise<void> {
+    console.log('[K6Service] Executing test via direct execution');
     try {
       // 테스트 시작 시 상태를 running으로 설정
       this.runningTests.set(testId, { status: 'running', startTime: new Date() });
+      
+      // 10분 타임아웃 설정
+      this.setTestTimeout(testId);
       
       // k6 스크립트 생성
       const scriptPath = await this.generateK6Script(testId, config);
@@ -46,22 +55,74 @@ export class K6Service {
    * k6 테스트 실행 (MCP 서버 방식)
    */
   async executeTestViaMCP(testId: string, config: LoadTestConfig): Promise<void> {
+    console.log('[K6Service] Executing test via MCP server');
     try {
       // 테스트 시작 시 상태를 running으로 설정
       this.runningTests.set(testId, { status: 'running', startTime: new Date() });
       
+      // 10분 타임아웃 설정
+      this.setTestTimeout(testId);
+      
       // k6 스크립트 생성
       const scriptPath = await this.generateK6Script(testId, config);
       
-      // MCP 서버를 통해 k6 실행
-      const result = await this.executeK6ViaMCP(scriptPath, config);
-      console.log('k6 MCP result:', result);
-
-      // 결과 처리
-      this.parseK6Output(testId, result, config);
+      // MCP 래퍼를 통해 k6 실행
+      const mcpResult = await this.mcpWrapper.executeK6Test({
+        ...config,
+        scriptPath
+      });
       
-      // 테스트 완료 시 상태 업데이트
-      this.handleTestCompletion(testId, 'completed');
+      console.log('k6 MCP result:', mcpResult);
+
+      if (mcpResult.success) {
+        // MCP 결과에서 실제 k6 출력 추출
+        const k6Output = mcpResult.output || mcpResult.data?.result || '';
+        console.log('Parsing k6 output for testId:', testId);
+        console.log('Output length:', k6Output.length);
+        console.log('MCP result structure:', {
+          hasOutput: !!mcpResult.output,
+          hasData: !!mcpResult.data,
+          hasDataResult: !!mcpResult.data?.result,
+          outputLength: mcpResult.output?.length || 0,
+          dataResultLength: mcpResult.data?.result?.length || 0
+        });
+        
+        // k6 출력에서 에러 확인
+        if (k6Output.includes('Error executing k6 test:') || 
+            k6Output.includes('Request Failed') ||
+            k6Output.includes('connectex: A connection attempt failed')) {
+          console.error('k6 test failed due to network/connection errors');
+          this.handleTestCompletion(testId, 'failed');
+          throw new Error('k6 test failed: Network connection error');
+        }
+        
+        // k6 threshold 에러 확인
+        if (k6Output.includes('thresholds on metrics') || 
+            k6Output.includes('level=error')) {
+          console.error('k6 test failed due to threshold violations');
+          this.handleTestCompletion(testId, 'failed');
+          throw new Error('k6 test failed: Performance thresholds exceeded');
+        }
+        
+        // 정상적인 k6 출력인지 확인 (메트릭 정보 포함)
+        if (!k6Output.includes('█ TOTAL RESULTS') && 
+            !k6Output.includes('http_req_duration') &&
+            !k6Output.includes('iterations')) {
+          console.error('k6 test failed: No valid metrics found in output');
+          this.handleTestCompletion(testId, 'failed');
+          throw new Error('k6 test failed: Invalid output format');
+        }
+        
+        // 결과 처리
+        this.parseK6Output(testId, k6Output, config);
+        
+        // 테스트 완료 시 상태 업데이트
+        this.handleTestCompletion(testId, 'completed');
+      } else {
+        console.error('MCP k6 test execution failed:', mcpResult.error);
+        this.handleTestCompletion(testId, 'failed');
+        throw new Error(mcpResult.error || 'MCP k6 test execution failed');
+      }
 
     } catch (error) {
       console.error('Failed to execute k6 test via MCP:', error);
@@ -124,113 +185,12 @@ export class K6Service {
   }
 
   /**
-   * k6 MCP 서버를 통한 실행 (새로운 방식)
-   */
-  private async executeK6ViaMCP(scriptPath: string, config: LoadTestConfig): Promise<string> {
-    return new Promise((resolve, reject) => {
-      console.log(`[MCP] Starting k6 test via MCP server: ${scriptPath}`);
-      console.log(`[MCP] Config: duration=${(config as any).duration}, vus=${(config as any).vus}`);
-      
-      // MCP 서버 경로 설정
-      const k6ServerPath = join(process.cwd(), 'k6-mcp-server');
-      const isWindows = process.platform === 'win32';
-      const pythonPath = isWindows 
-        ? join(k6ServerPath, '.venv', 'Scripts', 'python.exe')
-        : 'python3';
-      
-      // 배포환경에서 Python 경로 확인
-      console.log(`[MCP] Current working directory: ${process.cwd()}`);
-      console.log(`[MCP] k6ServerPath: ${k6ServerPath}`);
-      console.log(`[MCP] Python path: ${pythonPath}`);
-      console.log(`[MCP] Working directory: ${k6ServerPath}`);
-      
-      console.log(`[MCP] Python path: ${pythonPath}`);
-      console.log(`[MCP] Working directory: ${k6ServerPath}`);
-      
-      // Python MCP 서버 프로세스 시작 (1회성 실행)
-      const pythonProcess = spawn(pythonPath, ['k6_server.py'], {
-        cwd: k6ServerPath,
-        env: {
-          ...process.env,
-          K6_BIN: '/app/k6'
-        }
-      });
-
-      console.log(`[MCP] Python process started with PID: ${pythonProcess.pid}`);
-
-      let output = '';
-      let errorOutput = '';
-
-      // MCP 서버 출력 처리
-      pythonProcess.stdout.on('data', (data) => {
-        const dataStr = data.toString();
-        output += dataStr;
-        console.log(`[MCP] stdout: ${dataStr.trim()}`);
-      });
-
-      pythonProcess.stderr.on('data', (data) => {
-        const dataStr = data.toString();
-        errorOutput += dataStr;
-        console.error(`[MCP] stderr: ${dataStr.trim()}`);
-      });
-
-      // MCP 서버 종료 처리
-      pythonProcess.on('close', (code) => {
-        console.log(`[MCP] Process exited with code: ${code}`);
-        console.log(`[MCP] Total stdout length: ${output.length}`);
-        console.log(`[MCP] Total stderr length: ${errorOutput.length}`);
-        
-        try {
-          // JSON 응답 파싱
-          const response = JSON.parse(output);
-          console.log(`[MCP] Parsed response:`, response);
-          
-          if (response.error) {
-            console.error(`[MCP] Server returned error: ${response.error}`);
-            reject(new Error(`MCP server error: ${response.error}`));
-          } else if (response.result) {
-            console.log(`[MCP] Successfully received result`);
-            resolve(response.result);
-          } else {
-            console.error(`[MCP] Invalid response format`);
-            reject(new Error('MCP server returned invalid response format'));
-          }
-        } catch (parseError) {
-          console.error('[MCP] Failed to parse response:', parseError);
-          console.error('[MCP] Raw output:', output);
-          reject(new Error(`Failed to parse MCP server response: ${output}`));
-        }
-      });
-
-      pythonProcess.on('error', (error) => {
-        console.error('[MCP] Process error:', error);
-        reject(error);
-      });
-
-      // MCP 서버에 테스트 요청 전송 (JSON 형태)
-      const testRequest = {
-        method: 'execute_k6_test',
-        params: {
-          script_file: scriptPath,
-          duration: (config as any).duration || '30s',
-          vus: (config as any).vus || 10
-        }
-      };
-
-      console.log(`[MCP] Sending request:`, JSON.stringify(testRequest));
-      
-      // 요청을 JSON 형태로 전송
-      pythonProcess.stdin.write(JSON.stringify(testRequest) + '\n');
-      pythonProcess.stdin.end();
-      
-      console.log(`[MCP] Request sent, stdin closed`);
-    });
-  }
-
-  /**
    * k6 테스트 중단 (MCP 방식)
    */
   async cancelTest(testId: string): Promise<void> {
+    // 타임아웃 타이머 제거
+    this.clearTestTimeout(testId);
+    
     // MCP 서버에서는 직접적인 중단 기능이 없으므로
     // 프로세스 관리를 통해 처리
     this.runningTests.delete(testId);
@@ -369,37 +329,55 @@ export default function () {
     const lines = output.split('\n');
     
     for (const line of lines) {
-      // http_req_duration 파싱
+      // http_req_duration 파싱 (ms 단위 지원)
       if (line.includes('http_req_duration')) {
-        const match = line.match(/avg=([\d.]+)s min=([\d.]+)s max=([\d.]+)s.*p\(95\)=([\d.]+)s/);
-        if (match && match[1] && match[2] && match[3] && match[4]) {
+        // ms 단위 패턴
+        let match = line.match(/avg=([\d.]+)ms\s+min=([\d.]+)ms\s+med=([\d.]+)ms\s+max=([\d.]+)ms\s+p\(90\)=([\d.]+)ms\s+p\(95\)=([\d.]+)ms/);
+        if (match && match[1] && match[2] && match[3] && match[4] && match[6]) {
           metrics.http_req_duration = {
-            avg: parseFloat(match[1]) * 1000, // ms로 변환
-            min: parseFloat(match[2]) * 1000,
-            max: parseFloat(match[3]) * 1000,
-            p95: parseFloat(match[4]) * 1000
+            avg: parseFloat(match[1]),
+            min: parseFloat(match[2]),
+            max: parseFloat(match[4]),
+            p95: parseFloat(match[6])
           };
+        } else {
+          // s 단위 패턴 (기존 호환성)
+          match = line.match(/avg=([\d.]+)s\s+min=([\d.]+)s\s+max=([\d.]+)s.*p\(95\)=([\d.]+)s/);
+          if (match && match[1] && match[2] && match[3] && match[4]) {
+            metrics.http_req_duration = {
+              avg: parseFloat(match[1]) * 1000, // ms로 변환
+              min: parseFloat(match[2]) * 1000,
+              max: parseFloat(match[3]) * 1000,
+              p95: parseFloat(match[4]) * 1000
+            };
+          }
         }
       }
       
       // http_req_rate 파싱
-      if (line.includes('http_reqs')) {
-        const match = line.match(/(\d+)\s+([\d.]+)\/s/);
-        if (match && match[2]) {
-          metrics.http_req_rate = parseFloat(match[2]);
+      if (line.includes('http_req_rate')) {
+        const match = line.match(/([\d.]+)\s+req\/s/);
+        if (match && match[1]) {
+          metrics.http_req_rate = parseFloat(match[1]);
         }
       }
       
-      // http_req_failed 파싱
+      // http_req_failed 파싱 (유니코드 문자 포함)
       if (line.includes('http_req_failed')) {
-        const match = line.match(/(\d+\.\d+)%\s+(\d+)\s+out\s+of\s+(\d+)/);
+        const match = line.match(/([\d.]+)%\s+[✓✓]\s+(\d+)\s+\/\s+(\d+)/);
         if (match && match[1]) {
           metrics.http_req_failed = parseFloat(match[1]);
+        } else {
+          // 기존 패턴 (호환성)
+          const match2 = line.match(/([\d.]+)%\s+(\d+)\s+out\s+of\s+(\d+)/);
+          if (match2 && match2[1]) {
+            metrics.http_req_failed = parseFloat(match2[1]);
+          }
         }
       }
       
       // vus 파싱
-      if (line.includes('vus')) {
+      if (line.includes('vus') && !line.includes('vus_max')) {
         const match = line.match(/(\d+)\s+min=(\d+)\s+max=(\d+)/);
         if (match && match[1] && match[3]) {
           metrics.vus = parseInt(match[1]);
@@ -426,20 +404,27 @@ export default function () {
     const lines = output.split('\n');
     
     for (const line of lines) {
-      // 총 요청 수
-      if (line.includes('http_reqs')) {
+      // 총 요청 수 (유니코드 문자 포함)
+      if (line.includes('http_reqs') && !line.includes('http_req_rate')) {
         const match = line.match(/(\d+)\s+[\d.]+\/s/);
         if (match && match[1]) {
           summary.totalRequests = parseInt(match[1]);
         }
       }
       
-      // 실패한 요청 수
+      // 실패한 요청 수 (유니코드 문자 포함)
       if (line.includes('http_req_failed')) {
-        const match = line.match(/(\d+)\s+out\s+of\s+(\d+)/);
+        const match = line.match(/(\d+)\s+\/\s+(\d+)/);
         if (match && match[1]) {
           summary.failedRequests = parseInt(match[1]);
           summary.successfulRequests = (summary.totalRequests || 0) - summary.failedRequests;
+        } else {
+          // 기존 패턴 (호환성)
+          const match2 = line.match(/(\d+)\s+out\s+of\s+(\d+)/);
+          if (match2 && match2[1]) {
+            summary.failedRequests = parseInt(match2[1]);
+            summary.successfulRequests = (summary.totalRequests || 0) - summary.failedRequests;
+          }
         }
       }
       
@@ -463,7 +448,7 @@ export default function () {
     const metrics: any = {};
     
     try {
-      // HTTP 메트릭 파싱
+      // HTTP 메트릭 파싱 (개선된 정규식)
       const httpDurationMatch = output.match(/http_req_duration.*?: avg=([\d.]+)ms min=([\d.]+)ms med=([\d.]+)ms max=([\d.]+)ms p\(90\)=([\d.]+)ms p\(95\)=([\d.]+)ms/);
       if (httpDurationMatch && httpDurationMatch[1] && httpDurationMatch[2] && httpDurationMatch[3] && httpDurationMatch[4] && httpDurationMatch[5] && httpDurationMatch[6]) {
         metrics.http_req_duration_avg = parseFloat(httpDurationMatch[1]);
@@ -472,6 +457,39 @@ export default function () {
         metrics.http_req_duration_max = parseFloat(httpDurationMatch[4]);
         metrics.http_req_duration_p90 = parseFloat(httpDurationMatch[5]);
         metrics.http_req_duration_p95 = parseFloat(httpDurationMatch[6]);
+      }
+      
+      // HTTP 요청 대기 시간 파싱
+      const httpWaitingMatch = output.match(/http_req_waiting.*?: avg=([\d.]+)ms min=([\d.]+)ms med=([\d.]+)ms max=([\d.]+)ms p\(90\)=([\d.]+)ms p\(95\)=([\d.]+)ms/);
+      if (httpWaitingMatch && httpWaitingMatch[1] && httpWaitingMatch[2] && httpWaitingMatch[3] && httpWaitingMatch[4] && httpWaitingMatch[5] && httpWaitingMatch[6]) {
+        metrics.http_req_waiting_avg = parseFloat(httpWaitingMatch[1]);
+        metrics.http_req_waiting_min = parseFloat(httpWaitingMatch[2]);
+        metrics.http_req_waiting_med = parseFloat(httpWaitingMatch[3]);
+        metrics.http_req_waiting_max = parseFloat(httpWaitingMatch[4]);
+        metrics.http_req_waiting_p90 = parseFloat(httpWaitingMatch[5]);
+        metrics.http_req_waiting_p95 = parseFloat(httpWaitingMatch[6]);
+      }
+      
+      // HTTP 요청 연결 시간 파싱
+      const httpConnectingMatch = output.match(/http_req_connecting.*?: avg=([\d.]+)ms min=([\d.]+)ms med=([\d.]+)ms max=([\d.]+)ms p\(90\)=([\d.]+)ms p\(95\)=([\d.]+)ms/);
+      if (httpConnectingMatch && httpConnectingMatch[1] && httpConnectingMatch[2] && httpConnectingMatch[3] && httpConnectingMatch[4] && httpConnectingMatch[5] && httpConnectingMatch[6]) {
+        metrics.http_req_connecting_avg = parseFloat(httpConnectingMatch[1]);
+        metrics.http_req_connecting_min = parseFloat(httpConnectingMatch[2]);
+        metrics.http_req_connecting_med = parseFloat(httpConnectingMatch[3]);
+        metrics.http_req_connecting_max = parseFloat(httpConnectingMatch[4]);
+        metrics.http_req_connecting_p90 = parseFloat(httpConnectingMatch[5]);
+        metrics.http_req_connecting_p95 = parseFloat(httpConnectingMatch[6]);
+      }
+      
+      // HTTP 요청 차단 시간 파싱
+      const httpBlockedMatch = output.match(/http_req_blocked.*?: avg=([\d.]+)ms min=([\d.]+)ms med=([\d.]+)ms max=([\d.]+)ms p\(90\)=([\d.]+)ms p\(95\)=([\d.]+)ms/);
+      if (httpBlockedMatch && httpBlockedMatch[1] && httpBlockedMatch[2] && httpBlockedMatch[3] && httpBlockedMatch[4] && httpBlockedMatch[5] && httpBlockedMatch[6]) {
+        metrics.http_req_blocked_avg = parseFloat(httpBlockedMatch[1]);
+        metrics.http_req_blocked_min = parseFloat(httpBlockedMatch[2]);
+        metrics.http_req_blocked_med = parseFloat(httpBlockedMatch[3]);
+        metrics.http_req_blocked_max = parseFloat(httpBlockedMatch[4]);
+        metrics.http_req_blocked_p90 = parseFloat(httpBlockedMatch[5]);
+        metrics.http_req_blocked_p95 = parseFloat(httpBlockedMatch[6]);
       }
       
       // HTTP 요청 실패율
@@ -636,17 +654,10 @@ export default function () {
    */
   private async saveDetailedMetrics(testId: string, metrics: any): Promise<void> {
     try {
-      const { createClient } = await import('@supabase/supabase-js');
+      // supabase-client.ts의 createServiceClient 사용
+      const { createServiceClient } = await import('./supabase-client');
       
-      const supabaseUrl = process.env['SUPABASE_URL'];
-      const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
-      
-      if (!supabaseUrl || !supabaseKey) {
-        console.error('Supabase credentials not found');
-        return;
-      }
-      
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      const supabase = createServiceClient();
       
       // 메트릭을 key-value 형태로 변환하여 저장
       const metricRecords = this.convertMetricsToRecords(testId, metrics);
@@ -658,12 +669,21 @@ export default function () {
         
         if (dbError) {
           console.error('Failed to save detailed metrics to database:', dbError);
+          // 개발 환경에서는 에러를 무시하고 계속 진행
+          if (process.env['NODE_ENV'] === 'development') {
+            console.warn('⚠️ Continuing without saving detailed metrics due to database error');
+            return;
+          }
         } else {
           console.log(`Successfully saved ${metricRecords.length} metric records to DB for test:`, testId);
         }
       }
     } catch (error) {
       console.error('Failed to save detailed metrics:', error);
+      // 개발 환경에서는 에러를 무시하고 계속 진행
+      if (process.env['NODE_ENV'] === 'development') {
+        console.warn('⚠️ Continuing without saving detailed metrics due to error');
+      }
     }
   }
 
@@ -735,6 +755,87 @@ export default function () {
         value: metrics.http_reqs_rate,
         unit: 'req/s',
         description: 'HTTP 요청 속도',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // HTTP 요청 대기 시간 메트릭
+    if (metrics.http_req_waiting_avg !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_waiting_avg',
+        value: metrics.http_req_waiting_avg,
+        unit: 'ms',
+        description: 'HTTP 요청 평균 대기 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.http_req_waiting_p95 !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_waiting_p95',
+        value: metrics.http_req_waiting_p95,
+        unit: 'ms',
+        description: 'HTTP 요청 95퍼센타일 대기 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // HTTP 요청 연결 시간 메트릭
+    if (metrics.http_req_connecting_avg !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_connecting_avg',
+        value: metrics.http_req_connecting_avg,
+        unit: 'ms',
+        description: 'HTTP 요청 평균 연결 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.http_req_connecting_p95 !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_connecting_p95',
+        value: metrics.http_req_connecting_p95,
+        unit: 'ms',
+        description: 'HTTP 요청 95퍼센타일 연결 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    // HTTP 요청 차단 시간 메트릭
+    if (metrics.http_req_blocked_avg !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_blocked_avg',
+        value: metrics.http_req_blocked_avg,
+        unit: 'ms',
+        description: 'HTTP 요청 평균 차단 시간',
+        created_at: now,
+        updated_at: now
+      });
+    }
+    
+    if (metrics.http_req_blocked_p95 !== undefined) {
+      records.push({
+        test_id: testId,
+        metric_type: 'http',
+        metric_name: 'req_blocked_p95',
+        value: metrics.http_req_blocked_p95,
+        unit: 'ms',
+        description: 'HTTP 요청 95퍼센타일 차단 시간',
         created_at: now,
         updated_at: now
       });
@@ -913,6 +1014,11 @@ export default function () {
         updated_at: now
       });
     }
+    
+    // 디버깅을 위한 로그 추가
+    console.log(`Converted ${records.length} metrics to records for test: ${testId}`);
+    console.log('Available metrics:', Object.keys(metrics));
+    console.log('Converted records:', records.map(r => `${r.metric_type}.${r.metric_name}: ${r.value}${r.unit}`));
     
     return records;
   }
@@ -1136,9 +1242,66 @@ export default function () {
   // }
 
   /**
+   * 테스트 타임아웃 설정
+   */
+  private setTestTimeout(testId: string): void {
+    // 기존 타이머가 있다면 제거
+    this.clearTestTimeout(testId);
+    
+    // 10분 후 타임아웃 설정
+    const timeoutTimer = setTimeout(async () => {
+      console.log(`⏰ Test timeout reached for testId: ${testId}`);
+      
+      // DB에서 테스트 상태를 failed로 업데이트
+      try {
+        const { TestResultService } = await import('./test-result-service');
+        const testResultService = new TestResultService();
+        
+        const existingResult = await testResultService.getResultByTestId(testId);
+        if (existingResult) {
+          const updatedResult = {
+            ...existingResult,
+            status: 'failed' as const,
+            currentStep: 'Test timeout after 10 minutes',
+            updatedAt: new Date().toISOString()
+          };
+          
+          await testResultService.updateResult(updatedResult);
+          console.log(`✅ Test status updated to failed due to timeout: ${testId}`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to update test status to failed: ${testId}`, error);
+      }
+      
+      // 메모리에서 테스트 제거
+      this.runningTests.delete(testId);
+      this.timeoutTimers.delete(testId);
+      
+    }, this.TIMEOUT_DURATION);
+    
+    this.timeoutTimers.set(testId, timeoutTimer);
+    console.log(`⏰ Timeout timer set for testId: ${testId} (10 minutes)`);
+  }
+
+  /**
+   * 테스트 타임아웃 타이머 제거
+   */
+  private clearTestTimeout(testId: string): void {
+    const existingTimer = this.timeoutTimers.get(testId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      this.timeoutTimers.delete(testId);
+      console.log(`⏰ Timeout timer cleared for testId: ${testId}`);
+    }
+  }
+
+  /**
    * 테스트 완료 처리
    */
   private handleTestCompletion(testId: string, status: LoadTestResult['status']): void {
+    // 타임아웃 타이머 제거
+    this.clearTestTimeout(testId);
+    
     const result = this.testResults.get(testId);
     if (result) {
       result.status = status;
@@ -1192,5 +1355,47 @@ export default function () {
    */
   getTestResult(testId: string): any {
     return this.testResults.get(testId);
+  }
+
+  /**
+   * 타임아웃 설정 테스트 (개발용)
+   */
+  async testTimeout(testId: string, timeoutMs: number = 30000): Promise<void> {
+    console.log(`🧪 Testing timeout for testId: ${testId} with ${timeoutMs}ms`);
+    
+    // 테스트 시작 시 상태를 running으로 설정
+    this.runningTests.set(testId, { status: 'running', startTime: new Date() });
+    
+    // 짧은 타임아웃 설정 (테스트용)
+    setTimeout(async () => {
+      console.log(`⏰ Test timeout reached for testId: ${testId}`);
+      
+      // DB에서 테스트 상태를 failed로 업데이트
+      try {
+        const { TestResultService } = await import('./test-result-service');
+        const testResultService = new TestResultService();
+        
+        const existingResult = await testResultService.getResultByTestId(testId);
+        if (existingResult) {
+          const updatedResult = {
+            ...existingResult,
+            status: 'failed' as const,
+            currentStep: `Test timeout after ${timeoutMs / 1000} seconds`,
+            updatedAt: new Date().toISOString()
+          };
+          
+          await testResultService.updateResult(updatedResult);
+          console.log(`✅ Test status updated to failed due to timeout: ${testId}`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to update test status to failed: ${testId}`, error);
+      }
+      
+      // 메모리에서 테스트 제거
+      this.runningTests.delete(testId);
+      
+    }, timeoutMs);
+    
+    console.log(`⏰ Test timeout timer set for testId: ${testId} (${timeoutMs}ms)`);
   }
 } 

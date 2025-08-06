@@ -10,6 +10,9 @@ export interface LoadTestConfig {
   testType?: string; // 테스트 유형 (load, lighthouse, playwright 등)
   device?: string; // Lighthouse용 디바이스 설정 (desktop, mobile)
   categories?: string[]; // Lighthouse용 카테고리 설정
+  scriptPath?: string; // k6 스크립트 파일 경로
+  duration?: string; // 테스트 지속 시간
+  vus?: number; // 가상 사용자 수
   createdAt?: string;
   updatedAt?: string;
 }
@@ -61,6 +64,35 @@ export interface LoadTestResult {
   createdAt: string;
   updatedAt: string;
   rowNumber?: number; // 순차 번호 필드 추가
+}
+
+/**
+ * E2E 테스트 설정 인터페이스
+ */
+export interface E2ETestConfig {
+  url: string;
+  name: string;
+  description?: string;
+  config: {
+    testType: string;
+    settings: any;
+  };
+}
+
+/**
+ * E2E 테스트 로컬 결과 인터페이스
+ */
+export interface E2ETestLocalResult {
+  id: string;
+  url: string;
+  name: string;
+  description?: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  startTime: string;
+  endTime?: string;
+  logs: string[];
+  results?: any;
+  error?: string;
 }
 
 /**

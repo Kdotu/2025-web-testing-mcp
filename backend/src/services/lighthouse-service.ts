@@ -47,7 +47,7 @@ export class LighthouseService {
       console.log(`[MCP] Config: url=${(config as any).url}, device=${(config as any).device || 'desktop'}`);
       
       // Lighthouse MCP 서버 경로 설정
-      const lighthouseServerPath = join(process.cwd(), '..', 'lighthouse-mcp-server');
+      const lighthouseServerPath = join(process.cwd(), 'mcp', 'lighthouse-mcp-server');
       const isWindows = process.platform === 'win32';
       const nodePath = isWindows ? 'node' : 'node';
       
@@ -166,11 +166,18 @@ export class LighthouseService {
         lighthouseResult = output;
       }
       
+      // MCP 응답 구조 처리: result.data에서 실제 Lighthouse 데이터 추출
+      if (lighthouseResult.result && lighthouseResult.result.data) {
+        lighthouseResult = lighthouseResult.result.data;
+      }
+      
       console.log('Parsed Lighthouse result structure:', {
         hasScores: !!lighthouseResult.scores,
         hasMetrics: !!lighthouseResult.metrics,
+        hasCategories: !!lighthouseResult.categories,
         scoreKeys: lighthouseResult.scores ? Object.keys(lighthouseResult.scores) : [],
-        metricKeys: lighthouseResult.metrics ? Object.keys(lighthouseResult.metrics) : []
+        metricKeys: lighthouseResult.metrics ? Object.keys(lighthouseResult.metrics) : [],
+        categoryKeys: lighthouseResult.categories ? Object.keys(lighthouseResult.categories) : []
       });
       
       // 메트릭 추출
@@ -188,11 +195,12 @@ export class LighthouseService {
       try {
         // 파싱된 lighthouseResult를 사용하여 정돈된 JSON 생성
         const cleanResult = {
-          url: lighthouseResult.url,
+          url: lighthouseResult.requestedUrl || lighthouseResult.url,
           fetchTime: lighthouseResult.fetchTime,
-          version: lighthouseResult.version,
-          scores: lighthouseResult.scores,
-          metrics: lighthouseResult.metrics
+          version: lighthouseResult.lighthouseVersion || lighthouseResult.version,
+          categories: lighthouseResult.categories,
+          metrics: lighthouseResult.metrics,
+          audits: lighthouseResult.audits
         };
         
         // 정돈된 JSON 문자열 생성 (이스케이프 문자 제거)
@@ -238,49 +246,49 @@ export class LighthouseService {
       seo: {}
     };
 
-    // scores 객체에서 점수 추출 (Lighthouse 결과 구조에 맞게)
-    if (result.scores) {
-      // 성능 점수
-      if (result.scores.performance?.score) {
-        metrics.performance.score = Math.round(result.scores.performance.score * 100);
-      }
-
-      // 접근성 점수
-      if (result.scores.accessibility?.score) {
-        metrics.accessibility.score = Math.round(result.scores.accessibility.score * 100);
-      }
-
-      // 모범 사례 점수
-      if (result.scores['best-practices']?.score) {
-        metrics['best-practices'].score = Math.round(result.scores['best-practices'].score * 100);
-      }
-
-      // SEO 점수
-      if (result.scores.seo?.score) {
-        metrics.seo.score = Math.round(result.scores.seo.score * 100);
-      }
-    }
-
-    // categories 객체에서도 점수 추출 (기존 구조 지원)
+    // categories 객체에서 점수 추출 (Lighthouse MCP 응답 구조)
     if (result.categories) {
       // 성능 점수
-      if (result.categories.performance?.score && !metrics.performance.score) {
+      if (result.categories.performance?.score) {
         metrics.performance.score = Math.round(result.categories.performance.score * 100);
       }
 
       // 접근성 점수
-      if (result.categories.accessibility?.score && !metrics.accessibility.score) {
+      if (result.categories.accessibility?.score) {
         metrics.accessibility.score = Math.round(result.categories.accessibility.score * 100);
       }
 
       // 모범 사례 점수
-      if (result.categories['best-practices']?.score && !metrics['best-practices'].score) {
+      if (result.categories['best-practices']?.score) {
         metrics['best-practices'].score = Math.round(result.categories['best-practices'].score * 100);
       }
 
       // SEO 점수
-      if (result.categories.seo?.score && !metrics.seo.score) {
+      if (result.categories.seo?.score) {
         metrics.seo.score = Math.round(result.categories.seo.score * 100);
+      }
+    }
+
+    // scores 객체에서 점수 추출 (기존 구조 지원)
+    if (result.scores) {
+      // 성능 점수
+      if (result.scores.performance?.score && !metrics.performance.score) {
+        metrics.performance.score = Math.round(result.scores.performance.score * 100);
+      }
+
+      // 접근성 점수
+      if (result.scores.accessibility?.score && !metrics.accessibility.score) {
+        metrics.accessibility.score = Math.round(result.scores.accessibility.score * 100);
+      }
+
+      // 모범 사례 점수
+      if (result.scores['best-practices']?.score && !metrics['best-practices'].score) {
+        metrics['best-practices'].score = Math.round(result.scores['best-practices'].score * 100);
+      }
+
+      // SEO 점수
+      if (result.scores.seo?.score && !metrics.seo.score) {
+        metrics.seo.score = Math.round(result.scores.seo.score * 100);
       }
     }
 
@@ -436,52 +444,106 @@ export class LighthouseService {
 
       const metricsToSave: any[] = [];
 
-      // 성능 점수 저장
-      if (lighthouseResult.scores?.performance?.score) {
-        metricsToSave.push({
-          test_id: testId,
-          metric_type: 'performance_score',
-          metric_name: 'Performance Score',
-          value: Math.round(lighthouseResult.scores.performance.score * 100),
-          unit: 'percent',
-          description: 'Lighthouse Performance Score'
-        });
+      // categories 객체에서 점수 저장 (Lighthouse MCP 응답 구조)
+      if (lighthouseResult.categories) {
+        // 성능 점수 저장
+        if (lighthouseResult.categories.performance?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'performance_score',
+            metric_name: 'Performance Score',
+            value: Math.round(lighthouseResult.categories.performance.score * 100),
+            unit: 'percent',
+            description: 'Lighthouse Performance Score'
+          });
+        }
+
+        // 접근성 점수 저장
+        if (lighthouseResult.categories.accessibility?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'accessibility_score',
+            metric_name: 'Accessibility Score',
+            value: Math.round(lighthouseResult.categories.accessibility.score * 100),
+            unit: 'percent',
+            description: 'Lighthouse Accessibility Score'
+          });
+        }
+
+        // 모범 사례 점수 저장
+        if (lighthouseResult.categories['best-practices']?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'best_practices_score',
+            metric_name: 'Best Practices Score',
+            value: Math.round(lighthouseResult.categories['best-practices'].score * 100),
+            unit: 'percent',
+            description: 'Lighthouse Best Practices Score'
+          });
+        }
+
+        // SEO 점수 저장
+        if (lighthouseResult.categories.seo?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'seo_score',
+            metric_name: 'SEO Score',
+            value: Math.round(lighthouseResult.categories.seo.score * 100),
+            unit: 'percent',
+            description: 'Lighthouse SEO Score'
+          });
+        }
       }
 
-      // 접근성 점수 저장
-      if (lighthouseResult.scores?.accessibility?.score) {
-        metricsToSave.push({
-          test_id: testId,
-          metric_type: 'accessibility_score',
-          metric_name: 'Accessibility Score',
-          value: Math.round(lighthouseResult.scores.accessibility.score * 100),
-          unit: 'percent',
-          description: 'Lighthouse Accessibility Score'
-        });
-      }
+      // scores 객체에서 점수 저장 (기존 구조 지원)
+      if (lighthouseResult.scores) {
+        // 성능 점수 저장
+        if (lighthouseResult.scores.performance?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'performance_score',
+            metric_name: 'Performance Score',
+            value: Math.round(lighthouseResult.scores.performance.score * 100),
+            unit: 'percent',
+            description: 'Lighthouse Performance Score'
+          });
+        }
 
-      // 모범 사례 점수 저장
-      if (lighthouseResult.scores?.['best-practices']?.score) {
-        metricsToSave.push({
-          test_id: testId,
-          metric_type: 'best_practices_score',
-          metric_name: 'Best Practices Score',
-          value: Math.round(lighthouseResult.scores['best-practices'].score * 100),
-          unit: 'percent',
-          description: 'Lighthouse Best Practices Score'
-        });
-      }
+        // 접근성 점수 저장
+        if (lighthouseResult.scores.accessibility?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'accessibility_score',
+            metric_name: 'Accessibility Score',
+            value: Math.round(lighthouseResult.scores.accessibility.score * 100),
+            unit: 'percent',
+            description: 'Lighthouse Accessibility Score'
+          });
+        }
 
-      // SEO 점수 저장
-      if (lighthouseResult.scores?.seo?.score) {
-        metricsToSave.push({
-          test_id: testId,
-          metric_type: 'seo_score',
-          metric_name: 'SEO Score',
-          value: Math.round(lighthouseResult.scores.seo.score * 100),
-          unit: 'percent',
-          description: 'Lighthouse SEO Score'
-        });
+        // 모범 사례 점수 저장
+        if (lighthouseResult.scores['best-practices']?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'best_practices_score',
+            metric_name: 'Best Practices Score',
+            value: Math.round(lighthouseResult.scores['best-practices'].score * 100),
+            unit: 'percent',
+            description: 'Lighthouse Best Practices Score'
+          });
+        }
+
+        // SEO 점수 저장
+        if (lighthouseResult.scores.seo?.score) {
+          metricsToSave.push({
+            test_id: testId,
+            metric_type: 'seo_score',
+            metric_name: 'SEO Score',
+            value: Math.round(lighthouseResult.scores.seo.score * 100),
+            unit: 'percent',
+            description: 'Lighthouse SEO Score'
+          });
+        }
       }
 
       // 성능 메트릭 저장

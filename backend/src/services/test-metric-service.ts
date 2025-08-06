@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from './supabase-client';
 
 export interface TestMetric {
   id: string;
@@ -20,23 +20,12 @@ export class TestMetricService {
   private supabase: any;
 
   constructor() {
-    const supabaseUrl = process.env['SUPABASE_URL'];
-    const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
-    
-    console.log('TestMetricService: Supabase URL:', supabaseUrl ? 'Set' : 'Not set');
-    console.log('TestMetricService: Supabase Service Role Key:', supabaseKey ? 'Set' : 'Not set');
-    
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('TestMetricService: Supabase credentials not found, using mock data');
+    try {
+      this.supabase = createServiceClient();
+      console.log('TestMetricService: Supabase client created successfully using createServiceClient');
+    } catch (error) {
+      console.error('TestMetricService: Failed to create Supabase client:', error);
       this.supabase = null;
-    } else {
-      try {
-        this.supabase = createClient(supabaseUrl, supabaseKey);
-        console.log('TestMetricService: Supabase client created successfully');
-      } catch (error) {
-        console.error('TestMetricService: Failed to create Supabase client:', error);
-        this.supabase = null;
-      }
     }
   }
 

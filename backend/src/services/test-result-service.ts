@@ -118,27 +118,47 @@ export class TestResultService {
   async updateResult(result: LoadTestResult): Promise<void> {
     console.log('updateResult called with testId:', result.testId);
     console.log('raw_data length:', result.raw_data?.length || 0);
+    console.log('Update data:', {
+      testId: result.testId,
+      status: result.status,
+      currentStep: result.currentStep,
+      updatedAt: result.updatedAt,
+      hasMetrics: !!result.metrics,
+      hasSummary: !!result.summary,
+      hasDetails: !!result.details,
+      hasConfig: !!result.config
+    });
+    
+    const updateData = {
+      name: result.name,
+      description: result.description, // description 업데이트
+      url: result.url,
+      status: result.status,
+      test_type: result.testType,
+      current_step: result.currentStep,
+      summary: result.summary,
+      metrics: result.metrics,
+      details: result.details,
+      config: result.config, // config 업데이트
+      raw_data: result.raw_data, // raw_data 업데이트
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('Supabase update query data:', updateData);
     
     const { error } = await this.supabaseClient
       .from('m2_test_results')
-      .update({
-        name: result.name,
-        description: result.description, // description 업데이트
-        url: result.url,
-        status: result.status,
-        test_type: result.testType,
-        current_step: result.currentStep,
-        summary: result.summary,
-        metrics: result.metrics,
-        details: result.details,
-        config: result.config, // config 업데이트
-        raw_data: result.raw_data, // raw_data 업데이트
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('test_id', result.testId);
 
     if (error) {
       console.error('Failed to update test result:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       throw error;
     } else {
       console.log('Test result updated successfully in DB');
@@ -284,6 +304,28 @@ export class TestResultService {
     if (error) {
       console.error('Failed to delete test result:', error);
       throw new Error('Failed to delete test result');
+    }
+  }
+
+  /**
+   * running 상태의 모든 테스트 조회
+   */
+  async getRunningTests(): Promise<LoadTestResult[]> {
+    try {
+      const { data, error } = await this.supabaseClient
+        .from('m2_test_results')
+        .select('*')
+        .eq('status', 'running');
+      
+      if (error) {
+        console.error('Failed to fetch running tests:', error);
+        return [];
+      }
+      
+      return data ? data.map(row => this.parseResultFromRow(row)) : [];
+    } catch (error) {
+      console.error('Error fetching running tests:', error);
+      return [];
     }
   }
 

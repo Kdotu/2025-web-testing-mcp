@@ -103,6 +103,32 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 /**
+ * POST /api/load-tests/:id/test-timeout
+ * 타임아웃 테스트 (개발용)
+ */
+router.post('/:id/test-timeout', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { timeoutMs = 30000 } = req.body;
+    
+    if (!id) {
+      throw createValidationError('Test ID is required');
+    }
+    
+    // 타임아웃 테스트 실행
+    await loadTestController.testTimeout(id, timeoutMs);
+    
+    res.json({
+      success: true,
+      message: `Timeout test started for ${timeoutMs}ms`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * POST /api/load-tests/k6-mcp-direct
  * k6 MCP 테스트 실행 (직접 실행 방식)
  */

@@ -1810,6 +1810,36 @@ test('성능 테스트 - ${url}', async ({ page }) => {
 `;
   };
 
+  // Lighthouse 테스트 검증 함수
+  const validateLighthouseTest = (): boolean => {
+    // URL이 유효한지 확인
+    if (!validateUrl(testUrl)) {
+      return false;
+    }
+
+    // Lighthouse 테스트인 경우에만 추가 검증
+    if (selectedTestType === 'lighthouse') {
+      const lighthouseSettings = testSettings?.lighthouse;
+      
+      // lighthouseSettings가 존재하지 않으면 false 반환
+      if (!lighthouseSettings) {
+        return false;
+      }
+      
+      // 디바이스가 선택되었는지 확인
+      if (!lighthouseSettings.device || lighthouseSettings.device.trim() === '') {
+        return false;
+      }
+      
+      // 카테고리가 1개 이상 선택되었는지 확인
+      if (!lighthouseSettings.categories || lighthouseSettings.categories.length === 0) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
       return (
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-8 mx-auto">
@@ -3024,7 +3054,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                 !testUrl ||
                 !selectedTestType ||
                 isExecuting ||
-                  !validateUrl(normalizeUrl(testUrl)) ||
+                  !validateLighthouseTest() ||
                   runningTests.some(test => test.status === "running" || test.status === "실행중")
               }
               className={`
@@ -3034,7 +3064,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                   !testUrl ||
                   !selectedTestType ||
                   isExecuting ||
-                    !validateUrl(normalizeUrl(testUrl)) ||
+                    !validateLighthouseTest() ||
                     runningTests.some(test => test.status === "running" || test.status === "실행중")
                     ? "neu-button opacity-50 cursor-not-allowed text-muted-foreground"
                     : "neu-button-primary text-white"

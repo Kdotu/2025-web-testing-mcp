@@ -280,13 +280,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <div className="neu-pressed rounded-xl px-4 py-3">
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">실시간 테스트 시뮬레이션</span>
-                  </div>
-                </div>
-                <div className="neu-pressed rounded-xl px-4 py-3">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">완전한 UI/UX 경험</span>
+                    <span className="text-sm font-medium">UI 화면 확인</span>
                   </div>
                 </div>
                 <div className="neu-pressed rounded-xl px-4 py-3">
@@ -327,8 +321,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   onClick={() => {
                     console.group('🎭 데모 모드 정보');
                     console.log('현재 상태: 데모 모드 활성화');
-                    console.log('모든 기능: 완전히 사용 가능');
-                    console.log('데이터 저장: 브라우저 로컬 저장소');
+                    // console.log('모든 기능: 완전히 사용 가능');
+                    // console.log('데이터 저장: 브라우저 로컬 저장소');
                     console.log('실제 테스트: 시뮬레이션');
                     console.log('Supabase 연동: window.mcpDebug.setDemoMode(false)');
                     console.groupEnd();

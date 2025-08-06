@@ -1,12 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { E2ETestService } from '../services/e2e-test-service';
+import { TestResultService } from '../services/test-result-service';
 import { createValidationError } from '../middleware/error-handler';
 
 export class E2ETestController {
   private e2eTestService: E2ETestService;
 
   constructor() {
-    this.e2eTestService = new E2ETestService();
+    const testResultService = new TestResultService();
+    this.e2eTestService = new E2ETestService(testResultService);
   }
 
   /**
