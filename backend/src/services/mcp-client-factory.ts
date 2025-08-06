@@ -23,12 +23,13 @@ export class MCPClientFactory {
    */
   static createExternalK6Client(): MCPClient {
     const config: ExternalMCPServerConfig = {
-      command: 'python',
+      command: 'python3',
       args: ['k6_server.py'],
       cwd: join(process.cwd(), 'mcp', 'k6-mcp-server'),
       env: {
         ...process.env,
-        ['K6_BIN']: process.env['K6_BIN'] || 'k6'
+        ['K6_BIN']: process.env['K6_BIN'] || 'k6',
+        ['PYTHON_PATH']: process.env['PYTHON_PATH'] || 'python3'
       }
     };
     return new ExternalMCPClient('external-k6', config);
