@@ -4,10 +4,9 @@ from pathlib import Path
 import sys
 import json
 import os
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Environment variables are already available from the parent process
+# No need to load dotenv
 
 def run_k6_script(script_file: str, duration: str = "30s", vus: int = 10) -> str:
     """Run a k6 load test script.
