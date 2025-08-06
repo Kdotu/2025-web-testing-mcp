@@ -64,6 +64,10 @@ export interface LoadTestResult {
   createdAt: string;
   updatedAt: string;
   rowNumber?: number; // 순차 번호 필드 추가
+  // 프론트엔드 호환성을 위한 필드 추가
+  startTime?: string;
+  endTime?: string;
+  duration?: string | undefined;
 }
 
 /**

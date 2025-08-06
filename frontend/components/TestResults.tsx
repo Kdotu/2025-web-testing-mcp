@@ -533,7 +533,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
 
                       <TableCell className="px-6 py-6 w-[80px] text-center">
                         <div className="neu-subtle rounded-full px-4 py-2 inline-block border-2" style={{ 
-                          borderColor: result.status === 'running' ? '#a5b4fc' : '#7886C7', 
+                          borderColor: '#7886c7', 
                           color: result.status === 'running' ? '#a5b4fc' : '#7886C7',
                           backgroundColor: result.status === 'running' ? '#a5b4fc' : 'transparent'
                         }}>

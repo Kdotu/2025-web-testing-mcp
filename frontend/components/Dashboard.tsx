@@ -87,16 +87,78 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   // 경과 시간 계산 함수 (MM:SS 포맷)
-  const calculateElapsedTime = (startTime: string, endTime?: string): string => {
-    const start = new Date(startTime).getTime();
-    const end = endTime ? new Date(endTime).getTime() : currentTime;
-    const elapsedTime = end - start;
-    const elapsedSeconds = Math.floor(elapsedTime / 1000);
-    
-    const minutes = Math.floor(elapsedSeconds / 60);
-    const seconds = elapsedSeconds % 60;
-    
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  const calculateElapsedTime = (startTime: string | number | Date, endTime?: string | number | Date): string => {
+    try {
+      // startTime이 유효한지 확인
+      if (!startTime) {
+        return '00:00';
+      }
+
+      // startTime을 Date 객체로 변환
+      const start = startTime instanceof Date ? startTime : new Date(startTime);
+      
+      // start가 유효한 날짜인지 확인
+      if (isNaN(start.getTime())) {
+        console.warn('Invalid startTime:', startTime);
+        return '00:00';
+      }
+
+      // endTime 처리
+      let end: Date;
+      if (endTime) {
+        end = endTime instanceof Date ? endTime : new Date(endTime);
+        if (isNaN(end.getTime())) {
+          console.warn('Invalid endTime:', endTime);
+          end = new Date(currentTime);
+        }
+      } else {
+        end = new Date(currentTime);
+      }
+
+      const elapsedTime = end.getTime() - start.getTime();
+      
+      // 음수 시간 방지
+      if (elapsedTime < 0) {
+        return '00:00';
+      }
+
+      const elapsedSeconds = Math.floor(elapsedTime / 1000);
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = elapsedSeconds % 60;
+      
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error('Error calculating elapsed time:', error);
+      return '00:00';
+    }
+  };
+
+  // 안전한 날짜 포맷팅 함수
+  const formatDate = (dateInput: string | number | Date): string => {
+    try {
+      if (!dateInput) {
+        return '날짜 없음';
+      }
+
+      const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+      
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date input:', dateInput);
+        return '날짜 없음';
+      }
+
+      return date.toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '날짜 없음';
+    }
   };
 
   useEffect(() => {
@@ -793,10 +855,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 {(isDemoModeActive || isOfflineMode) && <span className="text-purple-600"> (시뮬레이션 결과)</span>}
               </p>
             </div>
-            <Button className="neu-button rounded-xl">
-              <Play className="h-4 w-4 mr-2" />
-              새 테스트 실행
-            </Button>
           </div>
 
           <div className="space-y-4">
@@ -828,7 +886,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           )}
                         </div>
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                          <span>{new Date(test.startTime).toLocaleString()}</span>
+                          <span>{formatDate(test.startTime)}</span>
                           <span>•</span>
                           <span>경과시간: {
                             test.status === 'running' 
@@ -840,13 +898,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     </div>
                     
                     <div className="flex items-center space-x-4">
-                      {test.score && (
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">점수</p>
-                          <p className="text-2xl font-bold text-primary">{test.score}</p>
-                        </div>
-                      )}
-                      <div className={`neu-pressed rounded-full px-4 py-2 ${getStatusColor(test.status)}`}>
+                    <div className="neu-subtle rounded-full px-4 py-2 inline-block border-2" style={{ 
+                          borderColor: '#7886c7', 
+                          color: test.status === 'running' ? '#a5b4fc' : '#7886C7',
+                          backgroundColor: test.status === 'running' ? '#a5b4fc' : 'transparent'
+                        }}>
+                      {/* <div className={`neu-pressed rounded-full px-4 py-2 ${getStatusColor(test.status)}`}> */}
                       <span className={`font-semibold ${
                             test.status === 'completed' ? 'text-[var(--primary)]' : 
                             test.status === 'failed' ? 'text-gray-500' : 

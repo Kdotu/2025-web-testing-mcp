@@ -81,8 +81,41 @@ export class TestResultService {
       config: row.config || {}, // config 필드 추가
       raw_data: row.raw_data, // raw_data 필드 추가
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      // 프론트엔드 호환성을 위한 필드 추가
+      startTime: row.created_at,
+      endTime: row.status === 'completed' || row.status === 'failed' ? row.updated_at : undefined,
+      duration: row.status === 'completed' || row.status === 'failed' ? 
+        this.calculateDuration(row.created_at, row.updated_at) : undefined
     };
+  }
+
+  /**
+   * 경과 시간 계산 (MM:SS 형식)
+   */
+  private calculateDuration(startTime: string, endTime: string): string {
+    try {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return '00:00';
+      }
+      
+      const elapsedTime = end.getTime() - start.getTime();
+      if (elapsedTime < 0) {
+        return '00:00';
+      }
+      
+      const elapsedSeconds = Math.floor(elapsedTime / 1000);
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = elapsedSeconds % 60;
+      
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error('Error calculating duration:', error);
+      return '00:00';
+    }
   }
 
   /**
