@@ -157,20 +157,5 @@ export class TestTypeController {
     }
   }
 
-  /**
-   * 기본 테스트 타입 초기화
-   */
-  async initializeDefaultTestTypes(_req: Request, res: Response, next: NextFunction) {
-    try {
-      await this.testTypeService.initializeDefaultTestTypes();
-      
-      res.json({
-        success: true,
-        message: '기본 테스트 타입이 초기화되었습니다.',
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+
 } 

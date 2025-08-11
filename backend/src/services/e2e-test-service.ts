@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { E2ETestConfig, E2ETestLocalResult, LoadTestResult } from '../types';
 import { TestResultService } from './test-result-service';
+import { TestTypeService } from './test-type-service';
 
 /**
  * E2E 테스트 서비스 (Playwright MCP 서버 방식)
@@ -11,12 +12,14 @@ import { TestResultService } from './test-result-service';
 export class E2ETestService {
   private runningTests: Map<string, E2ETestLocalResult> = new Map();
   private tempDir: string;
+  private testTypeService: TestTypeService;
 
   constructor(private testResultService: TestResultService) {
     this.tempDir = path.join(process.cwd(), 'temp');
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
     }
+    this.testTypeService = new TestTypeService();
   }
 
   /**
@@ -24,6 +27,15 @@ export class E2ETestService {
    */
   async executeE2ETest(config: E2ETestConfig): Promise<E2ETestLocalResult> {
     const testId = uuidv4();
+    
+    // 테스트 타입에 대한 설정 잠금 획득 시도
+    const testTypeId = this.getTestTypeId();
+    const lockAcquired = await this.testTypeService.acquireTestConfigLock(testTypeId, testId);
+    
+    if (!lockAcquired) {
+      throw new Error(`E2E 테스트 타입 '${testTypeId}'이(가) 이미 잠겨있습니다.`);
+    }
+
     const testResult: E2ETestLocalResult = {
       id: testId,
       url: config.url,
@@ -36,13 +48,27 @@ export class E2ETestService {
 
     this.runningTests.set(testId, testResult);
 
-    // DB에 초기 결과 저장
-    await this.saveInitialResult(testId, config);
+    try {
+      // DB에 초기 결과 저장
+      await this.saveInitialResult(testId, config);
 
-    // Playwright MCP 서버를 사용하여 E2E 테스트 실행
-    this.runPlaywrightViaMCP(testId, config);
+      // Playwright MCP 서버를 사용하여 E2E 테스트 실행
+      this.runPlaywrightViaMCP(testId, config);
 
-    return testResult;
+      return testResult;
+    } catch (error) {
+      // 에러 발생 시 잠금 해제
+      await this.testTypeService.releaseTestConfigLock(testTypeId, testId);
+      throw error;
+    }
+  }
+
+  /**
+   * 테스트 타입 ID 생성
+   */
+  private getTestTypeId(): string {
+    // Playwright E2E 테스트 전용 타입 사용
+    return 'playwright';
   }
 
   /**
@@ -63,11 +89,11 @@ export class E2ETestService {
       await this.parsePlaywrightOutput(testId, result, config);
       
       // 테스트 완료 시 상태 업데이트
-      this.handleTestCompletion(testId, 'completed');
+      await this.handleTestCompletion(testId, 'completed');
 
     } catch (error) {
       console.error('Failed to execute Playwright test via MCP:', error);
-      this.handleTestCompletion(testId, 'failed');
+      await this.handleTestCompletion(testId, 'failed');
       throw error;
     }
   }
@@ -216,12 +242,18 @@ export class E2ETestService {
   /**
    * 테스트 완료 처리
    */
-  private handleTestCompletion(testId: string, status: 'running' | 'completed' | 'failed' | 'cancelled') {
+  private async handleTestCompletion(testId: string, status: 'running' | 'completed' | 'failed' | 'cancelled') {
     const result = this.runningTests.get(testId);
     if (result) {
       result.status = status;
       result.endTime = new Date().toISOString();
       this.runningTests.set(testId, result);
+      
+      // 테스트 완료 시 잠금 해제
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        const testTypeId = this.getTestTypeId();
+        await this.testTypeService.releaseTestConfigLock(testTypeId, testId);
+      }
     }
     this.cleanupTempFiles(testId);
   }

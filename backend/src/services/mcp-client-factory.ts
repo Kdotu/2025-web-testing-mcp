@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { spawn } from 'child_process';
+import { MCPProcessManager } from './mcp-process-manager';
 
 // MCP 클라이언트 인터페이스
 interface MCPClient {
@@ -17,22 +17,31 @@ interface ExternalMCPServerConfig {
 }
 
 export class MCPClientFactory {
+  private static processManager: MCPProcessManager | null = null;
+
+  static getProcessManager(): MCPProcessManager {
+    if (!this.processManager) {
+      this.processManager = new MCPProcessManager();
+    }
+    return this.processManager;
+  }
+
   /**
    * 외부 k6 MCP 서버 클라이언트 생성
    * 현재 backend/mcp/k6-mcp-server 활용
    */
   static createExternalK6Client(): MCPClient {
     const config: ExternalMCPServerConfig = {
-      command: 'python3',
+      command: process.platform === 'win32' ? 'python' : 'python3',
       args: ['k6_server.py'],
       cwd: join(process.cwd(), 'mcp', 'k6-mcp-server'),
       env: {
         ...process.env,
         ['K6_BIN']: process.env['K6_BIN'] || 'k6',
-        ['PYTHON_PATH']: process.env['PYTHON_PATH'] || 'python3'
+        ['PYTHON_PATH']: process.env['PYTHON_PATH'] || (process.platform === 'win32' ? 'python' : 'python3')
       }
     };
-    return new ExternalMCPClient('external-k6', config);
+    return new ExternalMCPClient('external-k6', config, this.getProcessManager());
   }
 
   /**
@@ -69,7 +78,7 @@ export class MCPClientFactory {
         ['LIGHTHOUSE_BIN']: process.env['LIGHTHOUSE_BIN'] || 'npx lighthouse'
       }
     };
-    return new ExternalMCPClient('external-lighthouse', config);
+    return new ExternalMCPClient('external-lighthouse', config, this.getProcessManager());
   }
 
   /**
@@ -105,7 +114,7 @@ export class MCPClientFactory {
         ['PLAYWRIGHT_BIN']: process.env['PLAYWRIGHT_BIN'] || 'npx playwright'
       }
     };
-    return new ExternalMCPClient('external-playwright', config);
+    return new ExternalMCPClient('external-playwright', config, this.getProcessManager());
   }
 
   /**
@@ -187,64 +196,63 @@ export class MCPClientFactory {
 class ExternalMCPClient implements MCPClient {
   private serverName: string;
   private config: ExternalMCPServerConfig;
+  private processManager: MCPProcessManager;
+  private processId: string | null = null;
 
-  constructor(serverName: string, config: ExternalMCPServerConfig) {
+  constructor(serverName: string, config: ExternalMCPServerConfig, processManager: MCPProcessManager) {
     this.serverName = serverName;
     this.config = config;
+    this.processManager = processManager;
   }
 
   async initialize(): Promise<void> {
     console.log(`[External MCP Client] Initializing ${this.serverName} client`);
-    console.log(`[External MCP Client] Command: ${this.config.command} ${this.config.args.join(' ')}`);
-    console.log(`[External MCP Client] CWD: ${this.config.cwd}`);
+    
+    try {
+      // 프로세스 매니저를 통해 서버 시작
+      this.processId = await this.processManager.startServer({
+        name: this.serverName,
+        command: this.config.command,
+        args: this.config.args,
+        cwd: this.config.cwd || process.cwd(),
+        env: this.config.env || process.env
+      });
+      
+      console.log(`[External MCP Client] ${this.serverName} client initialized with process ID: ${this.processId}`);
+    } catch (error) {
+      console.error(`[External MCP Client] Failed to initialize ${this.serverName} client:`, error);
+      throw error;
+    }
   }
 
   async callTool(method: string, params: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      console.log(`[External MCP Client] Calling ${method} on ${this.serverName}`);
+    try {
+      // 프로세스가 실행 중이 아니면 시작
+      if (!this.processId) {
+        await this.initialize();
+      }
 
-      const childProcess = spawn(this.config.command, this.config.args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: this.config.cwd,
-        env: this.config.env
-      });
-
-      let output = '';
-      let errorOutput = '';
-
-      childProcess.stdout.on('data', (data: Buffer) => {
-        output += data.toString();
-      });
-
-      childProcess.stderr.on('data', (data: Buffer) => {
-        errorOutput += data.toString();
-      });
-
-      childProcess.on('close', (code: number) => {
-        if (code === 0) {
-          try {
-            const response = JSON.parse(output);
-            resolve(response);
-          } catch (error) {
-            reject(new Error(`Failed to parse response: ${output}`));
-          }
-        } else {
-          reject(new Error(`Process exited with code ${code}: ${errorOutput}`));
-        }
-      });
-
-      childProcess.on('error', (error: Error) => {
-        reject(error);
-      });
-
-      const request = { method, params };
-      childProcess.stdin.write(JSON.stringify(request) + '\n');
-      childProcess.stdin.end();
-    });
+      // 프로세스 매니저를 통해 통신
+      const result = await this.processManager.executeCommand(this.processId!, method, params);
+      return result;
+    } catch (error) {
+      console.error(`[External MCP Client] Error calling ${method} on ${this.serverName}:`, error);
+      throw error;
+    }
   }
 
   async close(): Promise<void> {
     console.log(`[External MCP Client] Closing ${this.serverName} client`);
+    
+    if (this.processId) {
+      try {
+        await this.processManager.stopServer(this.processId);
+        this.processId = null;
+        console.log(`[External MCP Client] ${this.serverName} client closed successfully`);
+      } catch (error) {
+        console.error(`[External MCP Client] Error closing ${this.serverName} client:`, error);
+      }
+    }
   }
 }
 
@@ -252,116 +260,84 @@ class ExternalMCPClient implements MCPClient {
 class SimpleMCPClient implements MCPClient {
   private serverPath: string;
   private serverName: string;
+  private processManager: MCPProcessManager;
+  private processId: string | null = null;
 
   constructor(serverName: string, serverPath: string) {
     this.serverName = serverName;
     this.serverPath = serverPath;
+    this.processManager = MCPClientFactory.getProcessManager();
   }
 
   async initialize(): Promise<void> {
     console.log(`[Local MCP Client] Initializing ${this.serverName} client`);
-  }
-
-  async callTool(method: string, params: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      console.log(`[Local MCP Client] Calling ${method} on ${this.serverName}`);
-      
-      const isWindows = global.process.platform === 'win32';
+    
+    try {
       const isPythonFile = this.serverPath.endsWith('.py');
       const isTypeScriptFile = this.serverPath.endsWith('.ts');
       
-      let childProcess;
+      let command: string;
+      let args: string[];
       
       if (isPythonFile) {
-        // Python 경로 결정 (여러 가능한 경로 시도)
-        const possiblePythonPaths = [
-          process.env['PYTHON_PATH'],
-          '/usr/bin/python3',
-          '/usr/bin/python',
-          'python3',
-          'python'
-        ].filter(Boolean);
-        
-        let pythonPath = possiblePythonPaths[0] || 'python3';
-        
-        // 실제로 존재하는 Python 경로 찾기
-        for (const path of possiblePythonPaths) {
-          if (!path) continue;
-          try {
-            const { execSync } = require('child_process');
-            execSync(`${path} --version`, { stdio: 'ignore' });
-            pythonPath = path;
-            break;
-          } catch (error) {
-            // 이 경로는 사용할 수 없음, 다음 경로 시도
-            continue;
-          }
-        }
-        
-        console.log(`[Local MCP Client] Using Python path: ${pythonPath}`);
-        
-        childProcess = spawn(pythonPath, [this.serverPath], {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            // Python 관련 환경변수 설정
-            PYTHONPATH: process.env['PYTHONPATH'] || '',
-            PYTHONUNBUFFERED: '1',
-            PYTHON_PATH: pythonPath
-          }
-        });
+        // Python 경로 결정
+        const pythonPath = process.env['PYTHON_PATH'] || 'python3';
+        command = pythonPath;
+        args = [this.serverPath];
       } else if (isTypeScriptFile) {
-        childProcess = isWindows 
-          ? spawn('cmd', ['/c', 'npx', 'ts-node', this.serverPath], {
-              stdio: ['pipe', 'pipe', 'pipe'],
-              env: process.env
-            })
-          : spawn('npx', ['ts-node', this.serverPath], {
-              stdio: ['pipe', 'pipe', 'pipe'],
-              env: process.env
-            });
-      } else {
-        childProcess = spawn('node', [this.serverPath], {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: process.env
-        });
-      }
-
-      let output = '';
-      let errorOutput = '';
-
-      childProcess.stdout.on('data', (data: Buffer) => {
-        output += data.toString();
-      });
-
-      childProcess.stderr.on('data', (data: Buffer) => {
-        errorOutput += data.toString();
-      });
-
-      childProcess.on('close', (code: number) => {
-        if (code === 0) {
-          try {
-            const response = JSON.parse(output);
-            resolve(response);
-          } catch (error) {
-            reject(new Error(`Failed to parse response: ${output}`));
-          }
+        const isWindows = global.process.platform === 'win32';
+        if (isWindows) {
+          command = 'cmd';
+          args = ['/c', 'npx', 'ts-node', this.serverPath];
         } else {
-          reject(new Error(`Process exited with code ${code}: ${errorOutput}`));
+          command = 'npx';
+          args = ['ts-node', this.serverPath];
         }
+      } else {
+        command = 'node';
+        args = [this.serverPath];
+      }
+      
+      // 프로세스 매니저를 통해 서버 시작
+      this.processId = await this.processManager.startServer({
+        name: this.serverName,
+        command,
+        args,
+        cwd: process.cwd(),
+        env: process.env
       });
+      
+      console.log(`[Local MCP Client] ${this.serverName} client initialized with process ID: ${this.processId}`);
+    } catch (error) {
+      console.error(`[Local MCP Client] Failed to initialize ${this.serverName} client:`, error);
+      throw error;
+    }
+  }
 
-      childProcess.on('error', (error: Error) => {
-        reject(error);
-      });
-
-      const request = { method, params };
-      childProcess.stdin.write(JSON.stringify(request) + '\n');
-      childProcess.stdin.end();
-    });
+  async callTool(method: string, params: any): Promise<any> {
+    if (!this.processId) {
+      throw new Error('Client not initialized');
+    }
+    
+    try {
+      return await this.processManager.executeCommand(this.processId, method, params);
+    } catch (error) {
+      console.error(`[Local MCP Client] Error calling ${method} on ${this.serverName}:`, error);
+      throw error;
+    }
   }
 
   async close(): Promise<void> {
     console.log(`[Local MCP Client] Closing ${this.serverName} client`);
+    
+    if (this.processId) {
+      try {
+        await this.processManager.stopServer(this.processId);
+        this.processId = null;
+        console.log(`[Local MCP Client] ${this.serverName} client closed successfully`);
+      } catch (error) {
+        console.error(`[Local MCP Client] Error closing ${this.serverName} client:`, error);
+      }
+    }
   }
 } 

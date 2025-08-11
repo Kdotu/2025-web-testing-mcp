@@ -3,6 +3,7 @@ import { join } from 'path';
 import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { MCPServiceWrapper } from './mcp-service-wrapper';
+import { TestTypeService } from './test-type-service';  
 
 /**
  * k6 MCP 테스트 실행 서비스
@@ -13,10 +14,12 @@ export class K6Service {
   private timeoutTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly TIMEOUT_DURATION = 10 * 60 * 1000; // 10분 (밀리초)
   private mcpWrapper: MCPServiceWrapper;
+  private testTypeService: TestTypeService;
 
   constructor() {
     // MCP 서버는 별도 프로세스로 실행
     this.mcpWrapper = new MCPServiceWrapper();
+    this.testTypeService = new TestTypeService();
   }
 
   /**
@@ -24,6 +27,15 @@ export class K6Service {
    */
   async executeTest(testId: string, config: LoadTestConfig): Promise<void> {
     console.log('[K6Service] Executing test via direct execution');
+    
+    // 테스트 타입에 대한 설정 잠금 획득 시도
+    const testTypeId = this.getTestTypeId();
+    const lockAcquired = await this.testTypeService.acquireTestConfigLock(testTypeId, testId);
+    
+    if (!lockAcquired) {
+      throw new Error(`k6 테스트 타입 '${testTypeId}'이(가) 이미 잠겨있습니다.`);
+    }
+
     try {
       // 테스트 시작 시 상태를 running으로 설정
       this.runningTests.set(testId, { status: 'running', startTime: new Date() });
@@ -42,13 +54,21 @@ export class K6Service {
       this.parseK6Output(testId, result, config);
       
       // 테스트 완료 시 상태 업데이트
-      this.handleTestCompletion(testId, 'completed');
+      await this.handleTestCompletion(testId, 'completed');
 
     } catch (error) {
       console.error('Failed to execute k6 test:', error);
-      this.handleTestCompletion(testId, 'failed');
+      await this.handleTestCompletion(testId, 'failed');
       throw error;
     }
+  }
+
+  /**
+   * 테스트 타입 ID 생성
+   */
+  private getTestTypeId(): string {
+    // k6는 부하 테스트로 분류
+    return 'load';
   }
 
   /**
@@ -1298,7 +1318,7 @@ export default function () {
   /**
    * 테스트 완료 처리
    */
-  private handleTestCompletion(testId: string, status: LoadTestResult['status']): void {
+  private async handleTestCompletion(testId: string, status: LoadTestResult['status']): Promise<void> {
     // 타임아웃 타이머 제거
     this.clearTestTimeout(testId);
     
@@ -1308,6 +1328,16 @@ export default function () {
       result.completedAt = new Date().toISOString();
       this.testResults.set(testId, result);
     }
+
+          // 테스트 완료 시 잠금 해제
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        const runningTest = this.runningTests.get(testId);
+        if (runningTest) {
+          // config 정보가 없으므로 기본값 사용
+          const testTypeId = `k6_load`;
+          await this.testTypeService.releaseTestConfigLock(testTypeId, testId);
+        }
+      }
 
     // 임시 파일 정리
     this.cleanupTempFiles(testId);

@@ -160,12 +160,28 @@ export class DocumentationController {
 
       console.log('최종 찾은 문서:', document);
 
+      // 파일 존재 여부 및 접근 가능성 검증 강화
       if (!await fs.pathExists(document.filepath)) {
         console.error('파일이 존재하지 않음 - filepath:', document.filepath);
         throw createValidationError('파일이 존재하지 않습니다.');
       }
 
-      console.log('파일 다운로드 시작 - filepath:', document.filepath);
+      // 파일 읽기 권한 확인
+      try {
+        await fs.access(document.filepath, fs.constants.R_OK);
+      } catch (accessError: any) {
+        console.error('파일 읽기 권한 없음 - filepath:', document.filepath, 'error:', accessError.message);
+        throw createValidationError('파일을 읽을 수 있는 권한이 없습니다.');
+      }
+
+      // 파일 크기 확인
+      const stats = await fs.stat(document.filepath);
+      if (stats.size === 0) {
+        console.error('파일이 비어있음 - filepath:', document.filepath);
+        throw createValidationError('파일이 비어있습니다.');
+      }
+
+      console.log('파일 다운로드 시작 - filepath:', document.filepath, 'size:', stats.size);
       
       // 파일 스트림 생성
       const fileStream = fs.createReadStream(document.filepath);
@@ -177,10 +193,24 @@ export class DocumentationController {
       
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
+      res.setHeader('Content-Length', stats.size.toString());
       
       // 파일 스트림을 응답으로 전송
       fileStream.pipe(res);
-    } catch (error) {
+      
+      // 스트림 에러 처리
+      fileStream.on('error', (streamError: any) => {
+        console.error('파일 스트림 에러:', streamError);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: '파일 읽기 중 오류가 발생했습니다.',
+            timestamp: new Date().toISOString()
+          });
+        }
+      });
+      
+    } catch (error: any) {
       console.error('문서 다운로드 오류:', error);
       next(error);
     }

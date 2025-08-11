@@ -163,14 +163,75 @@ export function Documentation({ testId, testName }: DocumentationProps) {
   };
 
   // 문서 다운로드
-  const handleDownload = (doc: DocumentInfo) => {
-    const url = getDocumentDownloadUrl(doc.id);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = doc.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (doc: DocumentInfo) => {
+    try {
+      console.log('문서 다운로드 시작:', doc);
+      
+      // 다운로드 버튼 비활성화
+      const downloadButton = document.querySelector(`[data-document-id="${doc.id}"]`);
+      if (downloadButton) {
+        downloadButton.setAttribute('disabled', 'true');
+        downloadButton.innerHTML = '<div class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mr-2"></div>다운로드 중...';
+      }
+      
+      const url = getDocumentDownloadUrl(doc.id);
+      console.log('다운로드 URL:', url);
+      
+      // fetch를 사용하여 파일 다운로드 상태 확인
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status} ${response.statusText}`);
+      }
+      
+      // 파일 내용을 blob으로 변환
+      const blob = await response.blob();
+      
+      // 다운로드 링크 생성 및 클릭
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = doc.filename;
+      link.target = '_blank';
+      
+      // 링크를 DOM에 추가하고 클릭
+      document.body.appendChild(link);
+      link.click();
+      
+      // 정리
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      
+      // 성공 메시지
+      setSuccess(`${doc.type.toUpperCase()} 문서가 다운로드되었습니다.`);
+      setTimeout(() => setSuccess(null), 3000);
+      
+    } catch (error: any) {
+      console.error('문서 다운로드 오류:', error);
+      
+      // 사용자에게 구체적인 에러 메시지 표시
+      let errorMessage = '문서 다운로드에 실패했습니다.';
+      
+      if (error.message.includes('404')) {
+        errorMessage = '문서를 찾을 수 없습니다. 문서가 삭제되었거나 이동되었을 수 있습니다.';
+      } else if (error.message.includes('403')) {
+        errorMessage = '문서에 접근할 권한이 없습니다.';
+      } else if (error.message.includes('500')) {
+        errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+      } else if (error.message.includes('Failed to fetch')) {
+        errorMessage = '서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.';
+      }
+      
+      setError(errorMessage);
+      setTimeout(() => setError(null), 5000);
+      
+    } finally {
+      // 다운로드 버튼 상태 복원
+      const downloadButton = document.querySelector(`[data-document-id="${doc.id}"]`);
+      if (downloadButton) {
+        downloadButton.removeAttribute('disabled');
+        downloadButton.innerHTML = '<Download className="h-3 w-3" />';
+      }
+    }
   };
 
   // 문서 미리보기
@@ -380,6 +441,7 @@ export function Documentation({ testId, testName }: DocumentationProps) {
                           size="sm"
                           variant="outline"
                           onClick={() => handleDownload(document)}
+                          data-document-id={document.id}
                         >
                           <Download className="h-3 w-3" />
                         </Button>

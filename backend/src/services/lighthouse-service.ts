@@ -1,6 +1,7 @@
 import { LoadTestConfig, LoadTestResult } from '../types';
 import { join } from 'path';
 import { spawn } from 'child_process';
+import { TestTypeService } from './test-type-service';
 
 /**
  * Lighthouse MCP 테스트 실행 서비스
@@ -8,15 +9,33 @@ import { spawn } from 'child_process';
 export class LighthouseService {
   private runningTests: Map<string, any> = new Map();
   private testResults: Map<string, any> = new Map();
+  private testTypeService: TestTypeService;
 
   constructor() {
     // MCP 서버는 별도 프로세스로 실행
+    this.testTypeService = new TestTypeService();
+  }
+
+  /**
+   * 테스트 타입 ID 생성
+   */
+  private getTestTypeId(): string {
+    // Lighthouse 전용 테스트 타입 사용
+    return 'lighthouse';
   }
 
   /**
    * Lighthouse 테스트 실행 (MCP 서버 방식)
    */
   async executeTest(id: string, testId: string, config: LoadTestConfig): Promise<void> {
+    // 테스트 타입에 대한 설정 잠금 획득 시도
+    const testTypeId = this.getTestTypeId();
+    const lockAcquired = await this.testTypeService.acquireTestConfigLock(testTypeId, testId);
+    
+    if (!lockAcquired) {
+      throw new Error(`Lighthouse 테스트 타입 '${testTypeId}'이(가) 이미 잠겨있습니다.`);
+    }
+
     try {
       // 테스트 시작 시 상태를 running으로 설정
       this.runningTests.set(testId, { status: 'running', startTime: new Date() });
@@ -29,11 +48,11 @@ export class LighthouseService {
       await this.parseLighthouseOutput(id, testId, result, config);
       
       // 테스트 완료 시 상태 업데이트
-      this.handleTestCompletion(testId, 'completed');
+      await this.handleTestCompletion(testId, 'completed');
 
     } catch (error) {
       console.error('Failed to execute Lighthouse test via MCP:', error);
-      this.handleTestCompletion(testId, 'failed');
+      await this.handleTestCompletion(testId, 'failed');
       throw error;
     }
   }
@@ -769,18 +788,26 @@ export class LighthouseService {
     if (test) {
       // Lighthouse 프로세스 종료 로직 (필요시 구현)
       this.runningTests.delete(testId);
-      this.handleTestCompletion(testId, 'cancelled');
+      await this.handleTestCompletion(testId, 'cancelled');
     }
   }
 
   /**
    * 테스트 완료 처리
    */
-  private handleTestCompletion(testId: string, status: LoadTestResult['status']): void {
+  private async handleTestCompletion(testId: string, status: LoadTestResult['status']): Promise<void> {
     const test = this.runningTests.get(testId);
     if (test) {
       test.status = status;
       test.endTime = new Date();
+      
+      // 테스트 완료 시 잠금 해제
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        // config 정보가 없으므로 기본값 사용
+        const testTypeId = `lighthouse_default`;
+        await this.testTypeService.releaseTestConfigLock(testTypeId, testId);
+      }
+      
       this.runningTests.delete(testId);
       console.log(`Lighthouse test ${testId} completed with status: ${status}`);
     }

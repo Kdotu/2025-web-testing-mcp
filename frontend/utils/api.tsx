@@ -87,7 +87,16 @@ export interface TestType {
   name: string;
   description: string;
   enabled: boolean;
+  category?: string;
+  icon?: string;
+  color?: string;
+  config_template?: any;
   mcp_tool?: string;
+  is_locked?: boolean;
+  locked_by?: string;
+  lock_type?: 'config' | 'execution';
+  created_at?: string;
+  updated_at?: string;
 }
 
 // 연결 상태 체크를 위한 유틸리티 함수
@@ -655,11 +664,11 @@ export const getSettings = async () => {
 // 테스트 타입 목록 조회
 export const getTestTypes = async () => {
   const defaultTestTypes = [
-    { id: "performance", name: "성능 테스트", description: "페이지 로딩 속도 및 성능 측정", enabled: true },
-    { id: "lighthouse", name: "Lighthouse", description: "웹페이지 품질 종합 분석", enabled: true },
-    { id: "load", name: "부하 테스트", description: "동시 접속 및 부하 처리 능력 측정", enabled: true },
-    { id: "security", name: "보안 테스트", description: "웹사이트 보안 취약점 검사", enabled: true },
-    { id: "accessibility", name: "접근성 테스트", description: "웹 접근성 준수 검사", enabled: true },
+    { id: "performance", name: "성능 테스트", description: "페이지 로딩 속도 및 성능 측정", enabled: true, category: "builtin" },
+    { id: "lighthouse", name: "Lighthouse", description: "웹페이지 품질 종합 분석", enabled: true, category: "builtin" },
+    { id: "load", name: "부하 테스트", description: "동시 접속 및 부하 처리 능력 측정", enabled: true, category: "builtin" },
+    { id: "security", name: "보안 테스트", description: "웹사이트 보안 취약점 검사", enabled: true, category: "builtin" },
+    { id: "accessibility", name: "접근성 테스트", description: "웹 접근성 준수 검사", enabled: true, category: "builtin" },
   ];
 
   try {
@@ -685,11 +694,20 @@ export const getTestTypes = async () => {
       setOfflineData('testTypes', data.data);
       return data;
     } else {
-      // 백엔드 API가 실패하면 기본 데이터 반환
+      // 백엔드 API가 실패했을 때 데모 모드가 아니면 빈 배열 반환
+      if (!isDemoMode()) {
+        return {
+          success: false,
+          data: [],
+          error: '백엔드 연결 실패: 테스트 타입을 불러올 수 없습니다.'
+        };
+      }
+      
+      // 데모 모드일 때만 기본 데이터 반환
       return {
         success: true,
         data: defaultTestTypes,
-        message: '백엔드 연결 실패: 기본 테스트 타입을 표시합니다.'
+        message: '데모 모드: 기본 테스트 타입을 표시합니다.'
       };
     }
   } catch (error: any) {
@@ -698,20 +716,35 @@ export const getTestTypes = async () => {
     // 오프라인 데이터가 있으면 사용
     const offlineData = getOfflineData();
     if (offlineData.testTypes && offlineData.testTypes.length > 0) {
+      // 오프라인 데이터에 category가 없으면 builtin으로 설정
+      const offlineTypesWithCategory = offlineData.testTypes.map(testType => ({
+        ...testType,
+        category: testType.category || 'builtin'
+      }));
+      
       return {
         success: true,
-        data: offlineData.testTypes,
+        data: offlineTypesWithCategory,
         offline: true,
         message: '오프라인 모드: 저장된 테스트 타입을 표시합니다.'
       };
     }
     
-    // 기본 데이터 반환
+    // 데모 모드가 아니면 빈 배열 반환
+    if (!isDemoMode()) {
+      return {
+        success: false,
+        data: [],
+        error: '백엔드 연결 실패: 테스트 타입을 불러올 수 없습니다.'
+      };
+    }
+    
+    // 데모 모드일 때만 기본 데이터 반환
     return {
       success: true,
       data: defaultTestTypes,
       offline: true,
-      message: '오프라인 모드: 기본 테스트 타입을 표시합니다.'
+      message: '데모 모드: 기본 테스트 타입을 표시합니다.'
     };
   }
 };

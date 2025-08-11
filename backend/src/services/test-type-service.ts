@@ -10,11 +10,18 @@ export interface TestType {
   color?: string;
   config_template?: any;
   mcp_tool?: string;
+  is_locked?: boolean;
+  locked_by?: string;
+  lock_type?: 'config' | 'execution';
   created_at?: string;
   updated_at?: string;
 }
 
 export class TestTypeService {
+  constructor() {
+    // DB 기반 잠금 시스템 사용
+  }
+
   /**
    * 모든 테스트 타입 조회
    */
@@ -94,6 +101,21 @@ export class TestTypeService {
    */
   async updateTestType(id: string, updates: Partial<TestType>): Promise<TestType> {
     try {
+      // 테스트 타입이 잠겨있는지 확인
+      const existingTestType = await this.getTestTypeById(id);
+      if (!existingTestType) {
+        throw new Error(`테스트 타입 '${id}'을 찾을 수 없습니다.`);
+      }
+
+      // 잠금 해제를 위한 업데이트인 경우 허용
+      if (existingTestType.is_locked && updates.is_locked === false) {
+        console.log(`[TestTypeService] 테스트 타입 '${id}'의 잠금 해제 허용`);
+      }
+      // 잠금 상태에서 다른 필드 수정을 시도하는 경우 차단
+      else if (existingTestType.is_locked && updates.is_locked !== false) {
+        throw new Error(`테스트 타입 '${existingTestType.name}'이(가) 잠겨있습니다. 테스트 ID: ${existingTestType.locked_by}`);
+      }
+
       const { data, error } = await supabase
         .from('m2_test_types')
         .update({
@@ -121,6 +143,17 @@ export class TestTypeService {
    */
   async deleteTestType(id: string): Promise<void> {
     try {
+      // 테스트 타입이 잠겨있는지 확인
+      const existingTestType = await this.getTestTypeById(id);
+      if (!existingTestType) {
+        throw new Error(`테스트 타입 '${id}'을 찾을 수 없습니다.`);
+      }
+
+      // 잠금된 테스트 타입은 삭제 불가
+      if (existingTestType.is_locked) {
+        throw new Error(`테스트 타입 '${existingTestType.name}'이(가) 잠겨있습니다. 테스트 ID: ${existingTestType.locked_by}`);
+      }
+
       const { error } = await supabase
         .from('m2_test_types')
         .delete()
@@ -144,99 +177,165 @@ export class TestTypeService {
   }
 
   /**
-   * 기본 테스트 타입 초기화
+   * 테스트 실행 시 설정 잠금 획득
    */
-  async initializeDefaultTestTypes(): Promise<void> {
+  async acquireTestConfigLock(testTypeId: string, testId: string): Promise<boolean> {
     try {
-      const defaultTestTypes = [
-        {
-          id: 'performance',
-          name: '성능테스트',
-          description: '웹사이트 성능 및 응답 시간 테스트',
-          enabled: true,
-          category: 'builtin',
-          icon: 'BarChart3',
-          color: '#7886C7',
-          config_template: { duration: '30s', vus: 10 }
-        },
-        {
-          id: 'load',
-          name: '부하테스트',
-          description: '높은 부하 상황에서의 시스템 안정성 테스트',
-          enabled: true,
-          category: 'builtin',
-          icon: 'Activity',
-          color: '#9BA8E8',
-          config_template: { duration: '1m', vus: 50 }
-        },
-        {
-          id: 'stress',
-          name: '스트레스테스트',
-          description: '시스템 한계점을 찾는 테스트',
-          enabled: true,
-          category: 'builtin',
-          icon: 'Zap',
-          color: '#6773C0',
-          config_template: { duration: '2m', vus: 100 }
-        },
-        {
-          id: 'spike',
-          name: '스파이크테스트',
-          description: '갑작스러운 트래픽 증가 테스트',
-          enabled: true,
-          category: 'builtin',
-          icon: 'TrendingUp',
-          color: '#4F5BA3',
-          config_template: { duration: '30s', vus: 200 }
-        },
-        {
-          id: 'security',
-          name: '보안테스트',
-          description: '웹사이트 보안 취약점 테스트',
-          enabled: true,
-          category: 'builtin',
-          icon: 'Shield',
-          color: '#A9B5DF',
-          config_template: { duration: '1m', vus: 5 }
-        },
-        {
-          id: 'accessibility',
-          name: '접근성테스트',
-          description: '웹 접근성 준수 검사',
-          enabled: true,
-          category: 'builtin',
-          icon: 'Eye',
-          color: '#7886C7',
-          config_template: { duration: '30s', vus: 1 }
-        }
-      ];
+      // 이미 잠겨있는지 확인
+      const existingTestType = await this.getTestTypeById(testTypeId);
+      if (!existingTestType) {
+        throw new Error(`테스트 타입 '${testTypeId}'을 찾을 수 없습니다.`);
+      }
 
-      // 기존 데이터 확인
-      const { data: existingData } = await supabase
-        .from('m2_test_types')
-        .select('id')
-        .in('id', defaultTestTypes.map(t => t.id));
-
-      const existingIds = existingData?.map(t => t.id) || [];
-      const newTestTypes = defaultTestTypes.filter(t => !existingIds.includes(t.id));
-
-      if (newTestTypes.length > 0) {
-        const { error } = await supabase
-          .from('m2_test_types')
-          .insert(newTestTypes.map(t => ({
-            ...t,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })));
-
-        if (error) {
-          console.error('Error initializing default test types:', error);
-          throw new Error(error.message);
+      if (existingTestType.is_locked) {
+        // locked_by가 null인 경우 (비정상 상태) 잠금 해제 후 재시도
+        if (!existingTestType.locked_by) {
+          console.log(`[TestTypeService] 테스트 타입 '${testTypeId}'의 비정상 잠금 상태 감지, 잠금 해제 후 재시도`);
+          await this.forceReleaseLock(testTypeId);
+        } else {
+          console.log(`[TestTypeService] 테스트 타입 '${testTypeId}'이(가) 이미 잠겨있습니다. (테스트: ${existingTestType.locked_by})`);
+          return false;
         }
       }
+
+      // 잠금 획득
+      const { error } = await supabase
+        .from('m2_test_types')
+        .update({
+          is_locked: true,
+          locked_by: testId,
+          lock_type: 'config',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', testTypeId);
+
+      if (error) {
+        console.error('Error acquiring test config lock:', error);
+        return false;
+      }
+
+      console.log(`[TestTypeService] 테스트 타입 '${testTypeId}' 설정 잠금 획득 (테스트: ${testId})`);
+      return true;
     } catch (error) {
-      console.error('Error in initializeDefaultTestTypes:', error);
+      console.error('Error acquiring test config lock:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 테스트 완료 시 설정 잠금 해제
+   */
+  async releaseTestConfigLock(testTypeId: string, testId: string): Promise<boolean> {
+    try {
+      // 잠금 상태 확인
+      const existingTestType = await this.getTestTypeById(testTypeId);
+      if (!existingTestType || !existingTestType.is_locked) {
+        return true; // 이미 잠금이 해제된 상태
+      }
+
+      // 잠금을 획득한 테스트가 맞는지 확인
+      if (existingTestType.locked_by !== testId) {
+        console.warn(`[TestTypeService] 잠금 해제 실패: 테스트 ID 불일치 (예상: ${testId}, 실제: ${existingTestType.locked_by})`);
+        return false;
+      }
+
+      // 잠금 해제
+      const { error } = await supabase
+        .from('m2_test_types')
+        .update({
+          is_locked: false,
+          locked_by: null,
+          lock_type: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', testTypeId);
+
+      if (error) {
+        console.error('Error releasing test config lock:', error);
+        return false;
+      }
+
+      console.log(`[TestTypeService] 테스트 타입 '${testTypeId}' 설정 잠금 해제 (테스트: ${testId})`);
+      return true;
+    } catch (error) {
+      console.error('Error releasing test config lock:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 테스트 타입 ID로 조회
+   */
+  async getTestTypeById(id: string): Promise<TestType | null> {
+    try {
+      const { data, error } = await supabase
+        .from('m2_test_types')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching test type by id:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getTestTypeById:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 잠금된 테스트 타입 조회
+   */
+  async getLockedTestTypes(): Promise<TestType[]> {
+    try {
+      const { data, error } = await supabase
+        .from('m2_test_types')
+        .select('*')
+        .eq('is_locked', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching locked test types:', error);
+        throw new Error(error.message);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getLockedTestTypes:', error);
       throw error;
     }
   }
+
+  /**
+   * 테스트 타입 잠금 강제 해제 (관리자용)
+   */
+  async forceReleaseLock(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('m2_test_types')
+        .update({
+          is_locked: false,
+          locked_by: null,
+          lock_type: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error force releasing lock:', error);
+        return false;
+      }
+
+      console.log(`[TestTypeService] 테스트 타입 '${id}' 잠금 강제 해제 완료`);
+      return true;
+    } catch (error) {
+      console.error('Error in forceReleaseLock:', error);
+      return false;
+    }
+  }
+
+
 } 

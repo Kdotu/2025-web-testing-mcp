@@ -9,8 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { Plus, Trash2, Edit, Save, Bell, Database, Settings as SettingsIcon, Cog, Activity, CheckCircle, Shield, AlertCircle } from "lucide-react";
-import { getTestTypes, addTestType, updateTestType, deleteTestType, type TestType } from "../utils/api";
+import { Plus, Trash2, Edit, Save, Bell, Database, Settings as SettingsIcon, Cog, Activity, CheckCircle, Shield, AlertCircle, Lock, Unlock } from "lucide-react";
+import { getTestTypes, addTestType, updateTestType, deleteTestType, type TestType, isDemoMode } from "../utils/api";
 import { toast } from "sonner";
 import { TestTypeModal } from "./TestTypeModal";
 
@@ -41,11 +41,14 @@ export function Settings({ onNavigate }: SettingsProps) {
     try {
       const result = await getTestTypes();
       if (result.success && result.data) {
-        setTestTypes(result.data);
+        // DB 데이터 우선으로 정렬 및 그룹화
+        const sortedTestTypes = sortTestTypesByCategory(result.data);
+        setTestTypes(sortedTestTypes);
       } else {
         // API 실패 시에도 데이터가 있으면 사용 (오프라인 모드)
         if (result.data && result.data.length > 0) {
-          setTestTypes(result.data);
+          const sortedTestTypes = sortTestTypesByCategory(result.data);
+          setTestTypes(sortedTestTypes);
         } else {
           toast.error('테스트 타입을 불러오는데 실패했습니다.');
         }
@@ -57,6 +60,58 @@ export function Settings({ onNavigate }: SettingsProps) {
       setIsLoading(false);
     }
   };
+
+  // 테스트 타입을 카테고리별로 정렬
+  const sortTestTypesByCategory = (types: TestType[]): TestType[] => {
+    // 데모 모드나 오프라인 모드일 때는 기본 제공(builtin) 카테고리의 테스트 타입 표시
+    // 일반 모드일 때만 builtin 카테고리를 완전히 숨김
+    let filteredTypes = types;
+    if (isDemoMode()) {
+      // 데모 모드: builtin 카테고리만 표시
+      filteredTypes = types.filter(testType => testType.category === 'builtin');
+    } else {
+      // 일반 모드: builtin 카테고리 제외 (오프라인 데이터는 이미 필터링됨)
+      filteredTypes = types.filter(testType => testType.category !== 'builtin');
+    }
+
+    // 카테고리별로 그룹화하여 정렬
+    return filteredTypes.sort((a, b) => {
+      // 카테고리별로 정렬
+      const aCategory = a.category || 'custom';
+      const bCategory = b.category || 'custom';
+      
+      if (aCategory !== bCategory) {
+        return aCategory.localeCompare(bCategory);
+      }
+      
+      // 같은 카테고리 내에서는 이름으로 정렬
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  };
+
+  // 테스트 타입을 카테고리별로 그룹화
+  const groupTestTypesByCategory = (types: TestType[]) => {
+    const groups: { category: string; testTypes: TestType[] }[] = [];
+    const categoryMap = new Map<string, TestType[]>();
+
+    // 카테고리별로 그룹화
+    types.forEach(testType => {
+      const category = testType.category || 'custom';
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, []);
+      }
+      categoryMap.get(category)!.push(testType);
+    });
+
+    // Map을 배열로 변환하고 카테고리명으로 정렬
+    const sortedGroups = Array.from(categoryMap.entries())
+      .map(([category, testTypes]) => ({ category, testTypes }))
+      .sort((a, b) => a.category.localeCompare(b.category));
+
+    return sortedGroups;
+  };
+
+
 
   const handleSaveTestType = async (testTypeData: Partial<TestType>) => {
     try {
@@ -74,7 +129,9 @@ export function Settings({ onNavigate }: SettingsProps) {
           name: testTypeData.name!,
           description: testTypeData.description!,
           enabled: testTypeData.enabled!,
-          mcp_tool: testTypeData.mcp_tool || ''
+          mcp_tool: testTypeData.mcp_tool || '',
+          is_locked: testTypeData.is_locked,
+          lock_type: testTypeData.lock_type || 'config'
         });
         
         if (result.success) {
@@ -110,12 +167,37 @@ export function Settings({ onNavigate }: SettingsProps) {
     }
   };
 
-  // 테스트 타입에 맞는 아이콘 반환
+  // 테스트 타입에 맞는 아이콘 반환 (DB 데이터 우선)
   const getTestTypeIcon = (testType: TestType) => {
+    // DB에 저장된 icon이 있으면 우선 사용
+    if (testType.icon) {
+      try {
+        // Lucide 아이콘 동적 매핑
+        const iconMap: { [key: string]: any } = {
+          'BarChart3': Activity,
+          'Activity': Activity,
+          'Zap': Activity,
+          'TrendingUp': Activity,
+          'Shield': Shield,
+          'Eye': AlertCircle,
+          'MousePointer': CheckCircle,
+          'Database': Database,
+          'Settings': SettingsIcon,
+          'CheckCircle': CheckCircle,
+          'AlertCircle': AlertCircle
+        };
+        
+        const IconComponent = iconMap[testType.icon] || SettingsIcon;
+        return <IconComponent className="h-5 w-5" style={{ color: testType.color || 'var(--primary)' }} />;
+      } catch (error) {
+        console.warn(`Icon not found: ${testType.icon}`, error);
+      }
+    }
+    
+    // DB에 icon이 없거나 매핑 실패 시 ID 기반 폴백
     const typeId = testType.id.toLowerCase();
     const typeName = testType.name.toLowerCase();
     
-    // ID 기반 매칭
     if (typeId.includes('lighthouse') || typeName.includes('lighthouse')) {
       return <CheckCircle className="h-5 w-5 text-primary" />;
     }
@@ -154,6 +236,8 @@ export function Settings({ onNavigate }: SettingsProps) {
       toast.error('테스트 타입 삭제에 실패했습니다.');
     }
   };
+
+
 
 
 
@@ -209,62 +293,92 @@ export function Settings({ onNavigate }: SettingsProps) {
                   <p className="font-semibold text-lg mb-2">테스트 타입을 불러오는 중..</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {testTypes.map((testType) => (
-                    <div key={testType.id} className="neu-flat rounded-xl px-6 py-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-6">
-                          <Switch
-                            checked={testType.enabled}
-                            onCheckedChange={() => handleToggleTestType(testType)}
-                            className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
-                          />
-                          <div>
-
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className="neu-pressed rounded-full p-2 mr-2">
-                                {getTestTypeIcon(testType)}
-                              </div>
-                              <h4 className="font-semibold text-primary text-lg">{testType.name}</h4>
-                              
-                            </div>
-                            <p className="text-muted-foreground">{testType.description}</p>
-                            <div className="flex items-center space-x-3 mt-3">
-                              <div className="neu-pressed rounded-full px-3 py-1">
-                                <span className="text-xs font-mono text-muted-foreground">ID: {testType.id}</span>
-                              </div>
-                              {testType.mcp_tool && (
-                                <div className="neu-pressed rounded-full px-3 py-1">
-                                  <span className="text-xs font-mono text-primary">MCP: {testType.mcp_tool}</span>
+                <div className="space-y-6">
+                  {groupTestTypesByCategory(testTypes).map((group) => (
+                    <div key={group.category} className="space-y-4">
+                      {group.category && (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-primary"></div>
+                          <h4 className="text-lg font-semibold text-primary capitalize">
+                            {group.category === 'builtin' ? '기본 제공' : 
+                             group.category === 'custom' ? '사용자 정의' :
+                             group.category}
+                          </h4>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-4">
+                        {group.testTypes.map((testType) => (
+                          <div key={testType.id} className="neu-flat rounded-xl px-6 py-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-6">
+                                <Switch
+                                  checked={testType.enabled}
+                                  onCheckedChange={() => handleToggleTestType(testType)}
+                                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
+                                />
+                                <div>
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <div className="neu-pressed rounded-full p-2 mr-2">
+                                      {getTestTypeIcon(testType)}
+                                    </div>
+                                    <h4 className="font-semibold text-primary text-lg">{testType.name}</h4>
+                                  </div>
+                                  <p className="text-muted-foreground">{testType.description}</p>
+                                  <div className="flex items-center space-x-3 mt-3">
+                                    <div className="neu-pressed rounded-full px-3 py-1">
+                                      <span className="text-xs font-mono text-muted-foreground">ID: {testType.id}</span>
+                                    </div>
+                                    {testType.category && (
+                                      <div className="neu-pressed rounded-full px-3 py-1">
+                                        <span className="text-xs font-mono text-primary" style={{ color: testType.color }}>
+                                          {testType.category}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {testType.mcp_tool && (
+                                      <div className="neu-pressed rounded-full px-3 py-1">
+                                        <span className="text-xs font-mono text-primary">MCP: {testType.mcp_tool}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
+                              </div>
+                              <div className="flex items-center space-x-3">
+                                <div className="flex flex-col items-center space-y-2">
+                                  {testType.is_locked ? (
+                                    <Lock className="h-5 w-5 text-orange-500" />
+                                  ) : (
+                                    <Unlock className="h-5 w-5 text-green-500" />
+                                  )}
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="neu-button rounded-xl px-4 py-3"
+                                  onClick={() => {
+                                    setModalMode('edit');
+                                    setEditingTestType(testType);
+                                    setIsModalOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  수정
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleDeleteTestType(testType)}
+                                  disabled={testType.is_locked}
+                                  className="neu-button rounded-xl px-4 py-3 text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  삭제
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="neu-button rounded-xl px-4 py-3"
-                            onClick={() => {
-                              setModalMode('edit');
-                              setEditingTestType(testType);
-                              setIsModalOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            수정
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleDeleteTestType(testType)}
-                            className="neu-button rounded-xl px-4 py-3 text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            삭제
-                          </Button>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -272,8 +386,12 @@ export function Settings({ onNavigate }: SettingsProps) {
                   {testTypes.length === 0 && (
                     <div className="text-center py-12 text-muted-foreground">
                       <Activity className="h-16 w-16 mx-auto mb-6 opacity-50" />
-                      <p className="font-semibold text-lg mb-2">등록된 테스트 타입이 없습니다</p>
-                      <p className="text-base">새 테스트 타입을 추가해보세요</p>
+                      <p className="font-semibold text-lg mb-2">
+                        {isDemoMode() ? '데모 모드: 기본 제공 테스트 타입이 없습니다' : '등록된 테스트 타입이 없습니다'}
+                      </p>
+                      <p className="text-base">
+                        {isDemoMode() ? '데모 모드에서는 기본 제공 테스트 타입만 사용할 수 있습니다' : '새 테스트 타입을 추가해보세요'}
+                      </p>
                     </div>
                   )}
                 </div>

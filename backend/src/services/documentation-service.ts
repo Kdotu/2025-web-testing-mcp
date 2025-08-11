@@ -33,12 +33,88 @@ export class DocumentationService {
     this.testResultService = new TestResultService();
     this.testMetricService = new TestMetricService();
     
-    // 문서 저장 디렉토리 설정
-    this.reportsDir = path.join(__dirname, '../../reports');
-    this.templatesDir = path.join(__dirname, '../../templates');
+    // 문서 저장 디렉토리 설정 - 로컬 환경 호환성 개선
+    this.reportsDir = this.resolveReportsDirectory();
+    this.templatesDir = this.resolveTemplatesDirectory();
     
     this.ensureDirectories();
     this.registerHandlebarsHelpers();
+  }
+
+  /**
+   * Reports 디렉토리 경로 해결 - 로컬 환경 호환성 개선
+   */
+  private resolveReportsDirectory(): string {
+    // 여러 경로 옵션을 시도
+    const possiblePaths = [
+      // 1. 현재 작업 디렉토리 기준 (로컬 개발 환경)
+      path.join(process.cwd(), 'reports'),
+      // 2. 실행 파일 위치 기준 (빌드된 환경)
+      path.join(__dirname, '../../reports'),
+      // 3. 프로젝트 루트 기준 (절대 경로)
+      path.resolve(process.cwd(), 'backend', 'reports'),
+      // 4. 환경 변수로 지정된 경로
+      process.env['REPORTS_DIR'] || '',
+      // 5. 사용자 홈 디렉토리 기준 (fallback)
+      path.join(process.env['HOME'] || process.env['USERPROFILE'] || '', '.web-testing-mcp', 'reports')
+    ];
+
+    // 존재하는 첫 번째 경로 사용
+    for (const dirPath of possiblePaths) {
+      if (dirPath && dirPath !== '') {
+        try {
+          if (fs.existsSync(dirPath)) {
+            console.log(`Using existing reports directory: ${dirPath}`);
+            return dirPath;
+          }
+        } catch (error: any) {
+          console.log(`Path check failed for: ${dirPath}`, error.message);
+        }
+      }
+    }
+
+    // 기본 경로 사용 (자동 생성됨)
+    const defaultPath = path.join(process.cwd(), 'reports');
+    console.log(`Using default reports directory: ${defaultPath}`);
+    return defaultPath;
+  }
+
+  /**
+   * Templates 디렉토리 경로 해결 - 로컬 환경 호환성 개선
+   */
+  private resolveTemplatesDirectory(): string {
+    // 여러 경로 옵션을 시도
+    const possiblePaths = [
+      // 1. 현재 작업 디렉토리 기준 (로컬 개발 환경)
+      path.join(process.cwd(), 'templates'),
+      // 2. 실행 파일 위치 기준 (빌드된 환경)
+      path.join(__dirname, '../../templates'),
+      // 3. 프로젝트 루트 기준 (절대 경로)
+      path.resolve(process.cwd(), 'backend', 'templates'),
+      // 4. 환경 변수로 지정된 경로
+      process.env['TEMPLATES_DIR'] || '',
+      // 5. 사용자 홈 디렉토리 기준 (fallback)
+      path.join(process.env['HOME'] || process.env['USERPROFILE'] || '', '.web-testing-mcp', 'templates')
+    ];
+
+    // 존재하는 첫 번째 경로 사용
+    for (const dirPath of possiblePaths) {
+      if (dirPath && dirPath !== '') {
+        try {
+          if (fs.existsSync(dirPath)) {
+            console.log(`Using existing templates directory: ${dirPath}`);
+            return dirPath;
+          }
+        } catch (error: any) {
+          console.log(`Path check failed for: ${dirPath}`, error.message);
+        }
+      }
+    }
+
+    // 기본 경로 사용 (자동 생성됨)
+    const defaultPath = path.join(process.cwd(), 'templates');
+    console.log(`Using default templates directory: ${defaultPath}`);
+    return defaultPath;
   }
 
   /**
@@ -46,19 +122,64 @@ export class DocumentationService {
    */
   private ensureDirectories(): void {
     try {
+      // 메인 디렉토리들 생성
       fs.ensureDirSync(this.reportsDir);
       fs.ensureDirSync(this.templatesDir);
-      fs.ensureDirSync(path.join(this.reportsDir, 'html'));
-      fs.ensureDirSync(path.join(this.reportsDir, 'pdf'));
-      console.log(`Reports directory created: ${this.reportsDir}`);
-    } catch (error) {
-      console.error('Failed to create reports directory:', error);
-      // 대체 경로 사용
-      this.reportsDir = path.join(process.cwd(), 'reports');
-      fs.ensureDirSync(this.reportsDir);
-      fs.ensureDirSync(path.join(this.reportsDir, 'html'));
-      fs.ensureDirSync(path.join(this.reportsDir, 'pdf'));
-      console.log(`Using alternative reports directory: ${this.reportsDir}`);
+      
+      // 하위 디렉토리들 생성
+      const htmlDir = path.join(this.reportsDir, 'html');
+      const pdfDir = path.join(this.reportsDir, 'pdf');
+      
+      fs.ensureDirSync(htmlDir);
+      fs.ensureDirSync(pdfDir);
+      
+      console.log(`Reports directory structure created successfully:`);
+      console.log(`  - Main: ${this.reportsDir}`);
+      console.log(`  - HTML: ${htmlDir}`);
+      console.log(`  - PDF: ${pdfDir}`);
+      console.log(`  - Templates: ${this.templatesDir}`);
+      
+      // 디렉토리 권한 확인 및 설정
+      this.checkDirectoryPermissions();
+      
+    } catch (error: any) {
+      console.error('Failed to create reports directory structure:', error);
+      throw new Error(`Reports directory creation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * 디렉토리 권한 확인 및 설정
+   */
+  private checkDirectoryPermissions(): void {
+    try {
+      // 읽기 권한 확인
+      fs.accessSync(this.reportsDir, fs.constants.R_OK);
+      fs.accessSync(this.reportsDir, fs.constants.W_OK);
+      
+      // 하위 디렉토리 권한 확인
+      const htmlDir = path.join(this.reportsDir, 'html');
+      const pdfDir = path.join(this.reportsDir, 'pdf');
+      
+      fs.accessSync(htmlDir, fs.constants.R_OK | fs.constants.W_OK);
+      fs.accessSync(pdfDir, fs.constants.R_OK | fs.constants.W_OK);
+      
+      console.log('Directory permissions verified successfully');
+      
+    } catch (error: any) {
+      console.warn('Directory permission warning:', error.message);
+      console.log('Attempting to fix permissions...');
+      
+      try {
+        // 권한 수정 시도 (Unix/Linux 환경)
+        if (process.platform !== 'win32') {
+          const { execSync } = require('child_process');
+          execSync(`chmod -R 755 "${this.reportsDir}"`);
+          console.log('Directory permissions updated');
+        }
+      } catch (permError: any) {
+        console.warn('Permission fix failed:', permError.message);
+      }
     }
   }
 
@@ -234,22 +355,61 @@ export class DocumentationService {
       // HTML 리포트 먼저 생성 (이미 수정된 generateHtmlReport 사용)
       const htmlReport = await this.generateHtmlReport(testId);
       
+      // Puppeteer 모듈 확인
+      let puppeteer;
+      try {
+        puppeteer = require('puppeteer');
+      } catch (error: any) {
+        console.error('Puppeteer 모듈을 찾을 수 없습니다:', error.message);
+        throw new Error('PDF 생성을 위해 Puppeteer가 필요합니다. "npm install puppeteer"를 실행해주세요.');
+      }
+      
       // HTML을 PDF로 변환
       const pdfFilename = htmlReport.filename.replace('.html', '.pdf');
       const pdfFilepath = path.join(this.reportsDir, 'pdf', pdfFilename);
       
+      console.log('PDF 생성 시작 - HTML 파일:', htmlReport.filepath);
+      console.log('PDF 저장 경로:', pdfFilepath);
+      
+      // HTML 파일 내용을 직접 읽어서 PDF 생성
+      const htmlContent = await fs.readFile(htmlReport.filepath, 'utf8');
+      
       // Puppeteer를 사용하여 PDF 생성
-      const puppeteer = require('puppeteer');
       const browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process'
+        ]
       });
       
       const page = await browser.newPage();
-      await page.goto(`file://${htmlReport.filepath}`, { waitUntil: 'networkidle0' });
       
-      await page.pdf({
-        path: pdfFilepath,
+      // HTML 내용을 직접 설정 (파일 경로 문제 해결)
+      await page.setContent(htmlContent, {
+        waitUntil: 'networkidle0',
+        timeout: 30000
+      });
+      
+      // PDF 생성 전 페이지 로딩 대기 및 스타일 적용 확인
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 페이지 크기 설정 (A4 기준)
+      await page.setViewport({
+        width: 794,  // A4 너비 (72 DPI 기준)
+        height: 1123, // A4 높이 (72 DPI 기준)
+        deviceScaleFactor: 1
+      });
+      
+      console.log('PDF 생성 중...');
+      
+      // PDF 생성 시 더 안정적인 옵션 사용
+      const pdfData = await page.pdf({
         format: 'A4',
         printBackground: true,
         margin: {
@@ -257,16 +417,49 @@ export class DocumentationService {
           right: '20mm',
           bottom: '20mm',
           left: '20mm'
-        }
+        },
+        displayHeaderFooter: false,
+        preferCSSPageSize: true,
+        timeout: 30000
       });
       
       await browser.close();
       
+      // PDF 파일에 버퍼 내용 직접 쓰기
+      await fs.writeFile(pdfFilepath, pdfData);
+      
+      // PDF 파일 존재 여부 및 크기 확인
+      if (!await fs.pathExists(pdfFilepath)) {
+        throw new Error('PDF 파일이 생성되지 않았습니다.');
+      }
+      
       const stats = await fs.stat(pdfFilepath);
+      console.log('PDF 생성 완료 - 파일 크기:', stats.size, 'bytes');
+      
+      // 파일 크기가 너무 작으면 생성 실패로 간주
+      if (stats.size < 1000) {
+        throw new Error(`PDF 파일이 너무 작습니다 (${stats.size} bytes). 생성에 실패했을 수 있습니다.`);
+      }
+      
+      // PDF 파일 유효성 검증 (PDF 시그니처 확인)
+      const pdfFileBuffer = await fs.readFile(pdfFilepath);
+      const pdfHeader = pdfFileBuffer.slice(0, 4).toString('ascii');
+      if (pdfHeader !== '%PDF') {
+        throw new Error('생성된 파일이 유효한 PDF가 아닙니다. PDF 헤더를 찾을 수 없습니다.');
+      }
+      
+      console.log('PDF 파일 유효성 검증 완료 - PDF 시그니처:', pdfHeader);
       
       // ID를 파일명 기반으로 생성하여 일치시킴
       const timestamp = Date.now();
       const documentId = `report_${testId}_${timestamp}`;
+      
+      console.log('PDF 문서 정보 생성 완료:', {
+        id: documentId,
+        filename: pdfFilename,
+        filepath: pdfFilepath,
+        size: stats.size
+      });
       
       return {
         id: documentId,
@@ -277,8 +470,19 @@ export class DocumentationService {
         size: stats.size,
         createdAt: new Date().toISOString()
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('PDF 리포트 생성 실패:', error);
+      
+      // Puppeteer 관련 에러인 경우 특별한 메시지 제공
+      if (error.message.includes('Puppeteer') || error.message.includes('Cannot find module')) {
+        throw new Error('PDF 생성을 위해 Puppeteer가 필요합니다. 백엔드에서 "npm install puppeteer"를 실행해주세요.');
+      }
+      
+      // 파일 생성 실패 관련 에러
+      if (error.message.includes('파일이 생성되지 않았습니다') || error.message.includes('너무 작습니다')) {
+        throw new Error(`PDF 생성 실패: ${error.message}`);
+      }
+      
       throw error;
     }
   }
@@ -301,23 +505,37 @@ export class DocumentationService {
           if (file.endsWith('.html')) {
             const filepath = path.join(htmlDir, file);
             const stats = await fs.stat(filepath);
-            const testIdFromFilename = file.match(/report_(.+?)_/)?.[1];
-            const timestampFromFilename = file.match(/_(\d+)\.html$/)?.[1];
             
-            console.log('파일명:', file, '추출된 testId:', testIdFromFilename, '추출된 timestamp:', timestampFromFilename);
-            
-            if (!testId || testIdFromFilename === testId) {
-              const documentId = `report_${testIdFromFilename}_${timestampFromFilename}`;
-              console.log('생성된 documentId:', documentId);
-              documents.push({
-                id: documentId,
-                testId: testIdFromFilename || 'unknown',
-                type: 'html',
-                filename: file,
-                filepath,
-                size: stats.size,
-                createdAt: stats.birthtime.toISOString()
-              });
+            // 파일명에서 testId와 timestamp 추출 개선
+            const filenameMatch = file.match(/report_(.+?)_(\d+)\.html$/);
+            if (filenameMatch && filenameMatch[1] && filenameMatch[2]) {
+              const extractedTestId = filenameMatch[1];
+              const timestamp = filenameMatch[2];
+              
+              console.log('파일명:', file, '추출된 testId:', extractedTestId, '추출된 timestamp:', timestamp);
+              
+              // testId 필터링 로직 개선
+              let shouldInclude = true;
+              if (testId) {
+                // 정확한 매칭 또는 부분 매칭 허용
+                shouldInclude = extractedTestId === testId || 
+                               extractedTestId.includes(testId) || 
+                               testId.includes(extractedTestId);
+              }
+              
+              if (shouldInclude) {
+                const documentId = `report_${extractedTestId}_${timestamp}`;
+                console.log('생성된 documentId:', documentId, '포함 여부:', shouldInclude);
+                documents.push({
+                  id: documentId,
+                  testId: extractedTestId,
+                  type: 'html',
+                  filename: file,
+                  filepath,
+                  size: stats.size,
+                  createdAt: stats.birthtime.toISOString()
+                });
+              }
             }
           }
         }
@@ -335,23 +553,37 @@ export class DocumentationService {
           if (file.endsWith('.pdf')) {
             const filepath = path.join(pdfDir, file);
             const stats = await fs.stat(filepath);
-            const testIdFromFilename = file.match(/report_(.+?)_/)?.[1];
-            const timestampFromFilename = file.match(/_(\d+)\.pdf$/)?.[1];
             
-            console.log('파일명:', file, '추출된 testId:', testIdFromFilename, '추출된 timestamp:', timestampFromFilename);
-            
-            if (!testId || testIdFromFilename === testId) {
-              const documentId = `report_${testIdFromFilename}_${timestampFromFilename}`;
-              console.log('생성된 documentId:', documentId);
-              documents.push({
-                id: documentId,
-                testId: testIdFromFilename || 'unknown',
-                type: 'pdf',
-                filename: file,
-                filepath,
-                size: stats.size,
-                createdAt: stats.birthtime.toISOString()
-              });
+            // 파일명에서 testId와 timestamp 추출 개선
+            const filenameMatch = file.match(/report_(.+?)_(\d+)\.pdf$/);
+            if (filenameMatch && filenameMatch[1] && filenameMatch[2]) {
+              const extractedTestId = filenameMatch[1];
+              const timestamp = filenameMatch[2];
+              
+              console.log('파일명:', file, '추출된 testId:', extractedTestId, '추출된 timestamp:', timestamp);
+              
+              // testId 필터링 로직 개선
+              let shouldInclude = true;
+              if (testId) {
+                // 정확한 매칭 또는 부분 매칭 허용
+                shouldInclude = extractedTestId === testId || 
+                               extractedTestId.includes(testId) || 
+                               testId.includes(extractedTestId);
+              }
+              
+              if (shouldInclude) {
+                const documentId = `report_${extractedTestId}_${timestamp}`;
+                console.log('생성된 documentId:', documentId, '포함 여부:', shouldInclude);
+                documents.push({
+                  id: documentId,
+                  testId: extractedTestId,
+                  type: 'pdf',
+                  filename: file,
+                  filepath,
+                  size: stats.size,
+                  createdAt: stats.birthtime.toISOString()
+                });
+              }
             }
           }
         }

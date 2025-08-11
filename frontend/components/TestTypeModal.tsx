@@ -5,6 +5,7 @@ import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { Textarea } from "./ui/textarea";
 
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Save, Edit, Plus } from "lucide-react";
 import { type TestType } from "../utils/api";
@@ -24,21 +25,33 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
     name: "", 
     description: "", 
     enabled: true,
-    mcp_tool: ""
+    mcp_tool: "",
+    is_locked: false,
+    lock_type: 'config'
   });
   const [isLoading, setIsLoading] = useState(false);
 
   // 모드가 변경되거나 testType이 변경될 때 폼 데이터 초기화
   useEffect(() => {
     if (mode === 'add') {
-      setFormData({ id: "", name: "", description: "", enabled: true, mcp_tool: "" });
+      setFormData({ 
+        id: "", 
+        name: "", 
+        description: "", 
+        enabled: true, 
+        mcp_tool: "",
+        is_locked: false,
+        lock_type: 'config'
+      });
     } else if (mode === 'edit' && testType) {
       setFormData({
         id: testType.id,
         name: testType.name,
         description: testType.description,
         enabled: testType.enabled,
-        mcp_tool: testType.mcp_tool || ""
+        mcp_tool: testType.mcp_tool || "",
+        is_locked: testType.is_locked || false,
+        lock_type: testType.lock_type || 'config'
       });
     }
   }, [mode, testType]);
@@ -63,8 +76,8 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
   };
 
   const handleSubmit = async () => {
-    if (!formData.id || !formData.name || !formData.description || !formData.mcp_tool) {
-      toast.error('모든 필드를 입력해주세요.');
+    if (!formData.id || !formData.name || !formData.description) {
+      toast.error('필수 필드를 입력해주세요.');
       return;
     }
 
@@ -80,7 +93,15 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
   };
 
   const handleClose = () => {
-    setFormData({ id: "", name: "", description: "", enabled: true, mcp_tool: "" });
+    setFormData({ 
+      id: "", 
+      name: "", 
+      description: "", 
+      enabled: true, 
+      mcp_tool: "",
+      is_locked: false,
+      lock_type: 'config'
+    });
     onClose();
   };
 
@@ -154,18 +175,34 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
                 className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
               />
             </div>
-            <p className="text-sm text-muted-foreground">테스트 실행에 사용할 MCP 도구명을 입력하세요. (예: lighthouse, k6, custom-tool)</p>
+            <p className="text-sm text-muted-foreground">테스트 실행에 사용할 MCP 도구명을 입력하세요. (선택사항, 예: lighthouse, k6, custom-tool)</p>
           </div>
 
           {mode === 'edit' && (
-            <div className="neu-pressed rounded-xl px-4 py-4 flex items-center justify-between">
-              <Label className="text-foreground font-semibold">활성화 상태</Label>
-              <Switch
-                checked={formData.enabled}
-                onCheckedChange={(checked) => setFormData({...formData, enabled: checked})}
-                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
-              />
-            </div>
+            <>
+              <div className="neu-pressed rounded-xl px-4 py-4 flex items-center justify-between">
+                <Label className="text-foreground font-semibold">활성화 상태</Label>
+                <Switch
+                  checked={formData.enabled}
+                  onCheckedChange={(checked) => setFormData({...formData, enabled: checked})}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
+                />
+              </div>
+              
+              <div className="neu-pressed rounded-xl px-4 py-4 flex items-center justify-between">
+                <div className="space-y-2">
+                  <Label className="text-foreground font-semibold">잠금 상태</Label>
+                  <p className="text-sm text-muted-foreground">
+                    잠금 설정 시 테스트 타입의 삭제만 불가능합니다 (수정은 가능)
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.is_locked}
+                  onCheckedChange={(checked) => setFormData({...formData, is_locked: checked})}
+                  className="data-[state=checked]:bg-orange-500 data-[state=unchecked]:bg-muted"
+                />
+              </div>
+            </>
           )}
         </div>
         

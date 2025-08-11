@@ -52,12 +52,6 @@ router.patch('/:id/toggle', async (req: Request, res: Response, next: NextFuncti
   await testTypeController.toggleTestType(req, res, next);
 });
 
-/**
- * POST /api/test-types/initialize
- * 기본 테스트 타입 초기화
- */
-router.post('/initialize', async (req: Request, res: Response, next: NextFunction) => {
-  await testTypeController.initializeDefaultTestTypes(req, res, next);
-});
+
 
 export { router as testTypeRoutes }; 

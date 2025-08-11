@@ -40,7 +40,9 @@ import {
   XCircle,
   Download,
   Copy,
-  Check
+  Check,
+  Shield,
+  Database
 } from "lucide-react";
 import {
   executeTest,
@@ -51,6 +53,7 @@ import {
   getTestSettings,
   getTestTypes,
   type TestType,
+  isDemoMode,
 } from "../utils/api";
 import { getAllTestResults as getBackendTestResults } from "../utils/backend-api";
 import { getMcpTools } from "../utils/supabase/client";
@@ -64,8 +67,6 @@ import {
   getLighthouseTestStatus,
   runLighthouseTest,
   executeE2ETest,
-  type LoadTestConfig,
-  type LoadTestResult,
 } from "../utils/backend-api";
 
 import { Progress } from "./ui/progress";
@@ -286,12 +287,74 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     }
   };
 
-  // 테스트 타입이 변경될 때 MCP 도구 가져오기
+  // DB의 config_template을 활용한 기본 설정 생성
+  const generateDefaultSettingsFromDB = (testType: any): any => {
+    if (!testType || !testType.config_template) {
+      return null;
+    }
+
+    const template = testType.config_template;
+    
+    switch (testType.id) {
+      case 'lighthouse':
+        return {
+          device: template.device || 'desktop',
+          categories: template.categories || ['performance'],
+          throttling: template.throttling || 'none',
+          locale: template.locale || 'ko-KR'
+        };
+      case 'load':
+        return {
+          executor: 'ramping-vus',
+          preset: 'custom',
+          startRate: template.startRate || 50,
+          timeUnit: template.timeUnit || '30s',
+          preAllocatedVUs: template.preAllocatedVUs || 5,
+          maxVUs: template.maxVUs || 100,
+          stages: template.stages || []
+        };
+      case 'e2e':
+        return {
+          browser: template.browser || 'chromium',
+          headless: template.headless !== undefined ? template.headless : true,
+          viewport: template.viewport || { width: 1280, height: 720 },
+          timeout: template.timeout || 30000,
+          navigationTimeout: template.navigationTimeout || 30000,
+          actionTimeout: template.actionTimeout || 5000,
+          screenshotOnFailure: template.screenshotOnFailure !== undefined ? template.screenshotOnFailure : true,
+          videoRecording: template.videoRecording || false,
+          traceRecording: template.traceRecording || false,
+          slowMo: template.slowMo || 0,
+          userAgent: template.userAgent || '',
+          locale: template.locale || 'ko-KR',
+          timezone: template.timezone || 'Asia/Seoul'
+        };
+      default:
+        return null;
+    }
+  };
+
+  // 테스트 타입이 변경될 때 MCP 도구 가져오기 및 DB 설정 적용
   useEffect(() => {
     if (selectedTestType) {
       fetchMcpTools(selectedTestType);
+      
+      // DB의 config_template을 활용하여 기본 설정 적용
+      const selectedType = testTypes.find(t => t.id === selectedTestType);
+      if (selectedType) {
+        const defaultSettings = generateDefaultSettingsFromDB(selectedType);
+        if (defaultSettings) {
+          setTestSettings(prev => ({
+            ...prev,
+            [selectedTestType]: {
+              ...prev[selectedTestType as keyof TestSettings],
+              ...defaultSettings
+            }
+          }));
+        }
+      }
     }
-  }, [selectedTestType]);
+  }, [selectedTestType, testTypes]);
 
   // 기본 MCP 도구 목록 (fallback)
   const getDefaultMcpTools = (testType: string) => {
@@ -623,64 +686,29 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         // 테스트 유형 불러오기
         const testTypesResult = await getTestTypes();
         if (testTypesResult.success && testTypesResult.data) {
-          setTestTypes(
-            testTypesResult.data.filter((type) => type.enabled),
-          );
+          // 데모 모드나 오프라인 모드일 때는 builtin 카테고리 포함
+          // 일반 모드일 때만 builtin 카테고리 제외
+          const filteredTypes = (isDemoMode() || testTypesResult.offline)
+            ? testTypesResult.data.filter((type) => type.enabled)
+            : testTypesResult.data.filter((type) => type.enabled && type.category !== 'builtin');
+          
+          setTestTypes(filteredTypes);
         } else {
-          // API 실패 시에도 데이터가 있으면 사용 (오프라인 모드에서 로컬 데이터 반환)
-          if (
+          // API 실패 시 데모 모드가 아니면 빈 배열 사용
+          if (!isDemoMode()) {
+            setTestTypes([]);
+          } else if (
             testTypesResult.data &&
             testTypesResult.data.length > 0
           ) {
+            // 데모 모드일 때만 데이터가 있으면 사용
             setTestTypes(
               testTypesResult.data.filter(
                 (type) => type.enabled,
               ),
             );
           } else {
-            // 완전히 실패한 경우에만 기본값 사용
-            const defaultTestTypes = [
-              {
-                id: "performance",
-                name: "성능테스트",
-                description: "페이지 로딩 속도 및 성능 측정",
-                enabled: true,
-              },
-              {
-                id: "lighthouse",
-                name: "Lighthouse",
-                description: "웹페이지 품질 종합 평가",
-                enabled: true,
-              },
-              {
-                id: "load",
-                name: "부하테스트",
-                description:
-                  "k6 기반 동시 접속자 부하 처리 능력 측정",
-                enabled: true,
-              },
-              {
-                id: "security",
-                name: "보안테스트",
-                description: "웹사이트 보안 취약점 검사",
-                enabled: true,
-              },
-              {
-                id: "accessibility",
-                name: "접근성테스트",
-                description: "웹 접근성 표준 준수 검사",
-                enabled: true,
-              },
-              {
-                id: "e2e",
-                name: "E2E 테스트",
-                description: "Playwright 기반 End-to-End 사용자 시나리오 테스트",
-                enabled: true,
-              },
-            ];
-            setTestTypes(
-              defaultTestTypes.filter((type) => type.enabled),
-            );
+            setTestTypes([]);
           }
         }
 
@@ -935,8 +963,8 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
     try {
       setIsExecuting(true);
 
-      // LoadTestConfig 생성
-      const loadTestConfig: LoadTestConfig = {
+              // LoadTestConfig 생성
+        const loadTestConfig: any = {
         url: testUrl,
         name: testDescription || `Load Test - ${testUrl}`,
         description: testDescription,
@@ -1880,7 +1908,7 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                         key={type.id}
                         onClick={() => setSelectedTestType(type.id)}
                         disabled={isExecuting}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                           selectedTestType === type.id 
                             ? "neu-accent text-primary-foreground" 
                             : "neu-button text-foreground hover:text-primary"

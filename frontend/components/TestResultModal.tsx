@@ -19,6 +19,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
   const [showDocumentsDropdown, setShowDocumentsDropdown] = useState(false);
   const [availableDocuments, setAvailableDocuments] = useState<any[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [reportGenerating, setReportGenerating] = useState(false);
   const loadedTestIdRef = useRef<string | null>(null);
 
   // raw_data 복사 함수
@@ -47,44 +48,112 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
   const handleDocumentDownload = async (doc: any) => {
     try {
       console.log('문서 다운로드 시작 - document:', doc);
+      
+      // 다운로드 진행 상태 표시
+      const downloadButton = document.querySelector(`[data-document-id="${doc.id}"]`);
+      if (downloadButton) {
+        downloadButton.setAttribute('disabled', 'true');
+        downloadButton.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>다운로드 중...';
+      }
+      
       const downloadUrl = `/api/documents/${doc.id}/download`;
       console.log('다운로드 URL:', downloadUrl);
       
+      // fetch를 사용하여 파일 다운로드 상태 확인
+      const response = await fetch(downloadUrl);
+      
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status} ${response.statusText}`);
+      }
+      
+      // 파일 내용을 blob으로 변환
+      const blob = await response.blob();
+      
+      // 다운로드 링크 생성 및 클릭
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = URL.createObjectURL(blob);
       link.download = doc.filename;
       link.target = '_blank';
+      
+      // 링크를 DOM에 추가하고 클릭
       document.body.appendChild(link);
       link.click();
+      
+      // 정리
       document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
       
       // 다운로드 성공 메시지
       setTimeout(() => {
         alert(`${doc.type === 'html' ? 'HTML' : 'PDF'} 리포트가 다운로드되었습니다.`);
       }, 1000);
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('문서 다운로드 오류:', error);
-      alert('문서 다운로드에 실패했습니다.');
+      
+      // 사용자에게 구체적인 에러 메시지 표시
+      let errorMessage = '문서 다운로드에 실패했습니다.';
+      
+      if (error.message.includes('404')) {
+        errorMessage = '문서를 찾을 수 없습니다. 문서가 삭제되었거나 이동되었을 수 있습니다.';
+      } else if (error.message.includes('403')) {
+        errorMessage = '문서에 접근할 권한이 없습니다.';
+      } else if (error.message.includes('500')) {
+        errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+      } else if (error.message.includes('Failed to fetch')) {
+        errorMessage = '서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.';
+      }
+      
+      alert(errorMessage);
+      
+    } finally {
+      // 다운로드 버튼 상태 복원
+      const downloadButton = document.querySelector(`[data-document-id="${doc.id}"]`);
+      if (downloadButton) {
+        downloadButton.removeAttribute('disabled');
+        downloadButton.innerHTML = `<FileText className="h-4 w-4 mr-3" />${doc.type === 'html' ? 'HTML' : 'PDF'} Report`;
+      }
     }
   };
 
   // Report 생성 후 문서 목록 새로고침
   const handleReportGeneration = async (format: string) => {
     try {
+      setReportGenerating(true);
       const testId = result.testId || result.test_id || result.id;
       console.log('Report 생성 시작 - format:', format, 'testId:', testId);
       
       // Report 생성
-      await onDownload(result, format);
+      const response = await onDownload(result, format);
+      console.log('Report 생성 응답:', response);
       
       // 잠시 대기 후 문서 목록 새로고침
       setTimeout(async () => {
         console.log('문서 목록 새로고침 시작');
         await fetchDocuments(testId);
+        
+        // 새로 생성된 문서를 찾아서 자동 다운로드
+        const updatedDocuments = await getDocuments(testId);
+        if (updatedDocuments.success && updatedDocuments.data) {
+          // 가장 최근에 생성된 문서 찾기
+          const latestDocument = updatedDocuments.data
+            .filter((doc: any) => doc.type === format)
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+          
+          if (latestDocument) {
+            console.log('새로 생성된 문서 자동 다운로드:', latestDocument);
+            // 자동 다운로드 실행
+            setTimeout(() => {
+              handleDocumentDownload(latestDocument);
+            }, 1000);
+          }
+        }
       }, 2000);
       
     } catch (error) {
       console.error('Report 생성 오류:', error);
+    } finally {
+      setReportGenerating(false);
     }
   };
 
@@ -182,6 +251,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
       setShowDocumentsDropdown(false);
       setAvailableDocuments([]);
       setDocumentsLoading(false);
+      setReportGenerating(false);
     }
   }, [isOpen]);
 
@@ -454,15 +524,25 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
                 {/* Report 생성 버튼 */}
                 <div className="relative report-dropdown">
                   <button 
-                    className="neu-button rounded-xl px-6 py-4 font-medium text-foreground hover:text-primary transition-colors flex items-center"
+                    className="neu-button rounded-xl px-6 py-4 font-medium text-foreground hover:text-primary transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => setShowReportDropdown(!showReportDropdown)}
+                    disabled={reportGenerating}
                   >
-                    <FileText className="h-5 w-5 mr-3" />
-                    Report 생성
-                    <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showReportDropdown ? 'rotate-180' : ''}`} />
+                    {reportGenerating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-3"></div>
+                        생성 중...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-5 w-5 mr-3" />
+                        Report 생성
+                        <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showReportDropdown ? 'rotate-180' : ''}`} />
+                      </>
+                    )}
                   </button>
                   
-                  {showReportDropdown && (
+                  {showReportDropdown && !reportGenerating && (
                     <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[200px]">
                       <button 
                         className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-t-xl flex items-center"
@@ -510,6 +590,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload }: TestRes
                         {availableDocuments.map((doc, index) => (
                           <button 
                             key={`${doc.id}-${doc.type}-${doc.createdAt}`}
+                            data-document-id={doc.id}
                             className={`w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center ${
                               index === 0 ? 'rounded-t-xl' : ''
                             } ${

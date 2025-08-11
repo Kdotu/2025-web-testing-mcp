@@ -198,11 +198,11 @@ export function TestResults({ onNavigate }: TestResultsProps) {
         mimeType = 'text/csv';
         break;
       case 'html':
-        // HTML 리포트 생성 함수 호출
+        // HTML 리포트 생성 후 자동 다운로드
         handleGenerateHtmlReport(result);
         return;
       case 'pdf':
-        // PDF 리포트 생성 함수 호출
+        // PDF 리포트 생성 후 자동 다운로드
         handleGeneratePdfReport(result);
         return;
       default:
@@ -233,8 +233,14 @@ export function TestResults({ onNavigate }: TestResultsProps) {
       if (response.success && response.data) {
         console.log('생성된 문서 정보:', response.data);
         
-        // 생성 완료 메시지만 표시
-        alert('HTML 리포트가 성공적으로 생성되었습니다.');
+        // 생성 완료 메시지 표시
+        alert('HTML 리포트가 성공적으로 생성되었습니다. 다운로드를 시작합니다.');
+        
+        // 자동 다운로드 실행
+        setTimeout(() => {
+          downloadGeneratedReport(response.data);
+        }, 1000);
+        
       } else {
         console.error('HTML 리포트 생성 실패:', response.error);
         alert(response.error || 'HTML 리포트 생성에 실패했습니다.');
@@ -253,9 +259,18 @@ export function TestResults({ onNavigate }: TestResultsProps) {
       setGeneratingReport('pdf');
       const testId = result.testId || result.id;
       const response = await generatePdfReport(testId);
+      
       if (response.success && response.data) {
-        // 생성 완료 메시지만 표시
-        alert('PDF 리포트가 성공적으로 생성되었습니다.');
+        console.log('생성된 PDF 문서 정보:', response.data);
+        
+        // 생성 완료 메시지 표시
+        alert('PDF 리포트가 성공적으로 생성되었습니다. 다운로드를 시작합니다.');
+        
+        // 자동 다운로드 실행
+        setTimeout(() => {
+          downloadGeneratedReport(response.data);
+        }, 1000);
+        
       } else {
         alert(response.error || 'PDF 리포트 생성에 실패했습니다.');
       }
@@ -267,6 +282,45 @@ export function TestResults({ onNavigate }: TestResultsProps) {
     }
   };
 
+  // 생성된 리포트 자동 다운로드
+  const downloadGeneratedReport = async (documentInfo: any) => {
+    try {
+      console.log('생성된 리포트 자동 다운로드 시작:', documentInfo);
+      
+      const downloadUrl = `/api/documents/${documentInfo.id}/download`;
+      console.log('다운로드 URL:', downloadUrl);
+      
+      // fetch를 사용하여 파일 다운로드 상태 확인
+      const response = await fetch(downloadUrl);
+      
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status} ${response.statusText}`);
+      }
+      
+      // 파일 내용을 blob으로 변환
+      const blob = await response.blob();
+      
+      // 다운로드 링크 생성 및 클릭
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = documentInfo.filename;
+      link.target = '_blank';
+      
+      // 링크를 DOM에 추가하고 클릭
+      document.body.appendChild(link);
+      link.click();
+      
+      // 정리
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      
+      console.log('리포트 자동 다운로드 완료');
+      
+    } catch (error: any) {
+      console.error('리포트 자동 다운로드 오류:', error);
+      alert('리포트 다운로드에 실패했습니다. 수동으로 다운로드해주세요.');
+    }
+  };
 
 
   return (

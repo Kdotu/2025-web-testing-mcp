@@ -47,6 +47,7 @@ app.use('/api/e2e-tests', e2eTestRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api', mcpStatusRoutes);
 
+
 // 설정 라우트 (프론트엔드 호환성을 위해 루트 경로에 추가)
 app.use('/get-settings', settingsRoutes);
 app.use('/test-results', testResultRoutes);
