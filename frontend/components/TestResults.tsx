@@ -6,7 +6,7 @@ import { Badge } from "./ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Progress } from "./ui/progress";
-import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3, FileCode, FileImage } from "lucide-react";
+import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3, FileCode, FileImage, Activity } from "lucide-react";
 import { getAllTestResults, getTestResultById, getTestTypes, generateHtmlReport, generatePdfReport, getDocumentDownloadUrl, getTotalTestCount } from "../utils/backend-api";
 import { TestResultModal } from "./TestResultModal";
 
@@ -19,6 +19,7 @@ interface TestResultsProps {
 export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propConnectionStatus }: TestResultsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [selectedResult, setSelectedResult] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testResults, setTestResults] = useState<any[]>([]);
@@ -175,11 +176,20 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
 
   const filteredResults = Array.isArray(testResults) ? testResults.filter(result => {
     const matchesSearch = result.url.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterType === "all" || 
-                         result.type === filterType || 
-                         result.testType === filterType ||
-                         result.testTypeId === filterType;
-    return matchesSearch && matchesFilter;
+    const matchesTypeFilter = filterType === "all" || 
+                             result.type === filterType || 
+                             result.testType === filterType ||
+                             result.testTypeId === filterType;
+    const matchesStatusFilter = filterStatus === "all" || 
+                               result.status === filterStatus ||
+                               // 상태값 매핑 (다양한 상태값 고려)
+                               (filterStatus === 'completed' && (result.status === '완료' || result.status === 'success' || result.status === 'complete')) ||
+                               (filterStatus === 'failed' && (result.status === '실패' || result.status === 'failed')) ||
+                               (filterStatus === 'running' && result.status === 'running') ||
+                               (filterStatus === 'pending' && result.status === 'pending') ||
+                               (filterStatus === 'cancelled' && result.status === 'cancelled');
+    
+    return matchesSearch && matchesTypeFilter && matchesStatusFilter;
   }) : [];
 
 
@@ -486,11 +496,10 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
                   
                   // 테스트 유형 이름 매핑
                   const typeNames: { [key: string]: string } = {
-                    'load': '부하테스트',
+                    'load': '부하 테스트',
                     'lighthouse': 'Lighthouse',
-                    'performance': '성능테스트',
-                    'security': '보안테스트',
-                    'accessibility': '접근성테스트',
+                    // 'security': '보안테스트',
+                    'e2e': '단위 테스트',
                     'unknown': '알 수 없음'
                   };
                   
@@ -564,7 +573,7 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
               />
             </div>
           </div>
-          <div className="neu-input rounded-xl px-3 py-2" style={{ minWidth: '200px' }}>
+          <div className="neu-input rounded-xl px-3 py-2" style={{ minWidth: '200px', alignContent: 'center' }}>
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger className="border-none bg-transparent text-foreground">
                 <SelectValue placeholder="테스트 유형 필터" />
@@ -579,11 +588,78 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
               </SelectContent>
             </Select>
           </div>
-          <button className="neu-button rounded-xl px-6 py-3 font-medium text-foreground hover:text-primary transition-colors">
-            <Filter className="h-5 w-5 mr-3" />
-            필터
+          <div className="neu-input rounded-xl px-3 py-2" style={{ minWidth: '100px', alignContent: 'center' }}>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="border-none bg-transparent text-foreground">
+                <SelectValue placeholder="테스트 상태 필터" />
+              </SelectTrigger>
+              <SelectContent className="neu-card rounded-xl border-none bg-card">
+                <SelectItem value="all">전체</SelectItem>
+                <SelectItem value="completed">성공</SelectItem>
+                <SelectItem value="failed">실패</SelectItem>
+                <SelectItem value="running">실행중</SelectItem>
+                {/* <SelectItem value="pending">대기중</SelectItem>
+                <SelectItem value="cancelled">취소됨</SelectItem> */}
+              </SelectContent>
+            </Select>
+          </div>
+          <button 
+            className="neu-button rounded-xl px-6 py-3 font-medium text-foreground hover:text-primary transition-colors"
+            onClick={() => {
+              setSearchTerm("");
+              setFilterType("all");
+              setFilterStatus("all");
+            }}
+          >
+            초기화
           </button>
         </div>
+        
+        {/* 현재 적용된 필터 표시 */}
+        {(searchTerm || filterType !== "all" || filterStatus !== "all") && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {searchTerm && (
+              <Badge variant="secondary" className="neu-pressed px-3 py-1">
+                <Search className="h-3 w-3 mr-1" />
+                검색: {searchTerm}
+                <button 
+                  onClick={() => setSearchTerm("")}
+                  className="ml-2 hover:text-destructive"
+                >
+                  ×
+                </button>
+              </Badge>
+            )}
+            {filterType !== "all" && (
+              <Badge variant="secondary" className="neu-pressed px-3 py-1">
+                <BarChart3 className="h-3 w-3 mr-1" />
+                유형: {testTypes.find(t => t.id === filterType)?.name || filterType}
+                <button 
+                  onClick={() => setFilterType("all")}
+                  className="ml-2 hover:text-destructive"
+                >
+                  ×
+                </button>
+              </Badge>
+            )}
+            {filterStatus !== "all" && (
+              <Badge variant="secondary" className="neu-pressed px-3 py-1">
+                <Activity className="h-3 w-3 mr-1" />
+                상태: {filterStatus === 'completed' ? '성공' : 
+                       filterStatus === 'failed' ? '실패' : 
+                       filterStatus === 'running' ? '실행중' : 
+                       filterStatus === 'pending' ? '대기중' : 
+                       filterStatus === 'cancelled' ? '취소됨' : filterStatus}
+                <button 
+                  onClick={() => setFilterStatus("all")}
+                  className="ml-2 hover:text-destructive"
+                >
+                  ×
+                </button>
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 테스트 결과 테이블 */}
@@ -614,7 +690,7 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
                 <TableRow className="neu-subtle rounded-xl">
                   <TableHead className="w-[80px] px-6 py-6 text-primary font-semibold text-lg text-center">No</TableHead>
                   <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">웹사이트</TableHead>
-                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">실행 테스트</TableHead>
+                  <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">테스트 유형</TableHead>
                   <TableHead className="w-[120px] px-6 py-6 text-primary font-semibold text-lg text-center">실행 일시</TableHead>
                   <TableHead className="w-[80px] px-6 py-6 text-primary font-semibold text-lg text-center">상태</TableHead>
                 </TableRow>

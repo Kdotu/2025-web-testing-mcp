@@ -170,7 +170,7 @@ export const checkApiHealth = async () => {
     
     const data = await response.json();
     resetRetryCount(); // 성공시 카운터 리셋
-    console.log('[Supabase Edge Functions 연결 성공]');
+    // console.log('[Supabase Edge Functions 연결 성공]');
     return data;
   } catch (error: any) {
     const newRetryCount = incrementRetryCount();
@@ -234,7 +234,7 @@ export const checkDatabaseStatus = async () => {
     }
     
     const data = await response.json();
-    console.log('[데이터베이스 연결 성공]');
+    // console.log('[데이터베이스 연결 성공]');
     return data;
   } catch (error: any) {
     logConnectionError('데이터베이스 상태 체크', error, getRetryCount());

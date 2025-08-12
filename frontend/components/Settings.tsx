@@ -123,37 +123,103 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
 
 
 
-  const handleSaveTestType = async (testTypeData: Partial<TestType>) => {
+    const handleSaveTestType = async (testTypeData: Partial<TestType>) => {
     try {
       if (modalMode === 'add') {
         const result = await addTestType(testTypeData as TestType);
         if (result.success) {
-          toast.success('테스트 타입이 추가되었습니다.');
+          toast.success('✅ 테스트 타입이 성공적으로 추가되었습니다.');
           loadTestTypes();
         } else {
-          toast.error(result.error || '테스트 타입 추가에 실패했습니다.');
+          toast.error(result.error || '❌ 테스트 타입 추가에 실패했습니다.');
         }
       } else {
         if (!editingTestType) return;
-        const result = await updateTestType(editingTestType.id, {
-          name: testTypeData.name!,
-          description: testTypeData.description!,
-          enabled: testTypeData.enabled!,
-          mcp_tool: testTypeData.mcp_tool || '',
-          is_locked: testTypeData.is_locked,
-          lock_type: testTypeData.lock_type || 'config'
-        });
-        
-        if (result.success) {
-          toast.success('테스트 타입이 수정되었습니다.');
+
+        // 잠금 상태 확인 (기본 수정 시에만)
+        if (editingTestType.is_locked && !testTypeData.is_locked) {
+          toast.error(`🔒 잠금된 테스트 타입입니다.
+          잠금 유형: ${editingTestType.lock_type || 'config'}
+          잠금 해제 후 수정이 가능합니다.`);
+          return;
+        }
+
+        // 실시간 업데이트를 위한 로컬 상태 변경
+        if (testTypeData.is_locked !== undefined || testTypeData.enabled !== undefined) {
+          setTestTypes(prev => prev.map(t => 
+            t.id === editingTestType.id ? { 
+              ...t, 
+              is_locked: testTypeData.is_locked !== undefined ? testTypeData.is_locked : t.is_locked,
+              enabled: testTypeData.enabled !== undefined ? testTypeData.enabled : t.enabled
+            } : t
+          ));
+          
+          // 백그라운드에서 전체 데이터 새로고침 (실시간 업데이트 보장)
           loadTestTypes();
-        } else {
-          toast.error(result.error || '테스트 타입 수정에 실패했습니다.');
+        }
+        
+        // 기본 정보 수정 시에만 API 호출
+        if (testTypeData.name || testTypeData.description || testTypeData.mcp_tool) {
+          const result = await updateTestType(editingTestType.id, {
+            name: testTypeData.name!,
+            description: testTypeData.description!,
+            enabled: testTypeData.enabled!,
+            mcp_tool: testTypeData.mcp_tool || '',
+            is_locked: testTypeData.is_locked,
+            lock_type: testTypeData.lock_type || 'config'
+          });
+          
+          if (result.success) {
+            toast.success('✅ 테스트 타입이 성공적으로 수정되었습니다.');
+            // 백그라운드에서 전체 데이터 새로고침
+            loadTestTypes();
+          } else {
+            // 실패 시 원래 상태로 되돌리기
+            setTestTypes(prev => prev.map(t => 
+              t.id === editingTestType.id ? editingTestType : t
+            ));
+            
+            // 실패 원인에 따른 상세 메시지
+            let errorMessage = '❌ 테스트 타입 수정에 실패했습니다.';
+            if (result.error) {
+              if (result.error.includes('locked') || result.error.includes('잠금')) {
+                errorMessage = `🔒 잠금된 테스트 타입입니다. 잠금 해제 후 수정해주세요.`;
+              } else if (result.error.includes('permission') || result.error.includes('권한')) {
+                errorMessage = `🚫 권한이 없습니다. 관리자에게 문의하세요.`;
+              } else if (result.error.includes('not found') || result.error.includes('찾을 수 없음')) {
+                errorMessage = `🔍 테스트 타입을 찾을 수 없습니다.`;
+              } else {
+                errorMessage = `❌ ${result.error}`;
+              }
+            }
+            toast.error(errorMessage);
+          }
         }
       }
     } catch (error) {
       console.error('Error saving test type:', error);
-      toast.error('테스트 타입 저장에 실패했습니다.');
+      toast.error('❌ 테스트 타입 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // TestTypeModal의 Switch 변경 시 호출되는 콜백
+  const handleModalSwitchChange = async (testTypeData: Partial<TestType>) => {
+    try {
+      if (!editingTestType) return;
+
+      // 로컬 상태 즉시 업데이트
+      setTestTypes(prev => prev.map(t => 
+        t.id === editingTestType.id ? { 
+          ...t, 
+          is_locked: testTypeData.is_locked !== undefined ? testTypeData.is_locked : t.is_locked,
+          enabled: testTypeData.enabled !== undefined ? testTypeData.enabled : t.enabled
+        } : t
+      ));
+
+      // 백그라운드에서 전체 데이터 새로고침
+      loadTestTypes();
+    } catch (error) {
+      console.error('Error handling modal switch change:', error);
     }
   };
 
@@ -166,14 +232,77 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
       });
       
       if (result.success) {
-        loadTestTypes();
-        toast.success(`${testType.name}이(가) ${!testType.enabled ? '활성화' : '비활성화'}되었습니다.`);
+        // 성공 시에만 UI 업데이트
+        setTestTypes(prev => prev.map(t => 
+          t.id === testType.id ? { ...t, enabled: !testType.enabled } : t
+        ));
+        
+        const status = !testType.enabled ? '활성화' : '비활성화';
+        toast.success(`✅ ${testType.name}이(가) 성공적으로 ${status}되었습니다.`);
       } else {
-        toast.error(result.error || '테스트 타입 상태 변경에 실패했습니다.');
+        // 실패 원인에 따른 상세 메시지
+        let errorMessage = '❌ 테스트 타입 상태 변경에 실패했습니다.';
+        if (result.error) {
+          if (result.error.includes('locked') || result.error.includes('잠금')) {
+            errorMessage = `🔒 잠금된 테스트 타입입니다. 잠금 해제 후 상태 변경해주세요.`;
+          } else if (result.error.includes('permission') || result.error.includes('권한')) {
+            errorMessage = `🚫 권한이 없습니다. 관리자에게 문의하세요.`;
+          } else if (result.error.includes('not found') || result.error.includes('찾을 수 없음')) {
+            errorMessage = `🔍 테스트 타입을 찾을 수 없습니다.`;
+          } else {
+            errorMessage = `❌ ${result.error}`;
+          }
+        }
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Error toggling test type:', error);
-      toast.error('테스트 타입 상태 변경에 실패했습니다.');
+      toast.error('❌ 테스트 타입 상태 변경 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 잠금 상태 toggle 함수 추가
+  const handleToggleLockStatus = async (testType: TestType) => {
+    try {
+      const newLockStatus = !testType.is_locked;
+      
+      // 잠금 상태가 true가 되면 활성화 상태도 true로 고정
+      const updateData: any = { is_locked: newLockStatus };
+      if (newLockStatus) {
+        updateData.enabled = true;
+      }
+      
+      const result = await updateTestType(testType.id, updateData);
+      
+      if (result.success) {
+        // 성공 시에만 UI 업데이트
+        setTestTypes(prev => prev.map(t => 
+          t.id === testType.id ? { 
+            ...t, 
+            is_locked: newLockStatus,
+            enabled: newLockStatus ? true : t.enabled
+          } : t
+        ));
+        
+        const action = newLockStatus ? '잠금' : '잠금 해제';
+        toast.success(`🔒 ${testType.name}이(가) 성공적으로 ${action}되었습니다.`);
+      } else {
+        // 실패 원인에 따른 상세 메시지
+        let errorMessage = '❌ 잠금 상태 변경에 실패했습니다.';
+        if (result.error) {
+          if (result.error.includes('permission') || result.error.includes('권한')) {
+            errorMessage = `🚫 권한이 없습니다. 관리자에게 문의하세요.`;
+          } else if (result.error.includes('not found') || result.error.includes('찾을 수 없음')) {
+            errorMessage = `🔍 테스트 타입을 찾을 수 없습니다.`;
+          } else {
+            errorMessage = `❌ ${result.error}`;
+          }
+        }
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      console.error('Error toggling lock status:', error);
+      toast.error('❌ 잠금 상태 변경 중 오류가 발생했습니다.');
     }
   };
 
@@ -236,14 +365,29 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
     try {
       const result = await deleteTestType(testType.id);
       if (result.success) {
-        toast.success('테스트 타입이 삭제되었습니다.');
+        toast.success('🗑️ 테스트 타입이 성공적으로 삭제되었습니다.');
         loadTestTypes();
       } else {
-        toast.error(result.error || '테스트 타입 삭제에 실패했습니다.');
+        // 실패 원인에 따른 상세 메시지
+        let errorMessage = '❌ 테스트 타입 삭제에 실패했습니다.';
+        if (result.error) {
+          if (result.error.includes('locked') || result.error.includes('잠금')) {
+            errorMessage = `🔒 잠금된 테스트 타입입니다. 잠금 해제 후 삭제해주세요.`;
+          } else if (result.error.includes('permission') || result.error.includes('권한')) {
+            errorMessage = `🚫 권한이 없습니다. 관리자에게 문의하세요.`;
+          } else if (result.error.includes('in use') || result.error.includes('사용 중')) {
+            errorMessage = `⚠️ 현재 사용 중인 테스트 타입입니다. 사용을 중단한 후 삭제해주세요.`;
+          } else if (result.error.includes('not found') || result.error.includes('찾을 수 없음')) {
+            errorMessage = `🔍 테스트 타입을 찾을 수 없습니다.`;
+          } else {
+            errorMessage = `❌ ${result.error}`;
+          }
+        }
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Error deleting test type:', error);
-      toast.error('테스트 타입 삭제에 실패했습니다.');
+      toast.error('❌ 테스트 타입 삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -294,6 +438,15 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
                 <div>
                   <h3 className="text-2xl font-semibold text-primary mb-2">테스트 타입 관리</h3>
                   <p className="text-muted-foreground text-lg">사용 가능한 테스트 타입을 관리합니다</p>
+                  {/* 잠금 상태 안내 */}
+                  {testTypes.some(t => t.is_locked) && (
+                    <div className="mt-2 flex items-center space-x-2">
+                      <Lock className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm text-orange-600">
+                        🔒 잠금된 테스트 타입은 수정/삭제가 제한됩니다
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <Button 
                   className={`rounded-xl px-6 py-3 font-semibold ${
@@ -374,10 +527,26 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
                               </div>
                               <div className="flex items-center space-x-3">
                                 <div className="flex flex-col items-center space-y-2">
-                                  {testType.is_locked ? (
-                                    <Lock className="h-5 w-5 text-orange-500" />
-                                  ) : (
-                                    <Unlock className="h-5 w-5 text-green-500" />
+                                  <button
+                                    onClick={() => handleToggleLockStatus(testType)}
+                                    className="flex flex-col items-center hover:scale-105 transition-transform"
+                                    title={testType.is_locked ? `잠금 유형: ${testType.lock_type || 'config'}` : '편집 가능'}
+                                    disabled={isDemoModeActive}
+                                  >
+                                    {testType.is_locked ? (
+                                      <div className="flex flex-col items-center">
+                                        <Lock className="h-5 w-5 text-orange-500" />
+                                        <span className="text-xs text-orange-600 mt-1">잠금됨</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-col items-center">
+                                        <Unlock className="h-5 w-5 text-green-500" />
+                                        <span className="text-xs text-green-600 mt-1">편집가능</span>
+                                      </div>
+                                    )}
+                                  </button>
+                                  {isDemoModeActive && (
+                                    <span className="text-xs text-muted-foreground">데모 모드</span>
                                   )}
                                 </div>
                                 <Button 
@@ -533,6 +702,7 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
         mode={modalMode}
         testType={editingTestType}
         onSave={handleSaveTestType}
+        onSwitchChange={handleModalSwitchChange}
       />
     </div>
   );

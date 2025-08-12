@@ -8,8 +8,8 @@ import { Textarea } from "./ui/textarea";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Save, Edit, Plus } from "lucide-react";
-import { type TestType } from "../utils/api";
 import { toast } from "sonner";
+import { updateTestType, type TestType } from "../utils/backend-api";
 
 interface TestTypeModalProps {
   isOpen: boolean;
@@ -17,9 +17,10 @@ interface TestTypeModalProps {
   mode: 'add' | 'edit';
   testType?: TestType | null;
   onSave: (testType: Partial<TestType>) => Promise<void>;
+  onSwitchChange?: (testTypeData: Partial<TestType>) => Promise<void>;
 }
 
-export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestTypeModalProps) {
+export function TestTypeModal({ isOpen, onClose, mode, testType, onSave, onSwitchChange }: TestTypeModalProps) {
   const [formData, setFormData] = useState<Partial<TestType>>({ 
     id: "", 
     name: "", 
@@ -27,7 +28,7 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
     enabled: true,
     mcp_tool: "",
     is_locked: false,
-    lock_type: 'config'
+    lock_type: 'config' as const
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -51,7 +52,7 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
         enabled: testType.enabled,
         mcp_tool: testType.mcp_tool || "",
         is_locked: testType.is_locked || false,
-        lock_type: testType.lock_type || 'config'
+        lock_type: testType.lock_type || 'config' as const
       });
     }
   }, [mode, testType]);
@@ -148,7 +149,12 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
                   });
                 }}
                 placeholder="예: 접근성 테스트"
-                className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
+                className={`border-none bg-transparent placeholder:text-muted-foreground ${
+                  mode === 'edit' && formData.is_locked 
+                    ? 'text-muted-foreground cursor-not-allowed opacity-50' 
+                    : 'text-foreground'
+                }`}
+                disabled={mode === 'edit' && formData.is_locked}
               />
             </div>
           </div>
@@ -160,7 +166,12 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
                 placeholder="예: 웹 접근성 준수 검사"
-                className="min-h-24 border-none bg-transparent resize-none text-foreground placeholder:text-muted-foreground"
+                className={`min-h-24 border-none bg-transparent resize-none placeholder:text-muted-foreground ${
+                  mode === 'edit' && formData.is_locked 
+                    ? 'text-muted-foreground cursor-not-allowed opacity-50' 
+                    : 'text-foreground'
+                }`}
+                disabled={mode === 'edit' && formData.is_locked}
               />
             </div>
           </div>
@@ -172,7 +183,12 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
                 value={formData.mcp_tool}
                 onChange={(e) => setFormData({...formData, mcp_tool: e.target.value})}
                 placeholder="예: lighthouse, k6, custom-tool"
-                className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
+                className={`border-none bg-transparent placeholder:text-muted-foreground ${
+                  mode === 'edit' && formData.is_locked 
+                    ? 'text-muted-foreground cursor-not-allowed opacity-50' 
+                    : 'text-foreground'
+                }`}
+                disabled={mode === 'edit' && formData.is_locked}
               />
             </div>
             <p className="text-sm text-muted-foreground">테스트 실행에 사용할 MCP 도구명을 입력하세요. (선택사항, 예: lighthouse, k6, custom-tool)</p>
@@ -181,10 +197,62 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
           {mode === 'edit' && (
             <>
               <div className="neu-pressed rounded-xl px-4 py-4 flex items-center justify-between">
-                <Label className="text-foreground font-semibold">활성화 상태</Label>
+                <div className="space-y-2">
+                  <Label className="text-foreground font-semibold">활성화 상태</Label>
+                </div>
                 <Switch
                   checked={formData.enabled}
-                  onCheckedChange={(checked) => setFormData({...formData, enabled: checked})}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      if (testType) {
+                        // DB에 즉시 업데이트
+                        const result = await updateTestType(testType.id, {
+                          enabled: checked
+                        });
+
+                        if (result.success) {
+                          // 성공 시 로컬 상태 업데이트
+                          setFormData(prev => ({...prev, enabled: checked}));
+                          
+                          // 부모 컴포넌트에 즉시 업데이트 알림
+                          if (onSwitchChange) {
+                            // 현재 formData 상태를 기반으로 업데이트된 데이터 전달
+                            const updatedData = {
+                              ...formData,
+                              enabled: checked
+                            };
+                            await onSwitchChange(updatedData);
+                          }
+                          
+                          // 성공 메시지 표시
+                          const status = checked ? '활성화' : '비활성화';
+                          toast.success(`✅ ${testType.name}이(가) 성공적으로 ${status}되었습니다.`);
+                        } else {
+                          // 실패 시 Switch 상태를 원래대로 되돌리기
+                          console.error('Failed to update enabled status:', result.error);
+                          toast.error(`활성화 상태 변경에 실패했습니다: ${result.error}`);
+                          
+                          // Switch 상태를 원래대로 되돌리기
+                          setFormData(prev => ({
+                            ...prev,
+                            enabled: !checked // 원래 상태로 되돌리기
+                          }));
+                        }
+                      } else {
+                        // 새로 추가하는 경우 로컬 상태만 업데이트
+                        setFormData(prev => ({...prev, enabled: checked}));
+                      }
+                    } catch (error) {
+                      console.error('Error updating enabled status:', error);
+                      toast.error('활성화 상태 변경 중 오류가 발생했습니다.');
+                      
+                      // 에러 시 Switch 상태를 원래대로 되돌리기
+                      setFormData(prev => ({
+                        ...prev,
+                        enabled: !checked // 원래 상태로 되돌리기
+                      }));
+                    }
+                  }}
                   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
                 />
               </div>
@@ -193,12 +261,76 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
                 <div className="space-y-2">
                   <Label className="text-foreground font-semibold">잠금 상태</Label>
                   <p className="text-sm text-muted-foreground">
-                    잠금 설정 시 테스트 타입의 삭제만 불가능합니다 (수정은 가능)
+                    잠금 설정 시 테스트 타입의 수정 및 삭제가 불가능합니다
                   </p>
                 </div>
                 <Switch
                   checked={formData.is_locked}
-                  onCheckedChange={(checked) => setFormData({...formData, is_locked: checked})}
+                  onCheckedChange={async (checked) => {
+                    // 잠금 상태 변경 시 즉시 DB에 반영
+                    try {
+                      if (testType) {
+                        // DB에 즉시 업데이트
+                        const result = await updateTestType(testType.id, {
+                          is_locked: checked,
+                          // 잠금 상태가 true가 되면 활성화 상태도 true로 고정
+                          enabled: checked ? true : formData.enabled
+                        });
+
+                        if (result.success) {
+                          // 성공 시 로컬 상태 업데이트
+                          setFormData(prev => ({
+                            ...prev, 
+                            is_locked: checked,
+                            enabled: checked ? true : prev.enabled
+                          }));
+                          
+                          // 부모 컴포넌트에 즉시 업데이트 알림
+                          if (onSwitchChange) {
+                            // 현재 formData 상태를 기반으로 업데이트된 데이터 전달
+                            const updatedData = {
+                              ...formData,
+                              is_locked: checked,
+                              enabled: checked ? true : formData.enabled
+                            };
+                            await onSwitchChange(updatedData);
+                          }
+                          
+                          // 성공 메시지 표시
+                          const action = checked ? '잠금' : '잠금 해제';
+                          toast.success(`🔒 ${testType.name}이(가) 성공적으로 ${action}되었습니다.`);
+                        } else {
+                          // 실패 시 Switch 상태를 원래대로 유지 (변경하지 않음)
+                          console.error('Failed to update lock status:', result.error);
+                          toast.error(`잠금 상태 변경에 실패했습니다: ${result.error}`);
+                          
+                          // Switch 상태를 원래대로 되돌리기
+                          setFormData(prev => ({
+                            ...prev,
+                            is_locked: !checked, // 원래 상태로 되돌리기
+                            enabled: prev.enabled
+                          }));
+                        }
+                      } else {
+                        // 새로 추가하는 경우 로컬 상태만 업데이트
+                        setFormData(prev => ({
+                          ...prev, 
+                          is_locked: checked,
+                          enabled: checked ? true : prev.enabled
+                        }));
+                      }
+                    } catch (error) {
+                      console.error('Error updating lock status:', error);
+                      toast.error('잠금 상태 변경 중 오류가 발생했습니다.');
+                      
+                      // 에러 시 Switch 상태를 원래대로 되돌리기
+                      setFormData(prev => ({
+                        ...prev,
+                        is_locked: !checked, // 원래 상태로 되돌리기
+                        enabled: prev.enabled
+                      }));
+                    }
+                  }}
                   className="data-[state=checked]:bg-orange-500 data-[state=unchecked]:bg-muted"
                 />
               </div>
@@ -218,7 +350,7 @@ export function TestTypeModal({ isOpen, onClose, mode, testType, onSave }: TestT
           <Button 
             onClick={handleSubmit} 
             className="neu-accent rounded-xl px-6 py-3 text-primary-foreground"
-            disabled={isLoading}
+            disabled={isLoading || (mode === 'edit' && formData.is_locked)}
           >
             {isLoading ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />

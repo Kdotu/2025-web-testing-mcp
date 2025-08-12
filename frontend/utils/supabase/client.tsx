@@ -574,7 +574,7 @@ export const initializeTestTypes = async () => {
 
     // 이미 데이터가 있으면 성공으로 처리
     if (existingData && existingData.length > 0) {
-      console.log('Test types already exist in database');
+      // console.log('Test types already exist in database');
       return { success: true, data: existingData };
     }
 
@@ -641,7 +641,7 @@ export const initializeApp = async () => {
     // 테스트 타입 초기화
     const initResult = await initializeTestTypes();
     if (initResult.success) {
-      console.log('App initialized successfully with test types');
+      // console.log('App initialized successfully with test types');
     } else {
       console.warn('Failed to initialize test types:', initResult.error);
     }

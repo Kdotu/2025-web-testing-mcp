@@ -391,15 +391,6 @@ export function Dashboard({ onNavigate, isInDemoMode, connectionStatus: propConn
                   <Sparkles className="h-4 w-4 mr-2" />
                   데모 모드로 전환
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => window.open('/deploy-guide.md', '_blank')}
-                  className="neu-button"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  배포 가이드
-                </Button>
               </div>
             </div>
           </div>

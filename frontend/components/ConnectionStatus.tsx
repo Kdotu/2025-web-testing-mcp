@@ -71,6 +71,7 @@ export function ConnectionStatus({
           <span className={`text-xs font-medium transition-colors duration-200 ${
             isDemoMode ? 'text-purple-600' : 'text-muted-foreground'
           }`}>
+            
             데모
           </span>
           

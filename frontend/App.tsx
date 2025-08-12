@@ -13,10 +13,10 @@ import { checkApiHealth, checkDatabaseStatus, getConnectionInfo, isDemoMode, set
 import { initializeApp } from "./utils/supabase/client";
 
 const navigation = [
-  { id: "dashboard", name: "메인", component: Dashboard },
-  { id: "test-execution", name: "테스트 실행", component: TestExecution },
-  { id: "test-results", name: "테스트 결과", component: TestResults },
-  { id: "settings", name: "설정", component: Settings },
+  { id: "dashboard", name: "메인", component: Dashboard, url: "/dashboard" },
+  { id: "test-execution", name: "테스트 실행", component: TestExecution, url: "/test-execution" },
+  { id: "test-results", name: "테스트 결과", component: TestResults, url: "/test-results" },
+  { id: "settings", name: "설정", component: Settings, url: "/settings" },
 ];
 
 function AppContent() {
@@ -38,6 +38,29 @@ function AppContent() {
 
     initializeAppData();
   }, []);
+
+  // URL 변경 감지 및 탭 자동 변경
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.tabId) {
+        setActiveTab(event.state.tabId);
+      }
+    };
+
+    // 브라우저 뒤로가기/앞으로가기 이벤트 리스너
+    window.addEventListener('popstate', handlePopState);
+
+    // 초기 URL에 따른 탭 설정
+    const currentPath = window.location.pathname;
+    const navigationItem = navigation.find(nav => nav.url === currentPath);
+    if (navigationItem && navigationItem.id !== activeTab) {
+      setActiveTab(navigationItem.id);
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [activeTab]);
 
   // 연결 상태 확인
   useEffect(() => {
@@ -129,6 +152,14 @@ function AppContent() {
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
+    
+    // URL 변경
+    const navigationItem = navigation.find(nav => nav.id === tabId);
+    if (navigationItem) {
+      // 실제 URL 변경 (브라우저 히스토리에 추가)
+      window.history.pushState({ tabId }, '', navigationItem.url);
+    }
+    
     if (isMobile) {
       setOpenMobile(false);
     }
@@ -170,6 +201,7 @@ function AppContent() {
       <AppSidebar 
         activeTab={activeTab} 
         onTabChange={handleTabChange}
+        navigation={navigation}
       />
 
       {/* 메인 콘텐츠 영역 - 사이드바 오른쪽에 위치 */}

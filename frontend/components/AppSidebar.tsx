@@ -1,19 +1,31 @@
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "./ui/sidebar";
 import { BarChart3, Play, FileText, Settings as SettingsIcon } from "lucide-react";
 
-const navigation = [
-  { id: "dashboard", name: "메인", icon: BarChart3 },
-  { id: "test-execution", name: "테스트 실행", icon: Play },
-  { id: "test-results", name: "테스트 결과", icon: FileText },
-  { id: "settings", name: "설정", icon: SettingsIcon },
-];
+// 아이콘 컴포넌트 매핑 함수
+const getIconComponent = (id: string) => {
+  const iconMap: { [key: string]: any } = {
+    'dashboard': BarChart3,
+    'test-execution': Play,
+    'test-results': FileText,
+    'settings': SettingsIcon,
+  };
+  return iconMap[id] || BarChart3;
+};
+
+
 
 interface AppSidebarProps {
   activeTab: string;
   onTabChange: (tabId: string) => void;
+  navigation: Array<{
+    id: string;
+    name: string;
+    icon: any;
+    url: string;
+  }>;
 }
 
-export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
+export function AppSidebar({ activeTab, onTabChange, navigation }: AppSidebarProps) {
   return (
     <Sidebar className="border-none neu-raised" collapsible="offcanvas">
       <SidebarHeader className="px-6 py-6 border-b border-white/20">
@@ -34,25 +46,30 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       
       <SidebarContent className="px-4 py-6">
         <SidebarMenu className="space-y-3">
-          {navigation.map((item) => (
-            <SidebarMenuItem key={item.id}>
-              <SidebarMenuButton
-                isActive={activeTab === item.id}
-                onClick={() => onTabChange(item.id)}
-                className={`
-                  w-full justify-start rounded-xl px-6 py-4 text-base font-medium
-                  transition-all duration-200 min-h-[3rem]
-                  ${activeTab === item.id 
-                    ? 'neu-button-active text-primary-foreground bg-primary' 
-                    : 'neu-button text-foreground hover:text-primary'
-                  }
-                `}
-              >
-                <item.icon className="mr-4 h-5 w-5 flex-shrink-0" />
-                <span className="truncate">{item.name}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {navigation.map((item) => {
+            // 아이콘 컴포넌트 동적 매핑
+            const IconComponent = getIconComponent(item.id);
+            
+            return (
+              <SidebarMenuItem key={item.id}>
+                <SidebarMenuButton
+                  isActive={activeTab === item.id}
+                  onClick={() => onTabChange(item.id)}
+                  className={`
+                    w-full justify-start rounded-xl px-6 py-4 text-base font-medium
+                    transition-all duration-200 min-h-[3rem]
+                    ${activeTab === item.id 
+                      ? 'neu-button-active text-primary-foreground bg-primary' 
+                      : 'neu-button text-foreground hover:text-primary'
+                    }
+                  `}
+                >
+                  <IconComponent className="mr-4 h-5 w-5 flex-shrink-0" />
+                  <span className="truncate">{item.name}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
     </Sidebar>

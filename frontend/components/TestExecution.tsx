@@ -218,7 +218,7 @@ export function TestExecution({ onNavigate }: TestExecutionProps) {
         setBackendConnected(isConnected);
         
         if (isConnected) {
-          console.log('TestExecution: 백엔드 API 연결 성공');
+          // console.log('TestExecution: 백엔드 API 연결 성공');
           setBackendError(null);
         } else {
           console.log('TestExecution: 백엔드 API 연결 실패:', response.error);

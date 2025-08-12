@@ -42,7 +42,7 @@ class BackendApiClient {
     options: RequestInit = {}
   ): Promise<BackendApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
-    console.log('BackendApiClient: Making request to', url);
+    // console.log('BackendApiClient: Making request to', url);
     
     const defaultOptions: RequestInit = {
       headers: {
@@ -57,14 +57,14 @@ class BackendApiClient {
         ...options,
       });
 
-      console.log('BackendApiClient: Response status:', response.status);
+      // console.log('BackendApiClient: Response status:', response.status);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('BackendApiClient: Response data:', data);
+      // console.log('BackendApiClient: Response data:', data);
       return data;
     } catch (error: any) {
       console.error(`API 요청 실패 (${endpoint}):`, error);
@@ -611,6 +611,9 @@ export interface TestType {
   category?: string;
   icon?: string;
   color?: string;
+  mcp_tool?: string;
+  is_locked?: boolean;
+  lock_type?: "config" | "execution";
   config_template?: any;
   created_at?: string;
   updated_at?: string;
