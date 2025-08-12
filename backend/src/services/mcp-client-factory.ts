@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { MCPProcessManager } from './mcp-process-manager';
+import { MCPProcessManager } from '../services/mcp-process-manager';
 
 // MCP 클라이언트 인터페이스
 interface MCPClient {

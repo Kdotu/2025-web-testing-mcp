@@ -110,9 +110,10 @@ export class TestTypeService {
       // 잠금 해제를 위한 업데이트인 경우 허용
       if (existingTestType.is_locked && updates.is_locked === false) {
         console.log(`[TestTypeService] 테스트 타입 '${id}'의 잠금 해제 허용`);
+        // 잠금 해제 시에는 다른 필드 수정도 허용
       }
-      // 잠금 상태에서 다른 필드 수정을 시도하는 경우 차단
-      else if (existingTestType.is_locked && updates.is_locked !== false) {
+      // 잠금 상태에서 다른 필드 수정을 시도하는 경우 차단 (단, 잠금 해제는 제외)
+      else if (existingTestType.is_locked && updates.is_locked !== false && updates.is_locked !== undefined) {
         throw new Error(`테스트 타입 '${existingTestType.name}'이(가) 잠겨있습니다. 테스트 ID: ${existingTestType.locked_by}`);
       }
 
