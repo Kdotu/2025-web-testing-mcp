@@ -16,20 +16,30 @@ import { TestTypeModal } from "./TestTypeModal";
 
 interface SettingsProps {
   onNavigate?: (tabId: string) => void;
+  isInDemoMode?: boolean;
+  connectionStatus?: string;
 }
 
-export function Settings({ onNavigate }: SettingsProps) {
+export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConnectionStatus }: SettingsProps) {
   const [testTypes, setTestTypes] = useState<TestType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [editingTestType, setEditingTestType] = useState<TestType | null>(null);
+  const [isDemoModeActive, setIsDemoModeActive] = useState(isInDemoMode || false);
   
   // 일반 설정
   const [notifications, setNotifications] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
   const [maxConcurrentTests, setMaxConcurrentTests] = useState(3);
   const [defaultTimeout, setDefaultTimeout] = useState(30);
+
+  // props 변경 시 상태 업데이트
+  useEffect(() => {
+    if (isInDemoMode !== undefined) {
+      setIsDemoModeActive(isInDemoMode);
+    }
+  }, [isInDemoMode]);
 
   // 컴포넌트 마운트시 테스트 타입 불러오기
   useEffect(() => {
@@ -250,6 +260,17 @@ export function Settings({ onNavigate }: SettingsProps) {
         </div>
 
         <div className="neu-card rounded-3xl px-6 py-8">
+          {/* 데모 모드 알림 */}
+          {isDemoModeActive && (
+            <div className="mb-6 neu-accent rounded-xl px-6 py-4 border border-purple-300/30">
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
+                <span className="text-purple-700 font-semibold">데모 모드</span>
+                <span className="text-purple-600 text-sm">현재 데모 모드로 실행 중입니다. 설정 변경이 제한됩니다.</span>
+              </div>
+            </div>
+          )}
+
           <Tabs defaultValue="test-types" className="space-y-8">
             <TabsList className="grid w-full grid-cols-3 neu-flat rounded-xl p-1.5 gap-1.5 h-auto">
               <TabsTrigger 
@@ -275,15 +296,22 @@ export function Settings({ onNavigate }: SettingsProps) {
                   <p className="text-muted-foreground text-lg">사용 가능한 테스트 타입을 관리합니다</p>
                 </div>
                 <Button 
-                  className="neu-accent rounded-xl px-6 py-3 text-primary-foreground font-semibold" 
+                  className={`rounded-xl px-6 py-3 font-semibold ${
+                    isDemoModeActive 
+                      ? 'neu-pressed text-muted-foreground cursor-not-allowed' 
+                      : 'neu-accent text-primary-foreground'
+                  }`}
                   onClick={() => {
-                    setModalMode('add');
-                    setEditingTestType(null);
-                    setIsModalOpen(true);
+                    if (!isDemoModeActive) {
+                      setModalMode('add');
+                      setEditingTestType(null);
+                      setIsModalOpen(true);
+                    }
                   }}
+                  disabled={isDemoModeActive}
                 >
                   <Plus className="h-5 w-5 mr-2" />
-                  테스트 타입 추가
+                  {isDemoModeActive ? '데모 모드에서는 추가 불가' : '테스트 타입 추가'}
                 </Button>
               </div>
               
@@ -355,25 +383,34 @@ export function Settings({ onNavigate }: SettingsProps) {
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  className="neu-button rounded-xl px-4 py-3"
+                                  className={`rounded-xl px-4 py-3 ${
+                                    isDemoModeActive 
+                                      ? 'neu-pressed text-muted-foreground cursor-not-allowed' 
+                                      : 'neu-button'
+                                  }`}
                                   onClick={() => {
-                                    setModalMode('edit');
-                                    setEditingTestType(testType);
-                                    setIsModalOpen(true);
+                                    if (!isDemoModeActive) {
+                                      setModalMode('edit');
+                                      setEditingTestType(testType);
+                                      setIsModalOpen(true);
+                                    }
                                   }}
+                                  disabled={isDemoModeActive}
                                 >
                                   <Edit className="h-4 w-4 mr-2" />
-                                  수정
+                                  {isDemoModeActive ? '수정 불가' : '수정'}
                                 </Button>
                                 <Button 
                                   variant="ghost" 
                                   size="sm"
                                   onClick={() => handleDeleteTestType(testType)}
-                                  disabled={testType.is_locked}
-                                  className="neu-button rounded-xl px-4 py-3 text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  disabled={testType.is_locked || isDemoModeActive}
+                                  className={`rounded-xl px-4 py-3 text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    isDemoModeActive ? 'neu-pressed' : 'neu-button'
+                                  }`}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
-                                  삭제
+                                  {isDemoModeActive ? '삭제 불가' : '삭제'}
                                 </Button>
                               </div>
                             </div>

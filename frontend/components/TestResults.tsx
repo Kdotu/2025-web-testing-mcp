@@ -12,9 +12,11 @@ import { TestResultModal } from "./TestResultModal";
 
 interface TestResultsProps {
   onNavigate?: (tabId: string) => void;
+  isInDemoMode?: boolean;
+  connectionStatus?: string;
 }
 
-export function TestResults({ onNavigate }: TestResultsProps) {
+export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propConnectionStatus }: TestResultsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [selectedResult, setSelectedResult] = useState<any>(null);
@@ -26,6 +28,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
+  const [isDemoModeActive, setIsDemoModeActive] = useState(isInDemoMode || false);
 
   // 테이블 드래그 스크롤 기능
   useEffect(() => {
@@ -79,11 +82,46 @@ export function TestResults({ onNavigate }: TestResultsProps) {
 
 
 
+  // props 변경 시 상태 업데이트
+  useEffect(() => {
+    if (isInDemoMode !== undefined) {
+      setIsDemoModeActive(isInDemoMode);
+    }
+  }, [isInDemoMode]);
+
   // 백엔드 API에서 테스트 결과 데이터와 테스트 타입 데이터 가져오기
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        
+        // 데모 모드인 경우 mock 데이터 사용
+        if (isDemoModeActive) {
+          // Mock 데이터 설정
+          setTestResults([
+            {
+              id: "demo_1",
+              url: "https://example.com",
+              testType: "performance",
+              status: "completed",
+              score: 92,
+              createdAt: "2025-01-23T10:30:00",
+              duration: "2m 15s"
+            },
+            {
+              id: "demo_2", 
+              url: "https://demo-site.com",
+              testType: "lighthouse",
+              status: "completed",
+              score: 88,
+              createdAt: "2025-01-23T09:15:00",
+              duration: "1m 45s"
+            }
+          ]);
+          setTotalTestCount(2);
+          setLoading(false);
+          return;
+        }
         
         // 테스트 결과, 전체 개수, 테스트 타입을 병렬로 가져오기
         const [resultsResult, countResult, typesResult] = await Promise.all([
@@ -222,6 +260,11 @@ export function TestResults({ onNavigate }: TestResultsProps) {
 
   // HTML 리포트 생성
   const handleGenerateHtmlReport = async (result: any) => {
+    if (isDemoModeActive) {
+      alert('데모 모드에서는 리포트 생성이 불가능합니다.');
+      return;
+    }
+    
     try {
       setGeneratingReport('html');
       const testId = result.testId || result.id;
@@ -255,6 +298,11 @@ export function TestResults({ onNavigate }: TestResultsProps) {
 
   // PDF 리포트 생성
   const handleGeneratePdfReport = async (result: any) => {
+    if (isDemoModeActive) {
+      alert('데모 모드에서는 리포트 생성이 불가능합니다.');
+      return;
+    }
+    
     try {
       setGeneratingReport('pdf');
       const testId = result.testId || result.id;
@@ -284,6 +332,11 @@ export function TestResults({ onNavigate }: TestResultsProps) {
 
   // 생성된 리포트 자동 다운로드
   const downloadGeneratedReport = async (documentInfo: any) => {
+    if (isDemoModeActive) {
+      alert('데모 모드에서는 리포트 다운로드가 불가능합니다.');
+      return;
+    }
+    
     try {
       console.log('생성된 리포트 자동 다운로드 시작:', documentInfo);
       
@@ -332,9 +385,25 @@ export function TestResults({ onNavigate }: TestResultsProps) {
           <FileText className="h-10 w-10 text-primary" />
           <div>
             <h1 className="text-4xl font-bold text-primary">테스트 결과</h1>
-            <p className="text-muted-foreground text-lg mt-2">실행된 테스트 결과를 확인하고 분석하세요</p>
+            <p className="text-muted-foreground text-lg mt-2">
+              {isDemoModeActive 
+                ? '데모 모드: 샘플 테스트 결과를 확인하세요' 
+                : '실행된 테스트 결과를 확인하고 분석하세요'
+              }
+            </p>
           </div>
         </div>
+        
+        {/* 데모 모드 알림 */}
+        {isDemoModeActive && (
+          <div className="mt-4 neu-accent rounded-xl px-4 py-3 border border-purple-300/30">
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
+              <span className="text-purple-700 font-semibold">데모 모드</span>
+              <span className="text-purple-600 text-sm">현재 데모 모드로 실행 중입니다. 샘플 데이터가 표시됩니다.</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 로딩 상태 */}
@@ -626,6 +695,7 @@ export function TestResults({ onNavigate }: TestResultsProps) {
         onClose={closeModal}
         result={selectedResult}
         onDownload={handleDownload}
+        isInDemoMode={isDemoModeActive}
       />
     </div>
   );

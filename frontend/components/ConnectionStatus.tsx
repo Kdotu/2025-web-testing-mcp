@@ -64,7 +64,49 @@ export function ConnectionStatus({
   const StatusIcon = display.icon;
 
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex items-center space-x-4">
+      {/* 데모/연결 모드 선택 Toggle Switch */}
+      <div className="rounded-lg px-3 py-2 border border-white/10">
+        <div className="flex items-center space-x-3">
+          <span className={`text-xs font-medium transition-colors duration-200 ${
+            isDemoMode ? 'text-purple-600' : 'text-muted-foreground'
+          }`}>
+            데모
+          </span>
+          
+          {/* Toggle Switch */}
+          <button
+            onClick={onToggleDemoMode}
+            className={`
+              relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-300 ease-in-out
+              focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+              ${isDemoMode 
+                ? 'bg-purple-600' 
+                : 'bg-green-600'
+              }
+            `}
+            role="switch"
+            aria-checked={isDemoMode}
+            aria-label="데모 모드 토글"
+          >
+            <span
+              className={`
+                inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ease-in-out
+                ${isDemoMode ? 'translate-x-1' : 'translate-x-5'}
+                shadow-md
+              `}
+            />
+          </button>
+          
+          <span className={`text-xs font-medium transition-colors duration-200 ${
+            !isDemoMode ? 'text-green-600' : 'text-muted-foreground'
+          }`}>
+            연결
+          </span>
+        </div>
+      </div>
+
+      {/* 연결 상태 표시 */}
       <div 
         className={`
           flex items-center space-x-2 neu-pressed rounded-full px-4 py-2 

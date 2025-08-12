@@ -183,6 +183,8 @@ interface TestSettings {
 
 interface TestExecutionProps {
   onNavigate?: (tabId: string) => void;
+  isInDemoMode?: boolean;
+  connectionStatus?: string;
 }
 
 export function TestExecution({ onNavigate }: TestExecutionProps) {

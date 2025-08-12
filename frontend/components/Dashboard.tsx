@@ -75,15 +75,17 @@ const mockData = {
 
 interface DashboardProps {
   onNavigate?: (tabId: string) => void;
+  isInDemoMode?: boolean;
+  connectionStatus?: string;
 }
 
-export function Dashboard({ onNavigate }: DashboardProps) {
+export function Dashboard({ onNavigate, isInDemoMode, connectionStatus: propConnectionStatus }: DashboardProps) {
   const [testResults, setTestResults] = useState<any[]>([]);
   const [totalTestCount, setTotalTestCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState('checking');
+  const [connectionStatus, setConnectionStatus] = useState(propConnectionStatus || 'checking');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
-  const [isDemoModeActive, setIsDemoModeActive] = useState(isDemoMode());
+  const [isDemoModeActive, setIsDemoModeActive] = useState(isInDemoMode || isDemoMode());
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   // 경과 시간 계산 함수 (MM:SS 포맷)
@@ -161,13 +163,23 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
+  // props 변경 시 상태 업데이트
+  useEffect(() => {
+    if (isInDemoMode !== undefined) {
+      setIsDemoModeActive(isInDemoMode);
+    }
+    if (propConnectionStatus) {
+      setConnectionStatus(propConnectionStatus);
+    }
+  }, [isInDemoMode, propConnectionStatus]);
+
   useEffect(() => {
     const loadDashboardData = async () => {
       setIsLoading(true);
       
       try {
-        // 데모 모드 상태 확인
-        const demoMode = isDemoMode();
+        // props에서 데모 모드 상태 확인
+        const demoMode = isInDemoMode !== undefined ? isInDemoMode : isDemoMode();
         setIsDemoModeActive(demoMode);
         
         if (demoMode) {
@@ -351,50 +363,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <span className="text-sm font-medium">로컬 데이터 저장</span>
                   </div>
                 </div>
-                <div className="neu-pressed rounded-xl px-4 py-3">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">설정 및 결과 관리</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={toggleDemoMode}
-                  className="neu-button"
-                >
-                  <Database className="h-4 w-4 mr-2" />
-                  Supabase 연결 시도
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => window.open('/deploy-guide.md', '_blank')}
-                  className="neu-button"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  배포 가이드
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    console.group('🎭 데모 모드 정보');
-                    console.log('현재 상태: 데모 모드 활성화');
-                    // console.log('모든 기능: 완전히 사용 가능');
-                    // console.log('데이터 저장: 브라우저 로컬 저장소');
-                    console.log('실제 테스트: 시뮬레이션');
-                    console.log('Supabase 연동: window.mcpDebug.setDemoMode(false)');
-                    console.groupEnd();
-                    alert('데모 모드 정보가 콘솔에 출력되었습니다.');
-                  }}
-                  className="neu-button"
-                >
-                  <Info className="h-4 w-4 mr-2" />
-                  데모 정보
-                </Button>
               </div>
             </div>
           </div>

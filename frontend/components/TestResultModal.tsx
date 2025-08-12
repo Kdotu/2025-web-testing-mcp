@@ -7,9 +7,10 @@ interface TestResultModalProps {
   onClose: () => void;
   result: any;
   onDownload: (result: any, format: string) => void;
+  isInDemoMode?: boolean;
 }
 
-export function TestResultModal({ isOpen, onClose, result, onDownload }: TestResultModalProps) {
+export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoMode }: TestResultModalProps) {
   const [metrics, setMetrics] = useState<TestMetric[]>([]);
   const [groupedMetrics, setGroupedMetrics] = useState<any>({});
   const [loading, setLoading] = useState(false);

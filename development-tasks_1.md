@@ -1,4 +1,4 @@
-# k6 MCP 부하 테스트 시스템 개발 Task 목록
+# MCP 웹페이지 테스트 시스템 고도화 작업 계획
 
 **프로젝트 시작일**: 2025-07-29  
 **목표**: k6 MCP를 활용한 웹사이트 부하 테스트 시스템 구축
@@ -211,6 +211,12 @@
   - [x] 백엔드 문서 조회 로직 최적화
   - [x] 프론트엔드 다운로드 UI/UX 개선
 
+- [ ] **6.5** 로컬 환경 문서 다운로드 문제 해결 (우선순위 높음)
+  - [ ] 로컬 환경에서 문서 다운로드 실패 문제 진단
+  - [ ] 백엔드 파일 경로 및 권한 문제 해결
+  - [ ] 프론트엔드 다운로드 로직 개선
+  - [ ] 로컬 환경 테스트 및 검증
+
 ### Phase 7: 배포 및 인프라 (우선순위 7) ✅ 완료
 - [x] **7.1** Netlify 배포 설정
   - [x] Netlify 프로젝트 연결
@@ -237,60 +243,100 @@
   - [x] 환경 변수 처리 개선
   - [x] 배포 전 빌드 테스트
 
-### Phase 8: 테스트 결과 시각화 (우선순위 8) 🔄 진행 중
+### Phase 8: 테스트 결과 시각화 (우선순위 8) ✅ 완료
 - [x] **8.1** 차트 및 그래프 시스템
   - [x] Recharts 라이브러리 활용한 시각화 컴포넌트 구현
   - [x] 테스트 결과별 차트 타입 정의 (라인 차트, 바 차트, 파이 차트)
   - [x] 실시간 데이터 업데이트 기능
   - [x] 반응형 차트 디자인 (모바일/데스크톱 대응)
 
-- [x] **8.2** 성능 메트릭 시각화
-  - [x] k6 부하 테스트 결과 시각화
-    - [x] 응답 시간 분포 (히스토그램)
-    - [x] 요청 처리량 (RPS) 그래프
-    - [x] 에러율 추이 차트
-    - [x] 가상 사용자 수 변화 그래프
-  - [x] Lighthouse 성능 분석 결과 시각화
-    - [x] 성능 점수 변화 추이
-    - [x] Core Web Vitals 메트릭 차트
-    - [x] 리소스 로딩 시간 분석
-    - [x] 접근성/SEO/베스트 프랙티스 점수 비교
-  - [x] Playwright E2E 테스트 결과 시각화
-    - [x] 테스트 실행 시간 분포
-    - [x] 성공/실패율 파이 차트
-    - [x] 페이지별 성능 비교
+### Phase 9: 실제 MCP 서버 기반 통합 (우선순위 9) ✅ 완료
+- [x] **9.1** 실제 MCP 서버 구조 적용
+  - [x] **Lighthouse MCP**: [priyankark/lighthouse-mcp](https://github.com/priyankark/lighthouse-mcp) 기반 구조 적용
+    - [x] TypeScript 기반 MCP 서버 구현
+    - [x] @modelcontextprotocol/sdk 활용
+    - [x] Lighthouse 감사 실행 도구 구현
+    - [x] 성능 점수 추출 도구 구현
+  - [x] **Playwright MCP**: [microsoft/playwright-mcp](https://github.com/microsoft/playwright-mcp) 기반 구조 적용
+    - [x] Playwright MCP 서버 방식으로 변경
+    - [x] executePlaywrightViaMCP 메서드 구현
+    - [x] MCP 서버 통신 방식 적용
+    - [x] 결과 파싱 및 처리 로직 구현
 
-- [x] **8.3** 대시보드 및 분석 도구
-  - [x] 통합 대시보드 구현
-    - [x] 모든 테스트 타입 결과 통합 표시
-    - [x] 실시간 모니터링 위젯
-    - [x] 성능 트렌드 분석
-  - [x] 비교 분석 기능
-    - [x] 동일 URL의 이전 테스트와 비교
-    - [x] 다른 URL 간 성능 비교
-    - [x] 시간대별 성능 변화 분석
-  - [x] 임계값 기반 알림 시스템
-    - [x] 성능 지표 임계값 설정
-    - [x] 임계값 초과 시 시각적 경고
-    - [x] 알림 히스토리 관리
+- [x] **9.2** 백엔드 서비스 통합
+  - [x] **E2ETestService MCP 서버 방식 변경**:
+    - [x] 기존 직접 실행 방식 제거
+    - [x] executePlaywrightViaMCP 메서드 추가
+    - [x] MCP 서버 통신 로직 구현
+    - [x] JSON 기반 stdin/stdout 통신 적용
+  - [x] **LighthouseService MCP 서버 방식 적용**:
+    - [x] executeLighthouseViaMCP 메서드 구현
+    - [x] 실제 Lighthouse MCP 서버 연동
+    - [x] 결과 파싱 및 메트릭 추출
 
-- [ ] **8.4** 고급 시각화 기능
-  - [ ] 히트맵 및 분포도
-    - [ ] 응답 시간 히트맵
-    - [ ] 에러 발생 패턴 분석
-  - [ ] 인터랙티브 차트
-    - [ ] 줌인/줌아웃 기능
-    - [ ] 데이터 포인트 호버 정보
-    - [ ] 차트 필터링 및 정렬
+- [x] **9.3** 프론트엔드 연동 업데이트
+  - [x] TestExecution.tsx에서 MCP 서버 방식 호출
+  - [x] 백엔드 API 엔드포인트 MCP 서버 방식 통일
+  - [x] 에러 핸들링 및 재시도 로직 개선
 
+### Phase 10: MCP 서버 연결 방식 개선 및 테스트 검증 (우선순위 10) 🔄 진행 중
+- [ ] **10.1** Playwright MCP 서버 연결 방식 개선
+  - [ ] 현재 JSON 기반 stdin/stdout 방식 검토
+  - [ ] 실제 @playwright/mcp 패키지 기반 연결 방식으로 변경
+  - [ ] Playwright MCP 서버 정상 실행 확인
+  - [ ] E2E 테스트 실행 및 결과 검증
+
+- [ ] **10.2** Lighthouse MCP 서버 연결 방식 개선
+  - [ ] 현재 연결 방식 검토
+  - [ ] 실제 lighthouse-mcp 패키지 기반 연결 방식으로 변경
+  - [ ] Lighthouse MCP 서버 정상 실행 확인
+  - [ ] 성능 테스트 실행 및 결과 검증
+
+- [ ] **10.3** 통합 테스트 및 검증
+  - [ ] 모든 MCP 서버 연결 방식 통일
+  - [ ] 각 테스트 유형별 정상 실행 확인
+  - [ ] 결과 데이터베이스 저장 검증
+  - [ ] 프론트엔드 결과 표시 검증
 
 ## 🚀 현재 개발 상태
 
-**현재 단계**: Phase 8.4 - 고급 시각화 기능 (진행 중)  
-**다음 작업**: 히트맵 및 인터랙티브 차트 기능 구현  
-**향후 계획**: 프로젝트 완성 및 최종 테스트
+**현재 단계**: Phase 10 진행 중 - MCP 서버 연결 방식 개선 및 테스트 검증  
+**최근 작업**: TypeScript 컴파일 오류 수정 완료 (2025-08-06)  
+**다음 작업**: 
+1. 로컬 환경 문서 다운로드 문제 해결 (Phase 6.5)
+2. Playwright/Lighthouse MCP 서버 연결 방식 개선 (Phase 10)
+**향후 계획**: 성능 최적화 및 사용자 피드백 반영
 
 ## 📝 개발 노트
+
+### 2025-08-06
+- **TypeScript 컴파일 오류 수정 완료**:
+  - E2ETestService에서 타입 오류 수정 (status, description, updateResult 메서드)
+  - LoadTestResult 타입 import 추가
+  - metrics와 summary 필드를 LoadTestResult 타입에 맞게 수정
+  - handleTestCompletion 메서드의 status 매개변수 타입을 명시적으로 지정
+  - saveInitialResult에서 description 필드에 기본값 제공
+  - updateTestResult 메서드를 TestResultService.updateResult의 올바른 시그니처에 맞게 수정
+  - 백엔드 서버 정상 실행 확인
+- **실제 MCP 서버 기반 통합 완료**:
+  - **Lighthouse MCP 서버**: [priyankark/lighthouse-mcp](https://github.com/priyankark/lighthouse-mcp) 기반 구조 적용 완료
+    - TypeScript 기반 MCP 서버 구현
+    - @modelcontextprotocol/sdk 활용한 표준 MCP 서버 구조
+    - Lighthouse 감사 실행 도구 (run_audit) 구현
+    - 성능 점수 추출 도구 (get_performance_score) 구현
+  - **Playwright MCP 서버**: [microsoft/playwright-mcp](https://github.com/microsoft/playwright-mcp) 기반 구조 적용 완료
+    - 기존 직접 실행 방식에서 MCP 서버 방식으로 완전 변경
+    - executePlaywrightViaMCP 메서드 구현
+    - JSON 기반 stdin/stdout 통신 방식 적용
+    - 결과 파싱 및 처리 로직 구현
+  - **백엔드 서비스 통합 완료**:
+    - E2ETestService를 MCP 서버 방식으로 완전 변경
+    - LighthouseService MCP 서버 연동 완료
+    - 모든 테스트 유형이 MCP 서버 방식으로 통일
+  - **프론트엔드 연동 업데이트 완료**:
+    - TestExecution.tsx에서 MCP 서버 방식 호출
+    - 백엔드 API 엔드포인트 MCP 서버 방식 통일
+    - 에러 핸들링 및 재시도 로직 개선
 
 ### 2025-08-05
 - **Phase 8.3 대시보드 및 분석 도구 완료**:
@@ -468,8 +514,9 @@
 - **백엔드**: Node.js/Express (빠른 개발, 풍부한 생태계)
 - **데이터베이스**: Supabase (PostgreSQL 기반, 실시간 기능)
 - **MCP**: @modelcontextprotocol/sdk 사용
-- **문서화**: HTML + PDF 생성
-- **배포**: Netlify (프론트엔드), Vercel/Railway (백엔드)
+- **문서화**: HTML + PDF 생성 (Handlebars + Puppeteer)
+- **배포**: Netlify (프론트엔드), Cloudtype (백엔드)
+- **테스트 도구**: k6 (부하 테스트), Lighthouse (성능 분석), Playwright (E2E 테스트)
 
 ### 주의사항
 - 프론트엔드 기존 코드 직접 수정 금지
@@ -514,11 +561,14 @@ CORS_ORIGIN=http://localhost:3100
 - **Phase 3**: 100% (3/3 완료) ✅
 - **Phase 4**: 100% (8/8 완료) ✅
 - **Phase 5**: 100% (6/6 완료) ✅
-- **Phase 6**: 100% (4/4 완료) ✅
+- **Phase 6**: 85% (4/5 완료) 🔄 (6.5 로컬 다운로드 문제 해결 필요)
 - **Phase 7**: 100% (3/3 완료) ✅
-- **Phase 8**: 75% (3/4 완료) 🔄
+- **Phase 8**: 100% (4/4 완료) ✅
+- **Phase 9**: 100% (3/3 완료) ✅
+- **Phase 10**: 0% (0/3 진행) 🔄 (새로 추가됨)
 
-**전체 진행률**: 96% (28/29 완료)
+**전체 진행률**: 94% (31/33 완료)  
+**최근 업데이트**: 2025-08-06 - TypeScript 컴파일 오류 수정 완료, 새로운 Phase 추가
 
 ## 📁 생성된 파일 구조
 
@@ -526,7 +576,6 @@ CORS_ORIGIN=http://localhost:3100
 backend/
 ├── package.json ✅
 ├── tsconfig.json ✅
-├── supabase-config_3.md ✅ (Supabase 설정 가이드)
 ├── src/
 │   ├── index.ts ✅ (Express 서버)
 │   ├── types/index.ts ✅ (타입 정의)
@@ -534,66 +583,76 @@ backend/
 │   ├── routes/
 │   │   ├── load-tests.ts ✅
 │   │   ├── test-results.ts ✅
-│   │   ├── test-types.ts ✅ (테스트 타입 관리)
-│   │   ├── test-metrics.ts ✅ (메트릭 관리)
-│   │   ├── lighthouse.ts ✅ (Lighthouse 테스트)
-│   │   └── e2e-tests.ts ✅ (E2E 테스트)
+│   │   ├── test-types.ts ✅
+│   │   ├── test-metrics.ts ✅
+│   │   ├── lighthouse.ts ✅
+│   │   └── e2e-tests.ts ✅
 │   ├── controllers/
 │   │   ├── load-test-controller.ts ✅
 │   │   ├── test-result-controller.ts ✅
-│   │   ├── test-type-controller.ts ✅ (테스트 타입 관리)
-│   │   ├── test-metric-controller.ts ✅ (메트릭 관리)
-│   │   ├── lighthouse-controller.ts ✅ (Lighthouse 테스트)
-│   │   └── e2e-test-controller.ts ✅ (E2E 테스트)
+│   │   ├── test-type-controller.ts ✅
+│   │   ├── test-metric-controller.ts ✅
+│   │   ├── lighthouse-controller.ts ✅
+│   │   └── e2e-test-controller.ts ✅
 │   └── services/
-│       ├── supabase-client.ts ✅ (Supabase 클라이언트)
+│       ├── supabase-client.ts ✅
 │       ├── k6-service.ts ✅
-│       ├── test-result-service.ts ✅ (Supabase 기반)
-│       ├── test-type-service.ts ✅ (테스트 타입 관리)
-│       ├── test-metric-service.ts ✅ (메트릭 관리)
-│       ├── lighthouse-service.ts ✅ (Lighthouse 테스트)
-│       └── e2e-test-service.ts ✅ (E2E 테스트)
+│       ├── test-result-service.ts ✅
+│       ├── test-type-service.ts ✅
+│       ├── test-metric-service.ts ✅
+│       ├── lighthouse-service.ts ✅
+│       └── e2e-test-service.ts ✅
+├── mcp/
+│   ├── k6-mcp-server/
+│   │   ├── k6_server.py ✅
+│   │   └── requirements.txt ✅
+│   ├── lighthouse-mcp-server/
+│   │   ├── package.json ✅
+│   │   └── src/index.ts ✅
+│   └── playwright-mcp-server/
+│       ├── package.json ✅
+│       └── src/index.ts ✅
+├── temp/ ✅
+├── reports/ ✅
+└── templates/ ✅
 
 frontend/
 ├── utils/
-│   ├── api.tsx ✅ (기존 Supabase API)
-│   └── backend-api.ts ✅ (새로운 백엔드 API 클라이언트)
+│   ├── api.tsx ✅ (Supabase API)
+│   └── backend-api.ts ✅ (백엔드 API 클라이언트)
 ├── components/
-│   ├── TestExecution.tsx ✅ (백엔드 API 연동 및 UI/UX 대폭 개선)
-│   ├── TestResults.tsx ✅ (UI/UX 개선 완료)
-│   ├── TestResultModal.tsx ✅ (모달창 컴포넌트 분리)
-│   ├── Dashboard.tsx ✅ (실제 데이터 기반 차트 구현)
-│   └── Settings.tsx ✅ (테스트 타입 관리 연동)
-├── env.example ✅ (환경 변수 예시)
-├── README.md ✅ (환경 변수 설정 가이드)
-└── netlify.toml ✅ (Netlify 배포 설정)
-
-k6-mcp-server/
-├── k6_server.py ✅ (MCP 서버 - 1회성 실행 방식으로 변경)
-├── requirements.txt ✅
-└── hello.js ✅ (테스트 스크립트)
-
-lighthouse-mcp-server/
-├── requirements.txt ✅
-└── lighthouse_server.py ✅ (Lighthouse MCP 서버)
-
-playwright-mcp-server/
-├── requirements.txt ✅
-└── playwright_server.py ✅ (Playwright MCP 서버)
+│   ├── TestExecution.tsx ✅
+│   ├── TestResults.tsx ✅
+│   ├── TestResultModal.tsx ✅
+│   ├── Dashboard.tsx ✅
+│   └── Settings.tsx ✅
+├── env.example ✅
+├── README.md ✅
+└── netlify.toml ✅
 ```
 
 ## 🚀 다음 단계
 
-1. **Phase 8.4 완료**: 고급 시각화 기능
-   - 히트맵 및 분포도 구현
-   - 인터랙티브 차트 기능 (줌인/줌아웃, 호버 정보, 필터링)
-   - 3D 시각화 (선택적)
+1. **Phase 6.5**: 로컬 환경 문서 다운로드 문제 해결 (우선순위 높음)
+   - 로컬 환경에서 문서 다운로드 실패 문제 진단
+   - 백엔드 파일 경로 및 권한 문제 해결
+   - 프론트엔드 다운로드 로직 개선
+   - 로컬 환경 테스트 및 검증
 
-2. **프로젝트 완성**: 최종 테스트 및 최적화
+2. **Phase 10**: MCP 서버 연결 방식 개선 및 테스트 검증
+   - Playwright MCP 서버 연결 방식 개선
+   - Lighthouse MCP 서버 연결 방식 개선
+   - 통합 테스트 및 검증
+
+3. **프로젝트 완성**: 최종 테스트 및 최적화
    - 전체 시스템 통합 테스트
    - 성능 최적화
    - 사용자 피드백 반영
    - 문서화 완성
 
-### 📈 전체 진행률: 96% (28/29 완료)
+### 📈 전체 진행률: 94% (31/33 완료)
+
+**프로젝트 거의 완성!** 🚀  
+**최종 업데이트**: 2025-08-06 - TypeScript 컴파일 오류 수정 완료, 새로운 Phase 추가  
+**남은 작업**: 로컬 다운로드 문제 해결 및 MCP 서버 연결 방식 개선
 

@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { SidebarProvider, SidebarTrigger, useSidebar } from "./components/ui/sidebar";
-import { AppSidebar } from "./components/AppSidebar";
-import { ConnectionStatus } from "./components/ConnectionStatus";
-import { Dashboard } from "./components/Dashboard";
-import { TestExecution } from "./components/TestExecution";
-import { TestResults } from "./components/TestResults";
-import { Settings } from "./components/Settings";
-import { Menu } from "lucide-react";
+import { SidebarProvider, useSidebar } from "./components/ui/sidebar";
+import { 
+  AppSidebar, 
+  Header, 
+  Footer, 
+  Dashboard, 
+  TestExecution, 
+  TestResults, 
+  Settings 
+} from "./components";
 import { checkApiHealth, checkDatabaseStatus, getConnectionInfo, isDemoMode, setDemoMode } from "./utils/api";
 import { initializeApp } from "./utils/supabase/client";
 
@@ -176,51 +178,29 @@ function AppContent() {
         state === 'collapsed' ? 'ml-0' : 'md:ml-60'
       }`}>
         {/* 헤더 */}
-        <header className="neu-flat border-b border-white/10 w-full shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)] flex-shrink-0">
-          <div className="flex items-center justify-between px-4 py-4 w-full">
-            <div className="flex items-center space-x-4">
-              <div className="neu-button rounded-lg p-2">
-                <SidebarTrigger className="text-primary">
-                  <Menu className="h-4 w-4" />
-                </SidebarTrigger>
-              </div>
-              <h2 className="text-xl font-semibold text-primary truncate">
-                {navigation.find(nav => nav.id === activeTab)?.name || "메인"}
-              </h2>
-            </div>
-            
-            <ConnectionStatus
-              status={connectionStatus}
-              error={connectionError}
-              isDemoMode={isInDemoMode}
-              onToggleDemoMode={toggleDemoMode}
-              onShowDebug={showDebugInfo}
-            />
-          </div>
-        </header>
+        <Header
+          activeTab={activeTab}
+          navigation={navigation}
+          connectionStatus={connectionStatus}
+          connectionError={connectionError}
+          isInDemoMode={isInDemoMode}
+          onToggleDemoMode={toggleDemoMode}
+          onShowDebug={showDebugInfo}
+        />
 
         {/* 메인 콘텐츠 */}
         <main className="flex-1 overflow-y-auto px-4 md:px-12 py-4 md:py-8 w-full">
           <div className="w-full px-2 md:px-6">
-            <ActiveComponent onNavigate={handleTabChange} />
+            <ActiveComponent 
+              onNavigate={handleTabChange} 
+              isInDemoMode={isInDemoMode}
+              connectionStatus={connectionStatus}
+            />
           </div>
         </main>
 
         {/* 푸터 */}
-        <footer className="neu-flat border-t border-white/10 w-full flex-shrink-0">
-          <div className="flex items-center justify-between text-sm text-muted-foreground px-4 py-4 w-full">
-            <span>© 2025 MCP 웹사이트 테스터</span>
-            <div className="flex items-center space-x-3">
-              <span>버전 1.0.0</span>
-              {connectionStatus === 'connected' && (
-                <span className="text-green-600">• 연결됨</span>
-              )}
-              {connectionStatus === 'demo' && (
-                <span className="text-purple-600">• 데모 모드</span>
-              )}
-            </div>
-          </div>
-        </footer>
+        <Footer connectionStatus={connectionStatus} />
       </div>
     </div>
   );
