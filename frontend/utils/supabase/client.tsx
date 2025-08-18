@@ -488,7 +488,7 @@ export const getMcpTools = async (testType: string) => {
     const { data, error } = await supabase
       .from('m2_test_types')
       .select('mcp_tool')
-      .eq('name', testType)
+      .eq('id', testType)
       .limit(1);
 
     if (error) {
@@ -517,15 +517,30 @@ export const getMcpTools = async (testType: string) => {
     // mcp_tool이 JSON 배열인 경우 파싱
     const testTypeData = data[0];
     if (testTypeData?.mcp_tool) {
-      try {
-        const tools = typeof testTypeData.mcp_tool === 'string' 
-          ? JSON.parse(testTypeData.mcp_tool) 
-          : testTypeData.mcp_tool;
-        return Array.isArray(tools) ? tools : [tools];
-      } catch (parseError) {
-        console.error('Error parsing mcp_tool:', parseError);
-        return getDefaultMcpTools(testType);
+      const raw = testTypeData.mcp_tool as any;
+      // 배열이면 그대로 반환
+      if (Array.isArray(raw)) {
+        return raw;
       }
+      // 문자열이면 JSON 시도 후 실패 시 CSV/단일 문자열 처리
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        try {
+          if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+            const parsed = JSON.parse(trimmed);
+            return Array.isArray(parsed) ? parsed : [parsed];
+          }
+        } catch (_e) {
+          // JSON 파싱 실패 시 아래 fallback 로직으로 진행
+        }
+        // 콤마로 구분된 문자열 또는 단일 값 허용
+        const list = trimmed.includes(',')
+          ? trimmed.split(',').map((s) => s.trim()).filter(Boolean)
+          : [trimmed];
+        return list;
+      }
+      // 기타 타입은 단일 요소 배열로 반환
+      return [raw];
     }
 
     return getDefaultMcpTools(testType);
@@ -546,7 +561,7 @@ const getDefaultMcpTools = (testType: string) => {
       return ["OWASP ZAP"];
     case "accessibility":
       return ["axe-core"];
-    case "e2e":
+    case "playwright":
       return ["Playwright"];
     default:
       return [];
