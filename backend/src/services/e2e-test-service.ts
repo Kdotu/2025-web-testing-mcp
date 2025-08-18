@@ -67,7 +67,7 @@ export class E2ETestService {
    * 테스트 타입 ID 생성
    */
   private getTestTypeId(): string {
-    // Playwright E2E 테스트 전용 타입 사용
+    // Playwright E2E 테스트 타입 사용
     return 'playwright';
   }
 

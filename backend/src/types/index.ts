@@ -105,7 +105,7 @@ export interface E2ETestLocalResult {
 export interface E2ETestResult {
   id: string;
   testId: string;
-  testType: 'e2e';
+  testType: 'playwright';
   url: string;
   name: string;
   description?: string;

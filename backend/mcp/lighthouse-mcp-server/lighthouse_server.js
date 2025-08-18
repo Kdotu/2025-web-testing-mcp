@@ -44,56 +44,24 @@ async function runLighthouseAudit(url, device = 'desktop', categories = ['perfor
     
     // 운영체제에 따른 Lighthouse 실행 경로 설정
     const isWindows = process.platform === 'win32';
-    let lighthousePath;
     let command;
     let commandArgs;
     
     if (isWindows) {
-      // Windows 환경: 동적으로 lighthouse 경로 찾기
-      const { execSync } = require('child_process');
-      let lighthousePath;
-      
+      // Windows 환경: npx를 통해 lighthouse 실행
       try {
-        // 1. npx를 통해 lighthouse 찾기
-        lighthousePath = execSync('npx lighthouse --version', { encoding: 'utf8' }).trim();
-        if (lighthousePath.includes('lighthouse')) {
-          lighthousePath = 'npx lighthouse';
-        }
+        // npx lighthouse 명령어 사용
+        command = 'npx.cmd';
+        commandArgs = ['lighthouse', ...args];
+        console.error(`[Lighthouse] Windows Command: ${command} ${commandArgs.join(' ')}`);
       } catch (error) {
-        try {
-          // 2. 전역 설치된 lighthouse 찾기
-          lighthousePath = execSync('where lighthouse', { encoding: 'utf8' }).trim().split('\n')[0];
-        } catch (error2) {
-          // 3. 기본 경로들 시도
-          const possiblePaths = [
-            'C:\\nvm4w\\nodejs\\lighthouse.cmd',
-            'C:\\Program Files\\nodejs\\lighthouse.cmd',
-            'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Roaming\\npm\\lighthouse.cmd',
-            'lighthouse'
-          ];
-          
-          for (const path of possiblePaths) {
-            try {
-              execSync(`"${path}" --version`, { encoding: 'utf8' });
-              lighthousePath = path;
-              break;
-            } catch (e) {
-              continue;
-            }
-          }
-        }
+        console.error(`[Lighthouse] Failed to setup Windows command: ${error.message}`);
+        reject(new Error(`Failed to setup Windows command: ${error.message}`));
+        return;
       }
-      
-      if (!lighthousePath) {
-        throw new Error('Lighthouse not found. Please install it with: npm install -g lighthouse');
-      }
-      
-      command = 'cmd';
-      commandArgs = ['/c', lighthousePath, ...args];
-      console.error(`[Lighthouse] Windows Command: ${command} ${commandArgs.join(' ')}`);
     } else {
       // Linux/Mac 환경: 직접 lighthouse 실행
-      lighthousePath = path.join(__dirname, '../../node_modules/.bin/lighthouse');
+      const lighthousePath = path.join(__dirname, '../../node_modules/.bin/lighthouse');
       command = lighthousePath;
       commandArgs = args;
       console.error(`[Lighthouse] Linux/Mac Command: ${command} ${commandArgs.join(' ')}`);

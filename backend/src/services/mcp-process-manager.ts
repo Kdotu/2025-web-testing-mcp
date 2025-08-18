@@ -373,16 +373,42 @@ export class MCPProcessManager extends EventEmitter {
       
       let output = '';
       let errorOutput = '';
+      let isCompleted = false;
 
       // 표준 출력 처리
       const onData = (data: Buffer) => {
-        output += data.toString();
+        if (isCompleted) return;
         
-        // JSON 응답이 완성되었는지 확인
+        const dataStr = data.toString();
+        output += dataStr;
+        
+        // k6 실행 완료 신호 확인
+        if (dataStr.includes('█ TOTAL RESULTS') || 
+            dataStr.includes('http_req_duration') ||
+            dataStr.includes('iterations') ||
+            dataStr.includes('execution: local')) {
+          
+          // k6 실행이 완료되면 결과 반환
+          if (!isCompleted) {
+            isCompleted = true;
+            cleanup();
+            resolve({
+              success: true,
+              output: output,
+              // result 필드 제거하여 이전과 동일한 형태 유지
+              metrics: this.parseK6Metrics(output)
+            });
+          }
+        }
+        
+        // JSON 응답이 완성되었는지 확인 (기존 방식 유지)
         try {
           const response = JSON.parse(output);
-          cleanup();
-          resolve(response);
+          if (!isCompleted) {
+            isCompleted = true;
+            cleanup();
+            resolve(response);
+          }
         } catch (error) {
           // JSON이 아직 완성되지 않음, 계속 대기
         }
@@ -390,38 +416,114 @@ export class MCPProcessManager extends EventEmitter {
 
       // 표준 에러 처리
       const onErrorData = (data: Buffer) => {
-        errorOutput += data.toString();
+        const dataStr = data.toString();
+        errorOutput += dataStr;
+        
+        // k6 에러 확인
+        if (dataStr.includes('Error:') || dataStr.includes('level=error')) {
+          if (!isCompleted) {
+            isCompleted = true;
+            cleanup();
+            reject(new Error(`k6 execution error: ${dataStr}`));
+          }
+        }
       };
 
       // 프로세스 에러 처리
       const onError = (error: Error) => {
-        cleanup();
-        reject(error);
+        if (!isCompleted) {
+          isCompleted = true;
+          cleanup();
+          reject(error);
+        }
+      };
+
+      // 프로세스 종료 처리
+      const onClose = (code: number) => {
+        if (!isCompleted) {
+          isCompleted = true;
+          cleanup();
+          if (code === 0) {
+            resolve({
+              success: true,
+              output: output,
+              // result 필드 제거하여 이전과 동일한 형태 유지
+              metrics: this.parseK6Metrics(output)
+            });
+          } else {
+            reject(new Error(`Process exited with code ${code}: ${errorOutput}`));
+          }
+        }
       };
 
       // 이벤트 리스너 등록
-      process.stdout?.on('data', onData);
-      process.stderr?.on('data', onErrorData);
+      if (process.stdout) {
+        process.stdout.on('data', onData);
+      }
+      if (process.stderr) {
+        process.stderr.on('data', onErrorData);
+      }
       process.once('error', onError);
+      process.once('close', onClose);
 
       // 요청 전송
       const request = { method, params };
-      process.stdin?.write(JSON.stringify(request) + '\n');
+      if (process.stdin) {
+        process.stdin.write(JSON.stringify(request) + '\n');
+      } else {
+        reject(new Error('Process stdin is not available'));
+        return;
+      }
 
       // 타임아웃 설정
       const timeout = setTimeout(() => {
-        cleanup();
-        reject(new Error('Command execution timeout'));
-      }, 30000); // 30초 타임아웃
+        if (!isCompleted) {
+          isCompleted = true;
+          cleanup();
+          reject(new Error('Command execution timeout'));
+        }
+      }, 600000); // 10분 타임아웃 (k6 서비스와 일치)
 
       // 정리 함수
       const cleanup = () => {
         clearTimeout(timeout);
-        process.stdout?.removeListener('data', onData);
-        process.stderr?.removeListener('data', onErrorData);
+        if (process.stdout) {
+          process.stdout.removeListener('data', onData);
+        }
+        if (process.stderr) {
+          process.stderr.removeListener('data', onErrorData);
+        }
         process.removeListener('error', onError);
+        process.removeListener('close', onClose);
       };
     });
+  }
+
+  /**
+   * k6 메트릭 파싱
+   */
+  private parseK6Metrics(output: string): any {
+    const metrics: any = {};
+    
+    // http_req_duration 파싱
+    const durationMatch = output.match(/http_req_duration.*?p\(95\)=(\d+\.?\d*)ms/);
+    if (durationMatch && durationMatch[1]) {
+      metrics.http_req_duration_p95 = parseFloat(durationMatch[1]);
+    }
+    
+    // http_req_failed 파싱
+    const failedMatch = output.match(/http_req_failed.*?(\d+\.?\d*)%/);
+    if (failedMatch && failedMatch[1]) {
+      metrics.http_req_failed_rate = parseFloat(failedMatch[1]);
+    }
+    
+    // iterations 파싱
+    const iterationsMatch = output.match(/iterations.*?(\d+)/);
+    if (iterationsMatch && iterationsMatch[1]) {
+      metrics.iterations = parseInt(iterationsMatch[1]);
+    }
+    
+    return metrics;
   }
 
   /**

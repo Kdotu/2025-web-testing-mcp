@@ -73,7 +73,20 @@ def run_k6_script(script_file: str, duration: str = "30s", vus: int = 10) -> str
         cmd.extend([str(script_file_path)])
 
         print(f"Executing command: {' '.join(cmd)}", file=sys.stderr)
-        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        
+        # Windows 환경에서 인코딩 문제 해결을 위한 환경변수 설정
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONLEGACYWINDOWSSTDIO'] = 'utf-8'
+        
+        result = subprocess.run(
+            cmd, 
+            capture_output=True, 
+            text=True, 
+            encoding='utf-8', 
+            errors='replace',  # 인코딩 오류 시 대체 문자 사용
+            env=env
+        )
         
         # Print output for debugging
         print(f"\nCommand output:", file=sys.stderr)
@@ -84,7 +97,9 @@ def run_k6_script(script_file: str, duration: str = "30s", vus: int = 10) -> str
         if result.returncode != 0:
             return f"Error executing k6 test:\n{result.stderr}"
         
-        return result.stdout
+        # Unicode 문자를 안전하게 처리
+        safe_output = result.stdout.encode('utf-8', errors='replace').decode('utf-8')
+        return safe_output
 
     except Exception as e:
         return f"Unexpected error: {str(e)}"
@@ -112,6 +127,12 @@ def execute_k6_test_with_options(script_file: str, duration: str, vus: int) -> s
 def main():
     """1회성 실행 방식의 메인 함수"""
     try:
+        # Windows 환경에서 인코딩 문제 해결
+        if os.name == 'nt':  # Windows
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+        
         # 표준 입력에서 JSON 요청 읽기
         request_line = sys.stdin.readline().strip()
         if not request_line:
@@ -133,7 +154,9 @@ def main():
             vus = params.get('vus', 10)
             
             result = execute_k6_test(script_file, duration, vus)
-            print(json.dumps({"result": result}))
+            # 줄바꿈을 제대로 처리하여 JSON 응답 생성
+            response = {"output": result}
+            print(json.dumps(response, ensure_ascii=False))
             
         elif method == 'execute_k6_test_with_options':
             script_file = params.get('script_file')
@@ -141,7 +164,9 @@ def main():
             vus = params.get('vus')
             
             result = execute_k6_test_with_options(script_file, duration, vus)
-            print(json.dumps({"result": result}))
+            # 줄바꿈을 제대로 처리하여 JSON 응답 생성
+            response = {"output": result}
+            print(json.dumps(response, ensure_ascii=False))
             
         else:
             error_msg = f"Unknown method: {method}"

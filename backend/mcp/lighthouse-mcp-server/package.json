@@ -1,0 +1,20 @@
+{
+  "name": "lighthouse-mcp-server",
+  "version": "1.0.0",
+  "description": "Lighthouse MCP Server for web testing",
+  "main": "lighthouse_server.js",
+  "scripts": {
+    "start": "node lighthouse_server.js",
+    "test": "node -e \"console.log('Testing Lighthouse MCP server...')\""
+  },
+  "dependencies": {
+    "lighthouse": "^11.6.0"
+  },
+  "devDependencies": {},
+  "keywords": ["lighthouse", "mcp", "web-testing", "performance"],
+  "author": "Web Testing MCP Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 

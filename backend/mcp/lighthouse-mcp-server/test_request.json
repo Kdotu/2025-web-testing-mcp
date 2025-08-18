@@ -1,1 +1,1 @@
-{"method":"run_audit","params":{"url":"https://example.com","device":"desktop","categories":["performance"],"throttling":true}} 
+{"method":"run_audit","params":{"url":"https://example.com","device":"desktop","categories":["performance","accessibility"],"throttling":true}} 

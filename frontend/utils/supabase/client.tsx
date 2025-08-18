@@ -604,10 +604,10 @@ export const initializeTestTypes = async () => {
         mcp_tool: JSON.stringify(['axe-core'])
       },
       {
-        name: 'e2e',
+        name: 'playwright',
         description: '엔드투엔드 테스트',
         enabled: true,
-        mcp_tool: JSON.stringify(['Playwright'])
+        mcp_tool: JSON.stringify(['playwright'])
       }
     ];
 

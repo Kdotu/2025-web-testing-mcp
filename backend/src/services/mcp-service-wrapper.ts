@@ -48,8 +48,8 @@ export class MCPServiceWrapper {
 
       console.log('[MCP Wrapper] k6 test result:', result);
 
-      // k6 결과에서 에러 확인
-      const k6Output = result.result || result.output || '';
+      // k6 결과에서 에러 확인 (output 필드 우선 사용)
+      const k6Output = result.output || result.result || '';
       const hasNetworkError = k6Output.includes('Error executing k6 test:') || 
                              k6Output.includes('Request Failed') ||
                              k6Output.includes('connectex: A connection attempt failed');

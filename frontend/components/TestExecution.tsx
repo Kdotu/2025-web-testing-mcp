@@ -42,7 +42,8 @@ import {
   Copy,
   Check,
   Shield,
-  Database
+  Database,
+  Sparkles
 } from "lucide-react";
 import {
   executeTest,
@@ -187,14 +188,13 @@ interface TestExecutionProps {
   connectionStatus?: string;
 }
 
-export function TestExecution({ onNavigate }: TestExecutionProps) {
+export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) {
   const [testUrl, setTestUrl] = useState("");
   const [selectedTestType, setSelectedTestType] = useState("");
   const [testDescription, setTestDescription] = useState("");
   const [urlError, setUrlError] = useState("");
-  const [runningTests, setRunningTests] = useState<
-    RunningTest[]
-  >([]);
+  const [runningTests, setRunningTests] = useState<RunningTest[]>([]);
+  
   const [isExecuting, setIsExecuting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [testTypes, setTestTypes] = useState<TestType[]>([]);
@@ -1227,14 +1227,14 @@ export default function () {
         
         // Lighthouse MCP API 호출 (실제 구현 필요)
         result = await executeLighthouseTest(lighthouseParams);
-      } else if (selectedTestType === 'e2e') {
-        // E2E 테스트는 Playwright MCP 사용
+      } else if (selectedTestType === 'playwright') {
+        // Playwright E2E 테스트는 Playwright MCP 사용
         const e2eParams = {
           url: normalizedUrl,
-          name: testDescription || `E2E Test - ${normalizedUrl}`,
+          name: testDescription || `Playwright E2E Test - ${normalizedUrl}`,
           description: testDescription,
           config: {
-            testType: 'e2e',
+            testType: 'playwright',
             settings: testSettings.e2e || {}
           }
         };
@@ -1665,7 +1665,7 @@ export default function () {
 `;
   };
 
-  // E2E 테스트 스크립트 (Playwright 기반)
+  // Playwright E2E 테스트 스크립트 (Playwright 기반)
   const generateE2EScript = (url: string, settings: any): string => {
     const browserConfig = {
       browser: settings.browser || 'chromium',
@@ -1739,8 +1739,8 @@ const config = {
 
 export default config;
 
-// E2E 테스트 스크립트
-test('E2E 테스트 - ${url}', async ({ page }) => {
+// Playwright E2E 테스트 스크립트
+test('Playwright E2E 테스트 - ${url}', async ({ page }) => {
   // 페이지 로드
   await page.goto('${url}');
   
@@ -1774,9 +1774,9 @@ test('E2E 테스트 - ${url}', async ({ page }) => {
       await page.waitForTimeout(1000);
     }
     
-    console.log('E2E 테스트 완료: 모든 기본 상호작용이 성공적으로 수행되었습니다.');
+    console.log('Playwright E2E 테스트 완료: 모든 기본 상호작용이 성공적으로 수행되었습니다.');
   } catch (error) {
-    console.error('E2E 테스트 중 오류 발생:', error);
+    console.error('Playwright E2E 테스트 중 오류 발생:', error);
     throw error;
   }
 });
@@ -1871,17 +1871,35 @@ test('성능 테스트 - ${url}', async ({ page }) => {
   };
 
       return (
-    <div className="w-full flex flex-col items-center">
-      <div className="max-w-5xl w-full space-y-8 mx-auto">
-      {/* 헤더 */}
-      <div className="neu-card rounded-3xl px-8 py-6 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
-        <h1 className="text-4xl font-bold text-primary mb-4">
-          테스트 실행
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          웹사이트에 대한 다양한 테스트를 실행하세요
-        </p>
+        <div className="w-full flex flex-col items-center">
+          <div className="max-w-5xl w-full space-y-8 mx-auto">
+          {/* 헤더 */}
+          <div className="neu-card rounded-3xl px-8 py-8 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
+            <div className="flex items-center space-x-4 mb-6">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
+              <Play className="h-7 w-7 text-primary-foreground" />
+            </div>
+              <div className="flex-1">
+                <h1 className="text-4xl font-bold text-primary mb-4">테스트 실행</h1>
+                <p className="text-muted-foreground text-lg">웹사이트에 대한 다양한 테스트를 실행하세요</p>
+              </div>
           </div>
+          
+          {/* 데모 모드 알림 */}
+          {isInDemoMode && (
+          <div className="neu-input rounded-3xl px-6 py-6 border-l-4 border-l-purple-500">
+            <div className="flex items-start space-x-4">
+              <Sparkles className="h-6 w-6 text-purple-500 flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg text-primary mb-2">🎭 데모 모드로 실행 중</h3>
+                <p className="text-muted-foreground mb-4">
+                  모든 기능을 완전히 사용할 수 있는 시뮬레이션 환경입니다. 
+                </p>
+              </div>
+            </div>
+          </div>
+          )}
+        </div>
 
       {/* 메인 설정 영역: 세로 레이아웃 */}
       <div className="space-y-8">
@@ -2545,8 +2563,8 @@ test('성능 테스트 - ${url}', async ({ page }) => {
                 </div>
               </div>
             </div>
-          ) : selectedTestType === 'e2e' ? (
-            // E2E 테스트 설정
+          ) : selectedTestType === 'playwright' ? (
+            // Playwright E2E 테스트 설정
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
               {/* 브라우저 설정 */}

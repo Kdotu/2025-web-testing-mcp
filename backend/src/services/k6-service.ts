@@ -95,7 +95,7 @@ export class K6Service {
       console.log('k6 MCP result:', mcpResult);
 
       if (mcpResult.success) {
-        // MCP 결과에서 실제 k6 출력 추출
+        // MCP 결과에서 실제 k6 출력 추출 (output 필드 우선 사용)
         const k6Output = mcpResult.output || mcpResult.data?.result || '';
         console.log('Parsing k6 output for testId:', testId);
         console.log('Output length:', k6Output.length);
@@ -1137,43 +1137,69 @@ export default function () {
    * k6 출력에서 raw_data 추출 (타임스탬프 및 설정 정보 추가)
    */
   private extractRawData(output: string, config?: LoadTestConfig): string {
-    // 현재 시간을 한국 시간으로 포맷팅
-    const now = new Date();
-    const koreanTime = now.toLocaleString('ko-KR', { 
-      timeZone: 'Asia/Seoul',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }).replace(/\./g, '-').replace(/\s/g, ' ');
+    try {
+      // 현재 시간을 한국 시간으로 포맷팅
+      const now = new Date();
+      const koreanTime = now.toLocaleString('ko-KR', { 
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }).replace(/\./g, '-').replace(/\s/g, ' ');
 
-    const timestampLine = `====TEST START DATE ${koreanTime}====\n\n`;
-    
-    // 설정 정보 추가
-    let configInfo = '';
-    if (config) {
-      configInfo = `------------------------------------\n-------TEST CONFIG-------\n`;
-      configInfo += `Duration: ${(config as any).duration || '30s'}\n`;
-      configInfo += `Virtual Users: ${(config as any).vus || 10}\n`;
-      if ((config as any).detailedConfig) {
-        configInfo += `Test Type: ${(config as any).detailedConfig.testType || 'load'}\n`;
-        if ((config as any).detailedConfig.settings) {
-          configInfo += `Settings: ${JSON.stringify((config as any).detailedConfig.settings, null, 2)}\n`;
+      const timestampLine = `====TEST START DATE ${koreanTime}====\n\n`;
+      
+      // 설정 정보 추가
+      let configInfo = '';
+      if (config) {
+        configInfo = `------------------------------------\n-------TEST CONFIG-------\n`;
+        configInfo += `Duration: ${(config as any).duration || '30s'}\n`;
+        configInfo += `Virtual Users: ${(config as any).vus || 10}\n`;
+        if ((config as any).detailedConfig) {
+          configInfo += `Test Type: ${(config as any).detailedConfig.testType || 'load'}\n`;
+          if ((config as any).detailedConfig.settings) {
+            configInfo += `Settings: ${JSON.stringify((config as any).detailedConfig.settings, null, 2)}\n`;
+          }
         }
+        configInfo += `------------------------------------\n\n`;
       }
-      configInfo += `------------------------------------\n\n`;
+      
+      // JSON 응답에서 output 필드 추출 및 줄바꿈 정리
+      let processedOutput = output;
+      try {
+        // JSON 형태인지 확인
+        if (output.includes('{"output":')) {
+          const jsonMatch = output.match(/\{"output":\s*"([^"]*(?:\\.[^"]*)*)"\}/);
+          if (jsonMatch && jsonMatch[1]) {
+            // JSON 이스케이프된 문자열을 실제 줄바꿈으로 변환
+            processedOutput = jsonMatch[1]
+              .replace(/\\n/g, '\n')  // \\n을 실제 줄바꿈으로 변환
+              .replace(/\\"/g, '"')   // \\"를 실제 따옴표로 변환
+              .replace(/\\\\/g, '\\'); // \\\\를 실제 백슬래시로 변환
+          }
+        }
+      } catch (error) {
+        console.error('Failed to parse JSON output:', error);
+        // JSON 파싱 실패 시 원본 출력 사용
+      }
+      
+      // k6 result 부분 찾기
+      const startIndex = processedOutput.indexOf('k6 result:');
+      if (startIndex === -1) {
+        // k6 result가 없으면 전체 출력에 타임스탬프와 설정 정보 추가
+        return timestampLine + configInfo + processedOutput;
+      }
+      
+      return timestampLine + configInfo + processedOutput.substring(startIndex);
+    } catch (error) {
+      console.error('Error in extractRawData:', error);
+      // 오류 발생 시 기본 정보만 포함하여 반환
+      const fallbackOutput = `====TEST START DATE ${new Date().toISOString()}====\n\nError processing output: ${error}\n\nRaw output: ${output}`;
+      return fallbackOutput;
     }
-    
-    // k6 result 부분 찾기
-    const startIndex = output.indexOf('k6 result:');
-    if (startIndex === -1) {
-      // k6 result가 없으면 전체 출력에 타임스탬프와 설정 정보 추가
-      return timestampLine + configInfo + output;
-    }
-    
-    return timestampLine + configInfo + output.substring(startIndex);
   }
 
   /**
