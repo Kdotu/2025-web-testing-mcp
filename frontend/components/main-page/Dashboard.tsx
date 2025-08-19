@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Progress } from "../ui/progress";
 import { 
   BarChart3, 
   Activity, 
@@ -21,8 +21,8 @@ import {
   Calendar
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { getTestResults, checkApiHealth, isDemoMode, setDemoMode } from "../utils/api";
-import { getAllTestResults, getTotalTestCount } from "../utils/backend-api";
+import { getTestResults, checkApiHealth, isDemoMode, setDemoMode } from "../../utils/api";
+import { getAllTestResults, getTotalTestCount } from "../../utils/backend-api";
 
 // Mock 데이터 (오프라인/데모 모드용)
 const mockData = {

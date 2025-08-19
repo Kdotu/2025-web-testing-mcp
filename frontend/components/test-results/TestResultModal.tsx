@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, BarChart3, Copy, Check, FileText, ChevronDown } from 'lucide-react';
-import { getTestMetrics, getGroupedTestMetrics, TestMetric, getDocuments } from '../utils/backend-api';
+import { getTestMetrics, getGroupedTestMetrics, TestMetric, getDocuments } from '../../utils/backend-api';
 
 interface TestResultModalProps {
   isOpen: boolean;

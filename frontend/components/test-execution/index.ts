@@ -1,3 +1,4 @@
+export { TestExecution } from './TestExecution';
 export { TestExecutionHeader } from './TestExecutionHeader';
 export { BasicTestSettings } from './BasicTestSettings';
 export { TestConfiguration } from './TestConfiguration';

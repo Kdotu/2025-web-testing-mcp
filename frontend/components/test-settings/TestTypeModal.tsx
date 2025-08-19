@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
-import { Textarea } from "./ui/textarea";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
+import { Textarea } from "../ui/textarea";
 
-
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Save, Edit, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { updateTestType, type TestType } from "../utils/backend-api";
+import { updateTestType, type TestType } from "../../utils/backend-api";
+
 
 interface TestTypeModalProps {
   isOpen: boolean;

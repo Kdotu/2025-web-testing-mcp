@@ -1,12 +1,11 @@
 // UI Components
-export { Header } from './Header';
-export { Footer } from './Footer';
-export { AppSidebar } from './AppSidebar';
-export { ConnectionStatus } from './ConnectionStatus';
-export { Dashboard } from './Dashboard';
-export { TestExecution } from './TestExecution';
-export { TestResults } from './TestResults';
-export { Settings } from './Settings';
-export { Documentation } from './Documentation';
-export { TestResultModal } from './TestResultModal';
-export { TestTypeModal } from './TestTypeModal'; 
+export { Dashboard } from './main-page/index';
+export { TestExecution } from './test-execution/index';
+export { Documentation } from './documentation/index';
+export { TestTypeModal } from './test-settings/index';
+
+// Test Result Components
+export { TestResults, TestResultModal } from './test-results/index';
+
+// Test Settings Components
+export { Settings } from './test-settings/index'; 

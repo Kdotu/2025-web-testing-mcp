@@ -3,7 +3,9 @@ import { SidebarProvider, useSidebar } from "./components/ui/sidebar";
 import { 
   AppSidebar, 
   Header, 
-  Footer, 
+  Footer
+} from "./components/common";
+import { 
   Dashboard, 
   TestExecution, 
   TestResults, 

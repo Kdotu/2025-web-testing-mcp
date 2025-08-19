@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Badge } from "./ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Progress } from "./ui/progress";
-import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3, FileCode, FileImage, Activity, Sparkles, Play } from "lucide-react";
-import { getAllTestResults, getTestResultById, getTestTypes, generateHtmlReport, generatePdfReport, getDocumentDownloadUrl, getTotalTestCount } from "../utils/backend-api";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Badge } from "../ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Progress } from "../ui/progress";
+import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3, FileCode, FileImage } from "lucide-react";
+import { getAllTestResults, getTestResultById, getTestTypes, generateHtmlReport, generatePdfReport, getDocumentDownloadUrl, getTotalTestCount } from "../../utils/backend-api";
 import { TestResultModal } from "./TestResultModal";
 
 interface TestResultsProps {
@@ -390,11 +390,9 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-8 mx-auto">
       {/* 페이지 헤더 */}
-      <div className="neu-card rounded-3xl px-8 py-8 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
-              <FileText className="h-7 w-7 text-primary-foreground" />
-            </div>
+      <div className="neu-card rounded-3xl px-8 py-6 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
+        <div className="flex items-center space-x-4 mb-4">
+          <FileText className="h-10 w-10 text-primary" />
           <div>
             <h1 className="text-4xl font-bold text-primary">테스트 결과</h1>
             <p className="text-muted-foreground text-lg mt-2">
@@ -408,16 +406,12 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
         
         {/* 데모 모드 알림 */}
         {isDemoModeActive && (
-            <div className="neu-input rounded-3xl px-6 py-6 border-l-4 border-l-purple-500">
-              <div className="flex items-start space-x-4">
-                <Sparkles className="h-6 w-6 text-purple-500 flex-shrink-0 mt-1" />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg text-primary mb-2">🎭 데모 모드로 실행 중</h3>
-                  <p className="text-muted-foreground mb-4">
-                    모든 기능을 완전히 사용할 수 있는 시뮬레이션 환경입니다. 
-                  </p>
-                </div>
-              </div>
+          <div className="mt-4 neu-accent rounded-xl px-4 py-3 border border-purple-300/30">
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
+              <span className="text-purple-700 font-semibold">데모 모드</span>
+              <span className="text-purple-600 text-sm">현재 데모 모드로 실행 중입니다. 샘플 데이터가 표시됩니다.</span>
+            </div>
           </div>
         )}
       </div>
@@ -782,5 +776,3 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
     </div>
   );
 }
-
-

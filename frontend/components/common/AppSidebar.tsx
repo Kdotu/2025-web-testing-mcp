@@ -1,4 +1,4 @@
-import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "./ui/sidebar";
+import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "../ui/sidebar";
 import { BarChart3, Play, FileText, Settings as SettingsIcon } from "lucide-react";
 
 // 아이콘 컴포넌트 매핑 함수
@@ -20,7 +20,7 @@ interface AppSidebarProps {
   navigation: Array<{
     id: string;
     name: string;
-    icon: any;
+    component?: any;
     url: string;
   }>;
 }
@@ -74,4 +74,4 @@ export function AppSidebar({ activeTab, onTabChange, navigation }: AppSidebarPro
       </SidebarContent>
     </Sidebar>
   );
-}
+} 

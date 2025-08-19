@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
-import { SidebarTrigger } from './ui/sidebar';
+import { SidebarTrigger } from '../ui/sidebar';
 import { ConnectionStatus } from './ConnectionStatus';
 
 interface HeaderProps {

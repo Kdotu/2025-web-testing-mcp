@@ -1,20 +1,20 @@
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Textarea } from "./ui/textarea";
-import { Badge } from "./ui/badge";
-import { Alert, AlertDescription } from "./ui/alert";
-import { Switch } from "./ui/switch";
-import { Checkbox } from "./ui/checkbox";
-import { Slider } from "./ui/slider";
+} from "../ui/select";
+import { Textarea } from "../ui/textarea";
+import { Badge } from "../ui/badge";
+import { Alert, AlertDescription } from "../ui/alert";
+import { Switch } from "../ui/switch";
+import { Checkbox } from "../ui/checkbox";
+import { Slider } from "../ui/slider";
 import {
   Play,
   Square,
@@ -48,9 +48,9 @@ import {
   getTestTypes,
   type TestType,
   isDemoMode,
-} from "../utils/api";
-import { getAllTestResults as getBackendTestResults } from "../utils/backend-api";
-import { getMcpTools } from "../utils/supabase/client";
+} from "../../utils/api";
+import { getAllTestResults as getBackendTestResults } from "../../utils/backend-api";
+import { getMcpTools } from "../../utils/supabase/client";
 import {
   createLoadTest,
   getTestStatus as getBackendTestStatus,
@@ -64,9 +64,9 @@ import {
   executeDefaultTest,
   cancelLighthouseTest,
   cancelE2ETest,
-} from "../utils/backend-api";
+} from "../../utils/backend-api";
 
-import { Progress } from "./ui/progress";
+import { Progress } from "../ui/progress";
 
 // 새로운 컴포넌트들 import
 import {
@@ -77,7 +77,7 @@ import {
   RecentActivity,
   TestStartButton,
   StopConfirmDialog
-} from "./test-execution";
+} from "./index";
 
 interface RunningTest {
   id: number;
