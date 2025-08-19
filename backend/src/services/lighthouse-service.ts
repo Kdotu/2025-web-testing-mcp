@@ -1,7 +1,7 @@
 import { LoadTestConfig, LoadTestResult } from '../types';
 import { join } from 'path';
 import { spawn } from 'child_process';
-import { TestTypeService } from './test-type-service';
+// import { TestTypeService } from './test-type-service';
 
 /**
  * Lighthouse MCP 테스트 실행 서비스
@@ -9,32 +9,28 @@ import { TestTypeService } from './test-type-service';
 export class LighthouseService {
   private runningTests: Map<string, any> = new Map();
   private testResults: Map<string, any> = new Map();
-  private testTypeService: TestTypeService;
+  // private testTypeService: TestTypeService;
 
   constructor() {
     // MCP 서버는 별도 프로세스로 실행
-    this.testTypeService = new TestTypeService();
+    // this.testTypeService = new TestTypeService();
   }
 
-  /**
-   * 테스트 타입 ID 생성
-   */
-  private getTestTypeId(): string {
-    // Lighthouse 전용 테스트 타입 사용
-    return 'lighthouse';
-  }
+  // 테스트 타입 잠금 시스템 제거로 인해 더 이상 사용하지 않음
+  // /**
+  //  * 테스트 타입 ID 생성
+  //  */
+  // private getTestTypeId(): string {
+  //   // Lighthouse 전용 테스트 타입 사용
+  //   return 'lighthouse';
+  // }
 
   /**
    * Lighthouse 테스트 실행 (MCP 서버 방식)
    */
   async executeTest(id: string, testId: string, config: LoadTestConfig): Promise<void> {
-    // 테스트 타입에 대한 설정 잠금 획득 시도
-    const testTypeId = this.getTestTypeId();
-    const lockAcquired = await this.testTypeService.acquireTestConfigLock(testTypeId, testId);
-    
-    if (!lockAcquired) {
-      throw new Error(`Lighthouse 테스트 타입 '${testTypeId}'이(가) 이미 잠겨있습니다.`);
-    }
+    // 테스트 타입 잠금 시스템 제거로 인해 더 이상 사용하지 않음
+    // const testTypeId = this.getTestTypeId();
 
     try {
       // 테스트 시작 시 상태를 running으로 설정
@@ -801,11 +797,9 @@ export class LighthouseService {
       test.status = status;
       test.endTime = new Date();
       
-      // 테스트 완료 시 잠금 해제
+      // 테스트 완료 시 처리
       if (status === 'completed' || status === 'failed' || status === 'cancelled') {
-        // config 정보가 없으므로 기본값 사용
-        const testTypeId = `lighthouse_default`;
-        await this.testTypeService.releaseTestConfigLock(testTypeId, testId);
+        console.log(`Lighthouse test ${testId} completed with status: ${status}`);
       }
       
       this.runningTests.delete(testId);

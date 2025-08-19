@@ -37,7 +37,7 @@ export interface LoadTestResult {
   name?: string;
   description?: string; // 테스트 설명 추가
   config?: any; // 설정값 저장 필드 (LoadTestConfig 또는 상세 설정)
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'stopped';
   currentStep?: string;
   metrics: {
     http_req_duration: {
@@ -91,7 +91,7 @@ export interface E2ETestLocalResult {
   url: string;
   name: string;
   description?: string;
-  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | 'stopped';
   startTime: string;
   endTime?: string;
   logs: string[];

@@ -341,29 +341,14 @@ export function Dashboard({ onNavigate, isInDemoMode, connectionStatus: propConn
   const renderConnectionBanner = () => {
     if (connectionStatus === 'demo' || isDemoModeActive) {
       return (
-        <div className="neu-card rounded-3xl px-6 py-6 mb-8 border-l-4 border-l-purple-500">
+        <div className="neu-input rounded-3xl px-6 py-6 border-l-4 border-l-purple-500">
           <div className="flex items-start space-x-4">
             <Sparkles className="h-6 w-6 text-purple-500 flex-shrink-0 mt-1" />
             <div className="flex-1">
               <h3 className="font-semibold text-lg text-primary mb-2">🎭 데모 모드로 실행 중</h3>
               <p className="text-muted-foreground mb-4">
                 모든 기능을 완전히 사용할 수 있는 시뮬레이션 환경입니다. 
-                실제 테스트는 시뮬레이션되며, 모든 데이터는 브라우저에 저장됩니다.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="neu-pressed rounded-xl px-4 py-3">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">UI 화면 확인</span>
-                  </div>
-                </div>
-                <div className="neu-pressed rounded-xl px-4 py-3">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">로컬 데이터 저장</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -447,22 +432,21 @@ export function Dashboard({ onNavigate, isInDemoMode, connectionStatus: propConn
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-6 mx-auto">
         {/* 대시보드 헤더 */}
-        <div className="neu-card rounded-3xl px-8 py-6 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
-          <div className="flex items-center space-x-4">
+        <div className="neu-card rounded-3xl px-8 py-8 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
+          <div className="flex items-center space-x-4 mb-6">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
               <BarChart3 className="h-7 w-7 text-primary-foreground" />
             </div>
-            <div>
-              <h1 className="text-4xl font-bold text-primary">대시보드</h1>
-              <p className="text-muted-foreground text-lg mt-1">
-                웹사이트 테스트 현황 및 통계를 확인하세요
-              </p>
+            <div className="flex-1">
+              <h1 className="text-4xl font-bold text-primary mb-4">대시보드</h1>
+              <p className="text-muted-foreground text-lg">웹사이트 테스트 현황 및 통계를 확인하세요</p>
             </div>
           </div>
+          
+          {/* 데모 모드 알림 */}
+          {renderConnectionBanner()}
         </div>
 
-        {/* 연결 상태 배너 */}
-        {renderConnectionBanner()}
 
         {/* 주요 통계 카드 */}
         <div className="grid gap-6 md:grid-cols-4">

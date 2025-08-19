@@ -132,8 +132,8 @@ export class LoadTestController {
     // k6 서비스에서 테스트 중단
     await this.k6Service.cancelTest(testId);
     
-    // 상태 업데이트
-    await this.updateTestStatus(testId, 'cancelled', 'Test cancelled by user');
+    // 상태 업데이트 - stopped로 변경
+    await this.updateTestStatus(testId, 'stopped', 'Test stopped by user');
   }
 
   /**

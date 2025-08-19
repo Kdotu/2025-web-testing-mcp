@@ -3,7 +3,7 @@ import { join } from 'path';
 import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { MCPServiceWrapper } from './mcp-service-wrapper';
-import { TestTypeService } from './test-type-service';  
+// import { TestTypeService } from './test-type-service';  
 
 /**
  * k6 MCP 테스트 실행 서비스
@@ -14,12 +14,13 @@ export class K6Service {
   private timeoutTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly TIMEOUT_DURATION = 10 * 60 * 1000; // 10분 (밀리초)
   private mcpWrapper: MCPServiceWrapper;
-  private testTypeService: TestTypeService;
+  // 테스트 타입 잠금 시스템 제거로 인해 더 이상 사용하지 않음
+  // private testTypeService: TestTypeService;
 
   constructor() {
     // MCP 서버는 별도 프로세스로 실행
     this.mcpWrapper = new MCPServiceWrapper();
-    this.testTypeService = new TestTypeService();
+    // this.testTypeService = new TestTypeService();
   }
 
   /**
@@ -28,13 +29,8 @@ export class K6Service {
   async executeTest(testId: string, config: LoadTestConfig): Promise<void> {
     console.log('[K6Service] Executing test via direct execution');
     
-    // 테스트 타입에 대한 설정 잠금 획득 시도
-    const testTypeId = this.getTestTypeId();
-    const lockAcquired = await this.testTypeService.acquireTestConfigLock(testTypeId, testId);
-    
-    if (!lockAcquired) {
-      throw new Error(`k6 테스트 타입 '${testTypeId}'이(가) 이미 잠겨있습니다.`);
-    }
+    // 테스트 타입 잠금 시스템 제거로 인해 더 이상 사용하지 않음
+    // const testTypeId = this.getTestTypeId();
 
     try {
       // 테스트 시작 시 상태를 running으로 설정
@@ -63,13 +59,14 @@ export class K6Service {
     }
   }
 
-  /**
-   * 테스트 타입 ID 생성
-   */
-  private getTestTypeId(): string {
-    // k6는 부하 테스트로 분류
-    return 'load';
-  }
+  // 테스트 타입 잠금 시스템 제거로 인해 더 이상 사용하지 않음
+  // /**
+  //  * 테스트 타입 ID 생성
+  //  */
+  // private getTestTypeId(): string {
+  //   // k6는 부하 테스트로 분류
+  //   return 'load';
+  // }
 
   /**
    * k6 테스트 실행 (MCP 서버 방식)
@@ -1355,13 +1352,12 @@ export default function () {
       this.testResults.set(testId, result);
     }
 
-          // 테스트 완료 시 잠금 해제
+          // 테스트 완료 시 처리
       if (status === 'completed' || status === 'failed' || status === 'cancelled') {
         const runningTest = this.runningTests.get(testId);
         if (runningTest) {
-          // config 정보가 없으므로 기본값 사용
-          const testTypeId = `k6_load`;
-          await this.testTypeService.releaseTestConfigLock(testTypeId, testId);
+          // 테스트 완료 처리
+          console.log(`Test ${testId} completed with status: ${status}`);
         }
       }
 

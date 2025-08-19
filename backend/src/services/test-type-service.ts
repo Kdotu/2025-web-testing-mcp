@@ -178,90 +178,21 @@ export class TestTypeService {
   }
 
   /**
-   * 테스트 실행 시 설정 잠금 획득
+   * 테스트 실행 시 설정 잠금 획득 (비활성화됨)
    */
-  async acquireTestConfigLock(testTypeId: string, testId: string): Promise<boolean> {
-    try {
-      // 이미 잠겨있는지 확인
-      const existingTestType = await this.getTestTypeById(testTypeId);
-      if (!existingTestType) {
-        throw new Error(`테스트 타입 '${testTypeId}'을 찾을 수 없습니다.`);
-      }
-
-      if (existingTestType.is_locked) {
-        // locked_by가 null인 경우 (비정상 상태) 잠금 해제 후 재시도
-        if (!existingTestType.locked_by) {
-          console.log(`[TestTypeService] 테스트 타입 '${testTypeId}'의 비정상 잠금 상태 감지, 잠금 해제 후 재시도`);
-          await this.forceReleaseLock(testTypeId);
-        } else {
-          console.log(`[TestTypeService] 테스트 타입 '${testTypeId}'이(가) 이미 잠겨있습니다. (테스트: ${existingTestType.locked_by})`);
-          return false;
-        }
-      }
-
-      // 잠금 획득
-      const { error } = await supabase
-        .from('m2_test_types')
-        .update({
-          is_locked: true,
-          locked_by: testId,
-          lock_type: 'config',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', testTypeId);
-
-      if (error) {
-        console.error('Error acquiring test config lock:', error);
-        return false;
-      }
-
-      console.log(`[TestTypeService] 테스트 타입 '${testTypeId}' 설정 잠금 획득 (테스트: ${testId})`);
-      return true;
-    } catch (error) {
-      console.error('Error acquiring test config lock:', error);
-      return false;
-    }
+  async acquireTestConfigLock(testTypeId: string, _testId: string): Promise<boolean> {
+    // 테스트 타입 잠금 시스템 비활성화 - 항상 true 반환
+    console.log(`[TestTypeService] 테스트 타입 잠금 시스템 비활성화됨 - '${testTypeId}' 잠금 획득 허용`);
+    return true;
   }
 
   /**
-   * 테스트 완료 시 설정 잠금 해제
+   * 테스트 완료 시 설정 잠금 해제 (비활성화됨)
    */
-  async releaseTestConfigLock(testTypeId: string, testId: string): Promise<boolean> {
-    try {
-      // 잠금 상태 확인
-      const existingTestType = await this.getTestTypeById(testTypeId);
-      if (!existingTestType || !existingTestType.is_locked) {
-        return true; // 이미 잠금이 해제된 상태
-      }
-
-      // 잠금을 획득한 테스트가 맞는지 확인
-      if (existingTestType.locked_by !== testId) {
-        console.warn(`[TestTypeService] 잠금 해제 실패: 테스트 ID 불일치 (예상: ${testId}, 실제: ${existingTestType.locked_by})`);
-        return false;
-      }
-
-      // 잠금 해제
-      const { error } = await supabase
-        .from('m2_test_types')
-        .update({
-          is_locked: false,
-          locked_by: null,
-          lock_type: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', testTypeId);
-
-      if (error) {
-        console.error('Error releasing test config lock:', error);
-        return false;
-      }
-
-      console.log(`[TestTypeService] 테스트 타입 '${testTypeId}' 설정 잠금 해제 (테스트: ${testId})`);
-      return true;
-    } catch (error) {
-      console.error('Error releasing test config lock:', error);
-      return false;
-    }
+  async releaseTestConfigLock(testTypeId: string, _testId: string): Promise<boolean> {
+    // 테스트 타입 잠금 시스템 비활성화 - 항상 true 반환
+    console.log(`[TestTypeService] 테스트 타입 잠금 시스템 비활성화됨 - '${testTypeId}' 잠금 해제 허용`);
+    return true;
   }
 
   /**

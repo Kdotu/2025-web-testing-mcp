@@ -262,22 +262,28 @@ export class TestResultService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
-      // 조건 쿼리 생성
+      // 조건 쿼리 생성 - count를 제거하여 성능 향상
+      // 목록 화면에는 가벼운 컬럼만 조회 (raw_data, metrics 등 대용량 컬럼 제외)
       let query = this.supabaseClient
         .from('m2_test_results')
-        .select('*', { count: 'exact' });
+        .select('id,test_id,test_type,url,name,description,status,current_step,created_at,updated_at');
 
       if (status) {
         query = query.eq('status', status);
       }
 
       // 페이지네이션 적용
-      const { data, error, count } = await query
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .range(from, to);
 
       if (error) {
         console.error('Failed to get test results:', error);
+        // 타임아웃이나 서버 과부하 시에는 빈 결과 반환하여 UI 지연 방지
+        if (error.code === '57014' || error.code === 'ETIMEDOUT') {
+          console.warn('⚠️ Returning empty page due to timeout');
+          return { results: [], total: 0 };
+        }
         // 프로덕션에서는 빈 결과 반환
         if (process.env['NODE_ENV'] === 'production') {
           console.warn('⚠️ Returning empty results due to database error');
@@ -289,14 +295,15 @@ export class TestResultService {
       // JavaScript에서 순차 번호 추가 (내림차순)
       const results = data?.map((row, index) => {
         const parsedResult = this.parseResultFromRow(row);
-        // 전체 개수에서 현재 인덱스를 빼서 내림차순으로 번호 매기기
-        parsedResult.rowNumber = (count || 0) - from - index;
+        // 페이지 기반으로 번호 매기기
+        parsedResult.rowNumber = from + index + 1;
         return parsedResult;
       }) || [];
 
+      // 전체 개수는 별도로 조회하지 않고 현재 페이지 결과만 반환
       return { 
         results, 
-        total: count || 0 
+        total: results.length 
       };
     } catch (error) {
       console.error('Error in getAllResults:', error);
@@ -310,19 +317,29 @@ export class TestResultService {
   }
 
   /**
-   * 전체 테스트 결과 개수 조회
+   * 전체 테스트 결과 개수 조회 (최적화된 버전)
    */
   async getTotalCount(): Promise<number> {
-    const { count, error } = await this.supabaseClient
-      .from('m2_test_results')
-      .select('*', { count: 'exact', head: true });
+    try {
+      // 최근 1000개 결과만 카운트하여 성능 향상
+      const { count, error } = await this.supabaseClient
+        .from('m2_test_results')
+        .select('*', { count: 'exact', head: true })
+        .order('created_at', { ascending: false })
+        .limit(1000);
 
-    if (error) {
-      console.error('Failed to get total count:', error);
-      throw error;
+      if (error) {
+        console.error('Failed to get total count:', error);
+        // 에러 발생 시 기본값 반환
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('Error in getTotalCount:', error);
+      // 예외 발생 시 기본값 반환
+      return 0;
     }
-
-    return count || 0;
   }
 
   /**
