@@ -93,44 +93,6 @@ export function RecentActivity({
         </div>
       </div>
 
-      {/* 실행 현황 카드들 */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
-        <div className="neu-pressed rounded-2xl px-6 py-8 text-center">
-          <div className="text-4xl font-bold text-primary mb-3">
-            {
-              runningTests.filter(
-                (t) => t.status === "running" || t.status === "실행중",
-              ).length
-            }
-          </div>
-          <p className="text-muted-foreground font-semibold">
-            실행중
-          </p>
-        </div>
-        <div className="neu-pressed rounded-2xl px-6 py-8 text-center">
-          <div className="text-4xl font-bold text-orange-600 mb-3">
-            {
-              runningTests.filter((t) => t.status === "stopped").length +
-              recentTestResults.filter((t) => t.status === "stopped" || t.status === "중단됨").length
-            }
-          </div>
-          <p className="text-muted-foreground font-semibold">
-            중단됨
-          </p>
-        </div>
-        <div className="neu-pressed rounded-2xl px-6 py-8 text-center">
-          <div className="text-4xl font-bold text-primary mb-3">
-            {
-              runningTests.filter((t) => t.status === "completed" || t.status === "완료").length +
-              recentTestResults.filter((t) => t.status === "completed" || t.status === "완료").length
-            }
-          </div>
-          <p className="text-muted-foreground font-semibold">
-            완료
-          </p>
-        </div>
-      </div>
-
       {/* 최근 활동 목록 */}
       <div className="space-y-4 mt-8">
         <h4 className="font-semibold text-foreground text-lg">
@@ -154,8 +116,8 @@ export function RecentActivity({
                   backgroundColor:
                     testStatus === "완료" || testStatus === "completed"
                       ? "#7886C7"
-                      : testStatus === "stopped" || testStatus === "중단됨"
-                      ? "#F59E0B"
+                      : testStatus === "cancelled" || testStatus === "취소"
+                      ? "#EF4444"
                       : testStatus === "failed" || testStatus === "실패"
                       ? "#EF4444"
                       : "#A9B5DF",
@@ -178,8 +140,8 @@ export function RecentActivity({
               </div>
               <div className="neu-pressed rounded-full px-4 py-2">
                 <span className={`text-sm font-medium ${
-                  testStatus === "stopped" || testStatus === "중단됨" 
-                    ? "text-orange-600" 
+                  testStatus === "cancelled" || testStatus === "취소" 
+                    ? "text-orange-500" 
                     : testStatus === "failed" || testStatus === "실패"
                     ? "text-gray-500"
                     : "text-primary"
@@ -187,7 +149,7 @@ export function RecentActivity({
                   {testStatus === "completed" ? "완료" : 
                    testStatus === "running" ? "실행중" : 
                    testStatus === "failed" ? "실패" : 
-                   testStatus === "stopped" ? "중단됨" : testStatus}
+                   testStatus === "cancelled" ? "취소" : testStatus}
                 </span>
               </div>
             </div>

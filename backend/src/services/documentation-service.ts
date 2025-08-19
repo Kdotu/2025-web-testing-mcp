@@ -240,7 +240,7 @@ export class DocumentationService {
         case 'completed': return '완료';
         case 'failed': return '실패';
         case 'running': return '실행 중';
-        case 'cancelled': return '취소됨';
+        case 'cancelled': return '취소';
         default: return '알 수 없음';
       }
     });

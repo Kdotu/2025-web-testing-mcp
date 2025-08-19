@@ -49,12 +49,12 @@ import {
   type TestType,
   isDemoMode,
 } from "../../utils/api";
-import { getAllTestResults as getBackendTestResults } from "../../utils/backend-api";
+
 import { getMcpTools } from "../../utils/supabase/client";
 import {
   createLoadTest,
   getTestStatus as getBackendTestStatus,
-  cancelTest as cancelBackendTest,
+  cancelTest,
   checkBackendHealth,
   executeK6MCPTestDirect,
   executeK6MCPTest,
@@ -62,8 +62,7 @@ import {
   runLighthouseTest,
   executeE2ETest,
   executeDefaultTest,
-  cancelLighthouseTest,
-  cancelE2ETest,
+  getAllTestResults as getBackendTestResults,
 } from "../../utils/backend-api";
 
 import { Progress } from "../ui/progress";
@@ -78,6 +77,7 @@ import {
   TestStartButton,
   StopConfirmDialog
 } from "./index";
+import { DemoModeNotice } from "../common";
 
 interface RunningTest {
   id: number;
@@ -116,6 +116,8 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
   const [useBackendApi, setUseBackendApi] = useState(false);
   const [elapsedTime, setElapsedTime] = useState<{[key: number]: string}>({});
   const [recentResults, setRecentResults] = useState<any[]>([]);
+  
+
 
   // MCP 도구 상태
   const [mcpTools, setMcpTools] = useState<string[]>([]);
@@ -208,6 +210,93 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
           setTestSettings(settingsResult.data);
         }
 
+        // 최근 테스트 결과 및 전체 통계 불러오기
+        if (isDemoMode()) {
+          // 데모 모드: mock 데이터 설정
+          setRecentTestResults([
+            {
+              id: "demo_recent_1",
+              url: "https://example.com",
+              testType: "performance",
+              status: "completed",
+              score: 92,
+              createdAt: "2025-01-23T10:30:00",
+              updatedAt: "2025-01-23T10:32:15",
+              duration: "2m 15s"
+            },
+            {
+              id: "demo_recent_2", 
+              url: "https://demo-site.com",
+              testType: "lighthouse",
+              status: "completed",
+              score: 88,
+              createdAt: "2025-01-23T09:15:00",
+              updatedAt: "2025-01-23T09:16:45",
+              duration: "1m 45s"
+            },
+            {
+              id: "demo_recent_3",
+              url: "https://test-site.com",
+              testType: "load",
+              status: "stopped",
+              createdAt: "2025-01-23T08:00:00",
+              updatedAt: "2025-01-23T08:05:00",
+              duration: "5m 0s"
+            }
+          ]);
+          
+          // 데모 모드: mock 실행중 테스트 설정
+          setRunningTests([
+            {
+              id: Date.now(),
+              url: "https://demo-running.com",
+              type: "lighthouse",
+              status: "running",
+              startTime: new Date().toISOString(),
+              currentStep: "Lighthouse 실행 중",
+              estimatedTime: "2m",
+              logs: ["테스트 시작", "페이지 로딩 중", "Lighthouse 실행 중"],
+              settings: {},
+              description: "데모 실행중 테스트",
+              testStartTime: Date.now() - 30000, // 30초 전 시작
+            }
+          ]);
+        } else {
+          // 실제 모드: 백엔드에서 데이터 가져오기
+          try {
+            // 최근 테스트 결과 가져오기
+            const recentResults = await getBackendTestResults(1, 10);
+            if (recentResults.success && recentResults.data) {
+              setRecentTestResults(recentResults.data);
+            }
+            
+            // 실행중인 테스트 가져오기
+            const allResults = await getBackendTestResults(1, 1000);
+            if (allResults.success && allResults.data) {
+              const runningTestsData = allResults.data
+                .filter((r: any) => r.status === 'running' || r.status === '실행중')
+                .map((r: any) => ({
+                  id: r.id || Date.now(),
+                  backendTestId: r.testId || r.id,
+                  url: r.url,
+                  type: r.testType || r.type || 'unknown',
+                  status: r.status,
+                  startTime: r.createdAt || r.startTime || new Date().toISOString(),
+                  currentStep: r.currentStep || '실행 중',
+                  estimatedTime: r.estimatedTime || 'N/A',
+                  logs: r.logs || [],
+                  settings: r.settings || {},
+                  description: r.description || '',
+                  testStartTime: new Date(r.createdAt || r.startTime).getTime(),
+                }));
+              
+              setRunningTests(runningTestsData);
+            }
+          } catch (error) {
+            console.log('테스트 데이터를 불러올 수 없습니다:', error);
+          }
+        }
+
         setIsConnected(true);
       } catch (error) {
         setIsConnected(false);
@@ -216,6 +305,47 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
 
     loadData();
   }, []);
+
+  // 실행중인 테스트 상태 주기적 업데이트 (실제 모드에서만)
+  useEffect(() => {
+    if (isDemoMode() || !backendConnected) return;
+
+    const updateRunningTests = async () => {
+      try {
+        const allResults = await getBackendTestResults(1, 1000);
+        if (allResults.success && allResults.data) {
+          const runningTestsData = allResults.data
+            .filter((r: any) => r.status === 'running' || r.status === '실행중')
+            .map((r: any) => ({
+              id: r.id || Date.now(),
+              backendTestId: r.testId || r.id,
+              url: r.url,
+              type: r.testType || r.type || 'unknown',
+              status: r.status,
+              startTime: r.createdAt || r.startTime || new Date().toISOString(),
+              currentStep: r.currentStep || '실행 중',
+              estimatedTime: r.estimatedTime || 'N/A',
+              logs: r.logs || [],
+              settings: r.settings || {},
+              description: r.description || '',
+              testStartTime: new Date(r.createdAt || r.startTime).getTime(),
+            }));
+          
+          setRunningTests(runningTestsData);
+        }
+      } catch (error) {
+        console.log('실행중인 테스트 상태 업데이트 실패:', error);
+      }
+    };
+
+    // 초기 실행
+    updateRunningTests();
+
+    // 10초마다 상태 업데이트
+    const interval = setInterval(updateRunningTests, 10000);
+
+    return () => clearInterval(interval);
+  }, [backendConnected, isDemoMode]);
 
   // URL 유효성 검사 함수
   const validateUrl = (url: string): boolean => {
@@ -321,6 +451,8 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
       testStartTime: Date.now(),
     };
     setRunningTests((prev) => [runningItem, ...prev]);
+    
+
 
     // k6 기본 스크립트 생성기
     const createBasicK6Script = (targetUrl: string) => `import http from 'k6/http';\nimport { check, sleep } from 'k6';\nexport default function () {\n  const res = http.get('${targetUrl}');\n  check(res, { 'status is 200': (r) => r.status === 200 });\n  sleep(1);\n}`;
@@ -329,10 +461,28 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
       if (selectedTestType === 'lighthouse') {
         const device = testSettings?.lighthouse?.device || 'desktop';
         const categories = testSettings?.lighthouse?.categories || ['performance', 'accessibility', 'best-practices', 'seo'];
-        const res = await runLighthouseTest({ url: normalizedUrl, device, categories });
+        
+        console.log('🔧 Lighthouse 테스트 설정:', { device, categories, testSettings: testSettings?.lighthouse });
+        
+        const res = await runLighthouseTest({ 
+          url: normalizedUrl, 
+          device, 
+          categories,
+          name: 'Lighthouse 테스트',
+          description: testDescription
+        });
         if (!res.success) throw new Error(res.error || 'Lighthouse 테스트 시작 실패');
-        const backendTestId = (res as any).testId || (res.data as any)?.testId;
-        updateTestStatus(newTestId, 'running', { backendTestId, currentStep: 'Lighthouse 실행 중' });
+        
+        // 백엔드 응답에서 testId와 상태 정보 추출
+        const backendTestId = (res as any).data?.testId || (res as any).testId;
+        const testStatus = (res as any).data?.status || 'running';
+        const currentStep = (res as any).data?.currentStep || 'Lighthouse 실행 중';
+        
+        updateTestStatus(newTestId, 'running', { 
+          backendTestId, 
+          currentStep,
+          status: testStatus
+        });
       } else if (selectedTestType === 'load') {
         // k6 기본 프리셋 기반 구성
         const loadCfg = testSettings?.load || {};
@@ -343,6 +493,8 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
           vus: loadCfg.preAllocatedVUs || 10,
           detailedConfig: loadCfg,
         } as any;
+        
+        console.log('🔧 Load 테스트 설정:', { loadCfg, config });
         const script = createBasicK6Script(normalizedUrl);
         const res = await executeK6MCPTest({
           url: normalizedUrl,
@@ -352,24 +504,60 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
           config,
         });
         if (!res.success) throw new Error(res.error || '부하 테스트 시작 실패');
+        
+        // 백엔드 응답에서 testId와 상태 정보 추출
         const backendTestId = (res as any).data?.testId || (res as any).testId;
-        updateTestStatus(newTestId, 'running', { backendTestId, currentStep: 'k6 실행 중' });
+        const testStatus = (res as any).data?.status || 'running';
+        const currentStep = (res as any).data?.currentStep || 'k6 실행 중';
+        
+        updateTestStatus(newTestId, 'running', { 
+          backendTestId, 
+          currentStep,
+          status: testStatus
+        });
       } else if (selectedTestType === 'playwright') {
+        const playwrightSettings = testSettings?.playwright || {};
+        
+        console.log('🔧 E2E 테스트 설정:', { playwrightSettings });
+        
         const res = await executeE2ETest({
           url: normalizedUrl,
           name: 'E2E 테스트',
           description: testDescription,
-          config: { testType: 'playwright', settings: testSettings?.playwright || {} },
+          config: { testType: 'playwright', settings: playwrightSettings },
         });
         if (!res.success) throw new Error(res.error || 'E2E 테스트 시작 실패');
+        
+        // 백엔드 응답에서 testId와 상태 정보 추출
         const backendTestId = (res as any).data?.testId || (res as any).testId;
-        updateTestStatus(newTestId, 'running', { backendTestId, currentStep: 'Playwright 실행 중' });
+        const testStatus = (res as any).data?.status || 'running';
+        const currentStep = (res as any).data?.currentStep || 'Playwright 실행 중';
+        
+        updateTestStatus(newTestId, 'running', { 
+          backendTestId, 
+          currentStep,
+          status: testStatus
+        });
       } else {
         // 기본 실행 경로
-        const res = await executeDefaultTest({ url: normalizedUrl, name: '기본 테스트', description: testDescription, testType: selectedTestType });
+        const res = await executeDefaultTest({ 
+          url: normalizedUrl, 
+          name: '기본 테스트', 
+          description: testDescription, 
+          testType: selectedTestType 
+        });
         if (!res.success) throw new Error(res.error || '테스트 시작 실패');
+        
+        // 백엔드 응답에서 testId와 상태 정보 추출
         const backendTestId = (res as any).data?.testId || (res as any).testId;
-        updateTestStatus(newTestId, 'running', { backendTestId, currentStep: '실행 중' });
+        const testStatus = (res as any).data?.status || 'running';
+        const currentStep = (res as any).data?.currentStep || '실행 중';
+        
+        updateTestStatus(newTestId, 'running', { 
+          backendTestId, 
+          currentStep,
+          status: testStatus
+        });
       }
     } catch (err: any) {
       console.error('테스트 시작 실패:', err);
@@ -385,17 +573,57 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
     if (!target) return;
 
     try {
-      if (target.type === 'lighthouse' && target.backendTestId) {
-        await cancelLighthouseTest(target.backendTestId);
-      } else if (target.type === 'load' && target.backendTestId) {
-        await cancelBackendTest(target.backendTestId);
-      } else if (target.type === 'playwright' && target.backendTestId) {
-        await cancelE2ETest(target.backendTestId);
+      // 먼저 UI 상태를 'stopping'으로 변경
+      updateTestStatus(testId, 'stopping', { currentStep: '중단 중...' });
+
+      let cancelSuccess = false;
+      
+      // 백엔드 API 호출 - 통합된 API 사용
+      if (target.backendTestId) {
+        // 테스트 타입을 백엔드 형식에 맞게 매핑
+        let backendTestType = 'load'; // 기본값
+        
+        if (target.type === 'lighthouse') {
+          backendTestType = 'lighthouse';
+        } else if (target.type === 'playwright' || target.type === 'e2e') {
+          backendTestType = 'e2e';
+        } else if (target.type === 'load' || target.type === 'k6') {
+          backendTestType = 'load';
+        }
+
+        console.log(`테스트 중단 요청: ID=${target.backendTestId}, Type=${backendTestType}`);
+        
+        // 통합된 테스트 취소 API 사용
+        const result = await cancelTest(target.backendTestId, backendTestType);
+        cancelSuccess = result.success;
+        
+        console.log('테스트 중단 결과:', result);
+      } else {
+        // 백엔드 ID가 없는 경우 (데모 모드 등) 로컬에서만 처리
+        cancelSuccess = true;
       }
-      updateTestStatus(testId, 'stopped', { stopTime: new Date().toISOString() });
+
+      if (cancelSuccess) {
+        // 백엔드에서 성공적으로 중단된 경우
+        updateTestStatus(testId, 'stopped', { 
+          stopTime: new Date().toISOString(),
+          currentStep: '테스트가 중단되었습니다'
+        });
+        
+        // 백엔드 상태 동기화를 위해 잠시 후 실행중인 테스트 목록 새로고침
+        setTimeout(() => {
+          if (!isDemoMode() && backendConnected) {
+            // 주기적 업데이트 useEffect가 있으므로 별도 호출 불필요
+            console.log('테스트 중단 완료, 백엔드 상태 동기화 대기 중...');
+          }
+        }, 1000);
+      } else {
+        // 백엔드에서 중단 실패한 경우
+        updateTestStatus(testId, 'failed', { currentStep: '중단 실패: 백엔드 응답 오류' });
+      }
     } catch (err) {
       console.error('테스트 중단 실패:', err);
-      updateTestStatus(testId, 'failed', { currentStep: '중단 실패' });
+      updateTestStatus(testId, 'failed', { currentStep: '중단 실패: 네트워크 오류' });
     }
   };
 
@@ -409,6 +637,19 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
       );
       
       if (newStatus === 'stopped' || newStatus === 'completed') {
+        // 테스트가 완료되거나 중단되면 최근 결과에 추가
+        const completedTest = prev.find(test => test.id === testId);
+        if (completedTest) {
+          const testData = {
+            ...completedTest,
+            status: newStatus,
+            ...additionalData,
+            updatedAt: new Date().toISOString()
+          };
+          addTestToRecentResults(testData);
+          
+
+        }
         return updated.filter(test => test.id !== testId);
       }
       
@@ -433,7 +674,7 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
   return (
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-8 mx-auto">
-        {/* 헤더 */}
+        {/* 페이지 헤더 */}
         <TestExecutionHeader isInDemoMode={isInDemoMode} />
 
         {/* 메인 설정 영역: 세로 레이아웃 */}

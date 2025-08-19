@@ -1,11 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import { loadTestRoutes } from './routes/load-tests';
+import testRoutes from './routes/test-routes';
 import { testResultRoutes } from './routes/test-results';
 import { testTypeRoutes } from './routes/test-types';
 import testMetricRoutes from './routes/test-metrics';
-import lighthouseRoutes from './routes/lighthouse';
-import e2eTestRoutes from './routes/e2e-tests';
+import testManageRoutes from './routes/test-manage';
 import { settingsRoutes } from './routes/settings';
 import { dbStatusRoutes } from './routes/db-status';
 import { saveSettingsRoutes } from './routes/save-settings';
@@ -38,12 +37,11 @@ app.use(cors({
 app.use(express.json());
 
 // 라우트 설정
-app.use('/api/load-tests', loadTestRoutes);
+app.use('/api/test', testRoutes);
 app.use('/api/test-results', testResultRoutes);
 app.use('/api/test-types', testTypeRoutes);
 app.use('/api/test-metrics', testMetricRoutes);
-app.use('/api/lighthouse', lighthouseRoutes);
-app.use('/api/e2e-tests', e2eTestRoutes);
+app.use('/api/test-manage', testManageRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api', mcpStatusRoutes);
 

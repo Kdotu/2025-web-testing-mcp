@@ -119,6 +119,71 @@ export class TestResultService {
   }
 
   /**
+   * 초기 테스트 결과 생성 (INSERT)
+   */
+  async createInitialResult(data: {
+    testType: string;
+    url: string;
+    name: string;
+    description?: string;
+    status: string;
+    config?: any;
+  }): Promise<any> {
+    try {
+      const testId = this.generateTestId();
+      const now = new Date().toISOString();
+      
+      const initialResult = {
+        test_id: testId,
+        test_type: data.testType,
+        url: data.url,
+        name: data.name,
+        description: data.description || '',
+        status: data.status,
+        current_step: '테스트 초기화',
+        metrics: {},
+        summary: {},
+        details: {},
+        config: data.config || {},
+        raw_data: '',
+        created_at: now,
+        updated_at: now
+      };
+
+      console.log('📋 TestResultService - 저장할 config 데이터:', JSON.stringify(data.config, null, 2));
+      console.log('📋 TestResultService - 전체 initialResult:', JSON.stringify(initialResult, null, 2));
+
+      console.log('Creating initial test result:', initialResult);
+
+      const { data: result, error } = await this.supabaseClient
+        .from('m2_test_results')
+        .insert(initialResult)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Failed to create initial test result:', error);
+        throw error;
+      }
+
+      console.log('✅ Initial test result created successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('초기 테스트 결과 생성 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 테스트 ID 생성 (타입별 고유 ID)
+   */
+  private generateTestId(): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    return `${timestamp}_${random}`;
+  }
+
+  /**
    * 결과 저장 (최초 insert)
    */
   async saveResult(result: LoadTestResult): Promise<void> {

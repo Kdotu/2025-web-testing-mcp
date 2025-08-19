@@ -30,7 +30,7 @@ export function ConnectionStatus({
           icon: CheckCircle,
           color: 'text-green-600',
           bgColor: 'bg-green-100',
-          text: '연결됨',
+          text: '온라인',
           animate: ''
         };
       case 'demo':
@@ -69,23 +69,24 @@ export function ConnectionStatus({
       <div className="rounded-lg px-3 py-2 border border-white/10">
         <div className="flex items-center space-x-3">
           <span className={`text-xs font-medium transition-colors duration-200 ${
-            isDemoMode ? 'text-purple-600' : 'text-muted-foreground'
+            status === 'demo' ? display.color : 'text-muted-foreground'
           }`}>
-            
             데모
           </span>
           
           {/* Toggle Switch */}
           <button
             onClick={onToggleDemoMode}
-            className={`
-              relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-300 ease-in-out
-              focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-              ${isDemoMode 
-                ? 'bg-purple-600' 
-                : 'bg-green-600'
-              }
-            `}
+                         className={`
+               relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-300 ease-in-out
+               focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+               ${isDemoMode
+                 ? 'bg-purple-600'
+                 : (status === 'connected'
+                   ? 'bg-green-600'
+                   : (status === 'offline' ? 'bg-blue-600' : 'bg-gray-400'))
+               }
+             `}
             role="switch"
             aria-checked={isDemoMode}
             aria-label="데모 모드 토글"
@@ -100,9 +101,9 @@ export function ConnectionStatus({
           </button>
           
           <span className={`text-xs font-medium transition-colors duration-200 ${
-            !isDemoMode ? 'text-green-600' : 'text-muted-foreground'
+            status === 'connected' ? 'text-green-600' : status === 'offline' ? 'text-blue-600' : 'text-muted-foreground'
           }`}>
-            연결
+            {status === 'connected' ? '온라인' : status === 'offline' ? '오프라인' : '연결'}
           </span>
         </div>
       </div>

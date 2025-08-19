@@ -8,11 +8,12 @@ import { Textarea } from "../ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Plus, Trash2, Edit, Save, Bell, Database, Settings as SettingsIcon, Cog, Activity, CheckCircle, Shield, AlertCircle, Lock, Unlock, Sparkles } from "lucide-react";
 import { getTestTypes, addTestType, updateTestType, deleteTestType, type TestType, isDemoMode } from "../../utils/api";
 import { toast } from "sonner";
 import { TestTypeModal } from "./TestTypeModal";
+import { SettingsHeader } from "./SettingsHeader";
 
 interface SettingsProps {
   onNavigate?: (tabId: string) => void;
@@ -395,32 +396,7 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-8 mx-auto">
           {/* 페이지 헤더 */}
-          <div className="neu-card rounded-3xl px-8 py-8 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
-            <div className="flex items-center space-x-4 mb-6">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center neu-accent">
-              <SettingsIcon className="h-7 w-7 text-primary-foreground" />
-            </div>
-              <div className="flex-1">
-                <h1 className="text-4xl font-bold text-primary mb-4">설정</h1>
-                <p className="text-muted-foreground text-lg">테스트 설정을 관리하고 테스트 타입을 구성하세요</p>
-              </div>
-          </div>
-
-          {/* 데모 모드 알림 */}
-          {isDemoModeActive && (
-          <div className="neu-input rounded-3xl px-6 py-6 border-l-4 border-l-purple-500">
-            <div className="flex items-start space-x-4">
-              <Sparkles className="h-6 w-6 text-purple-500 flex-shrink-0 mt-1" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg text-primary mb-2">🎭 데모 모드로 실행 중</h3>
-                <p className="text-muted-foreground mb-4">
-                  모든 기능을 완전히 사용할 수 있는 시뮬레이션 환경입니다. 
-                </p>
-              </div>
-            </div>
-          </div>
-          )}
-        </div>
+          <SettingsHeader isInDemoMode={isDemoModeActive} />
 
         <div className="neu-card rounded-3xl px-6 py-8">
           <Tabs defaultValue="test-types" className="space-y-8">

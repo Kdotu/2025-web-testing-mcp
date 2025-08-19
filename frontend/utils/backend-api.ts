@@ -90,7 +90,7 @@ class BackendApiClient {
    * 부하 테스트 생성 및 실행
    */
   async createLoadTest(config: LoadTestConfig): Promise<BackendApiResponse<LoadTestResult>> {
-    return this.request('/api/load-tests', {
+    return this.request('/api/test/load', {
       method: 'POST',
       body: JSON.stringify(config),
     });
@@ -100,31 +100,45 @@ class BackendApiClient {
    * 테스트 상태 조회 (기본)
    */
   async getTestStatus(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/load-tests/${testId}`);
+    return this.request(`/api/test-manage/status/${testId}?testType=load`);
   }
 
   /**
    * k6 테스트 상태 조회
    */
   async getK6TestStatus(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/load-tests/${testId}`);
+    return this.request(`/api/test-manage/status/${testId}?testType=load`);
   }
 
   /**
    * 테스트 결과 조회
    */
   async getTestResults(testId: string): Promise<BackendApiResponse<LoadTestResult>> {
-    return this.request(`/api/load-tests/${testId}/results`);
+    return this.request(`/api/test-results/${testId}`);
   }
 
   /**
-   * 테스트 취소
+   * 테스트 취소 (통합)
    */
-  async cancelTest(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/load-tests/${testId}`, {
-      method: 'DELETE',
-    });
+  async cancelTest(testId: string, testType?: string): Promise<BackendApiResponse> {
+    const queryParam = testType ? `?testType=${testType}` : '';
+    const url = `/api/test-manage/cancel/${testId}${queryParam}`;
+    
+    console.log('🔍 cancelTest 호출:', { testId, testType, url });
+    
+    try {
+      const result = await this.request(url, {
+        method: 'DELETE'
+      });
+      console.log('✅ cancelTest 성공:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ cancelTest 실패:', error);
+      throw error;
+    }
   }
+
+
 
   /**
    * 전체 테스트 결과 개수 조회
@@ -153,14 +167,7 @@ class BackendApiClient {
     return this.request(`/api/test-results/${id}`);
   }
 
-  /**
-   * 테스트 결과 삭제
-   */
-  async deleteTestResult(id: string): Promise<BackendApiResponse> {
-    return this.request(`/api/test-results/${id}`, {
-      method: 'DELETE',
-    });
-  }
+
 
   /**
    * 통계 조회
@@ -183,7 +190,7 @@ class BackendApiClient {
       detailedConfig?: any;
     };
   }): Promise<BackendApiResponse<LoadTestResult>> {
-    return this.request('/api/load-tests/k6-mcp-direct', {
+    return this.request('/api/test/load/k6-mcp-direct', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -203,7 +210,7 @@ class BackendApiClient {
       detailedConfig?: any;
     };
   }): Promise<BackendApiResponse<LoadTestResult>> {
-    return this.request('/api/load-tests/k6-mcp', {
+    return this.request('/api/test/load/k6-mcp', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -218,7 +225,7 @@ class BackendApiClient {
     description?: string;
     testType: string;
   }): Promise<BackendApiResponse> {
-    return this.request('/api/load-tests/default', {
+    return this.request('/api/test/load/default', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -231,8 +238,10 @@ class BackendApiClient {
     url: string;
     device?: string;
     categories?: string[];
+    name?: string;
+    description?: string;
   }): Promise<BackendApiResponse> {
-    return this.request('/api/lighthouse/run', {
+    return this.request('/api/test/lighthouse', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -242,23 +251,15 @@ class BackendApiClient {
    * Lighthouse 테스트 상태 조회
    */
   async getLighthouseTestStatus(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/lighthouse/status/${testId}`);
-  }
-
-  /**
-   * Lighthouse 테스트 취소
-   */
-  async cancelLighthouseTest(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/lighthouse/cancel/${testId}`, {
-      method: 'DELETE',
-    });
+    return this.request(`/api/test-manage/status/${testId}?testType=lighthouse`);
   }
 
   /**
    * 실행 중인 Lighthouse 테스트 조회
    */
   async getRunningLighthouseTests(): Promise<BackendApiResponse> {
-    return this.request('/api/lighthouse/running');
+    // 새로운 통합 API에서는 개별 실행 중인 테스트 조회 대신 전체 상태를 조회
+    return this.request('/api/test-manage/status/all?testType=lighthouse');
   }
 
   /**
@@ -273,7 +274,7 @@ class BackendApiClient {
       settings: any;
     };
   }): Promise<BackendApiResponse<LoadTestResult>> {
-    return this.request('/api/e2e-tests', {
+    return this.request('/api/test/e2e', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -283,17 +284,10 @@ class BackendApiClient {
    * E2E 테스트 상태 조회
    */
   async getE2ETestStatus(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/e2e-tests/${testId}`);
+    return this.request(`/api/test-manage/status/${testId}?testType=e2e`);
   }
 
-  /**
-   * E2E 테스트 취소
-   */
-  async cancelE2ETest(testId: string): Promise<BackendApiResponse> {
-    return this.request(`/api/e2e-tests/${testId}`, {
-      method: 'DELETE',
-    });
-  }
+
 
   // ===== 문서화 관련 API =====
 
@@ -529,12 +523,11 @@ export const createLoadTest = (config: LoadTestConfig) => backendApi.createLoadT
 export const getTestStatus = (testId: string) => backendApi.getTestStatus(testId);
 export const getK6TestStatus = (testId: string) => backendApi.getK6TestStatus(testId);
 export const getTestResults = (testId: string) => backendApi.getTestResults(testId);
-export const cancelTest = (testId: string) => backendApi.cancelTest(testId);
+export const cancelTest = (testId: string, testType?: string) => backendApi.cancelTest(testId, testType);
 export const getTotalTestCount = () => backendApi.getTotalTestCount();
 export const getAllTestResults = (page?: number, limit?: number, status?: string) => 
   backendApi.getAllTestResults(page, limit, status);
 export const getTestResultById = (id: string) => backendApi.getTestResultById(id);
-export const deleteTestResult = (id: string) => backendApi.deleteTestResult(id);
 export const getStatistics = () => backendApi.getStatistics();
 
 export const executeK6MCPTestDirect = (params: {
@@ -575,7 +568,6 @@ export const runLighthouseTest = (params: {
 }) => backendApi.runLighthouseTest(params);
 
 export const getLighthouseTestStatus = (testId: string) => backendApi.getLighthouseTestStatus(testId);
-export const cancelLighthouseTest = (testId: string) => backendApi.cancelLighthouseTest(testId);
 export const getRunningLighthouseTests = () => backendApi.getRunningLighthouseTests();
 
 export const executeE2ETest = (params: {
@@ -589,7 +581,6 @@ export const executeE2ETest = (params: {
 }) => backendApi.executeE2ETest(params);
 
 export const getE2ETestStatus = (testId: string) => backendApi.getE2ETestStatus(testId);
-export const cancelE2ETest = (testId: string) => backendApi.cancelE2ETest(testId);
 
 // ===== 문서화 관련 함수들 =====
 

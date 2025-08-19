@@ -36,10 +36,6 @@ export function TestProgress({
   const stoppedTestCount = runningTests.filter((t) => t.status === "중단됨").length;
   const totalTestCount = activeTestCount + stoppedTestCount;
 
-  if (totalTestCount === 0) {
-    return null;
-  }
-
   return (
     <div className="neu-card rounded-3xl px-6 py-8">
       <div className="flex items-center space-x-4 mb-8">
@@ -55,15 +51,18 @@ export function TestProgress({
       </div>
 
       {/* 테스트 진행 상황 목록 */}
-      <div className="space-y-6">
-        <h4 className="font-semibold text-foreground text-lg">
-          진행 중인 테스트 목록
-        </h4>
-        
-        <div className="space-y-6">
-          {runningTests
-            .filter((t) => t.status === "running" || t.status === "실행중" || t.status === "stopped" || t.status === "stopping")
-            .map((test) => {
+      <div className="space-y-6">      
+        {totalTestCount === 0 ? (
+          <div className="text-center pt-0 py-12 text-muted-foreground">
+            <Timer className="h-16 w-16 mx-auto mb-6 opacity-50" />
+            <p className="font-semibold text-lg mb-2">현재 실행 중인 테스트가 없습니다</p>
+            <p className="text-base">새 테스트를 시작해보세요</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {runningTests
+              .filter((t) => t.status === "running" || t.status === "실행중" || t.status === "stopped" || t.status === "stopping")
+              .map((test) => {
               const isStopped = test.status === "stopped";
               const isRunning = test.status === "running" || test.status === "실행중";
               const isStopping = test.status === "stopping";
@@ -115,11 +114,11 @@ export function TestProgress({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          // 중단 확인 다이얼로그 표시
+                          // 확인 모달을 먼저 표시
                           setStopConfirmDialog({
                             isOpen: true,
                             testId: test.id,
-                            testUrl: test.url,
+                            testUrl: test.url
                           });
                         }}
                         disabled={test.status === 'stopping'}
@@ -176,7 +175,8 @@ export function TestProgress({
                 </div>
               );
             })}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

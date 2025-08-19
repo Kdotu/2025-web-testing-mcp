@@ -148,7 +148,7 @@ export interface ApiResponse<T = any> {
  */
 export interface TestStatusUpdate {
   testId: string;
-  status: LoadTestResult['status'];
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'stopped' | 'not_found';
   progress?: number;
   currentStep?: string;
   message?: string;

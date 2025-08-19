@@ -6,9 +6,10 @@ import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Progress } from "../ui/progress";
-import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3, FileCode, FileImage } from "lucide-react";
+import { Download, Search, Filter, Eye, Calendar, Globe, ExternalLink, FileText, BarChart3, FileCode, FileImage, Activity } from "lucide-react";
 import { getAllTestResults, getTestResultById, getTestTypes, generateHtmlReport, generatePdfReport, getDocumentDownloadUrl, getTotalTestCount } from "../../utils/backend-api";
 import { TestResultModal } from "./TestResultModal";
+import { TestResultHeader } from "./index";
 
 interface TestResultsProps {
   onNavigate?: (tabId: string) => void;
@@ -390,31 +391,7 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
     <div className="w-full flex flex-col items-center">
       <div className="max-w-5xl w-full space-y-8 mx-auto">
       {/* 페이지 헤더 */}
-      <div className="neu-card rounded-3xl px-8 py-6 shadow-[0_4px_16px_rgba(0,0,0,0.1),0_8px_32px_rgba(99,102,241,0.4)]">
-        <div className="flex items-center space-x-4 mb-4">
-          <FileText className="h-10 w-10 text-primary" />
-          <div>
-            <h1 className="text-4xl font-bold text-primary">테스트 결과</h1>
-            <p className="text-muted-foreground text-lg mt-2">
-              {isDemoModeActive 
-                ? '데모 모드: 샘플 테스트 결과를 확인하세요' 
-                : '실행된 테스트 결과를 확인하고 분석하세요'
-              }
-            </p>
-          </div>
-        </div>
-        
-        {/* 데모 모드 알림 */}
-        {isDemoModeActive && (
-          <div className="mt-4 neu-accent rounded-xl px-4 py-3 border border-purple-300/30">
-            <div className="flex items-center space-x-3">
-              <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
-              <span className="text-purple-700 font-semibold">데모 모드</span>
-              <span className="text-purple-600 text-sm">현재 데모 모드로 실행 중입니다. 샘플 데이터가 표시됩니다.</span>
-            </div>
-          </div>
-        )}
-      </div>
+      <TestResultHeader isInDemoMode={isDemoModeActive} />
 
       {/* 로딩 상태 */}
       {loading && (
@@ -598,6 +575,7 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
                 <SelectItem value="completed">성공</SelectItem>
                 <SelectItem value="failed">실패</SelectItem>
                 <SelectItem value="running">실행중</SelectItem>
+                <SelectItem value="cancelled">취소</SelectItem>
                 {/* <SelectItem value="pending">대기중</SelectItem>
                 <SelectItem value="cancelled">취소됨</SelectItem> */}
               </SelectContent>
@@ -649,7 +627,7 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
                        filterStatus === 'failed' ? '실패' : 
                        filterStatus === 'running' ? '실행중' : 
                        filterStatus === 'pending' ? '대기중' : 
-                       filterStatus === 'cancelled' ? '취소됨' : filterStatus}
+                       filterStatus === 'cancelled' ? '취소' : filterStatus}
                 <button 
                   onClick={() => setFilterStatus("all")}
                   className="ml-2 hover:text-destructive"
@@ -740,13 +718,13 @@ export function TestResults({ onNavigate, isInDemoMode, connectionStatus: propCo
                             result.status === 'completed' ? 'text-[var(--primary)]' : 
                             result.status === 'failed' ? 'text-gray-500' : 
                             result.status === 'running' ? 'text-white' : 
-                            result.status === 'cancelled' ? 'text-gray-500' : 
+                            result.status === 'cancelled' ? 'text-orange-500' : 
                             result.status === 'pending' ? 'text-gray-500' : 'text-gray-500'
                           }`}>
                             {result.status === 'completed' ? '성공' : 
                              result.status === 'failed' ? '실패' : 
                              result.status === 'running' ? '실행중' : 
-                             result.status === 'cancelled' ? '취소됨' : 
+                             result.status === 'cancelled' ? '취소' : 
                              result.status === 'pending' ? '대기중' : result.status}
                           </span>
                         </div>
