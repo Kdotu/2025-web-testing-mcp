@@ -62,20 +62,19 @@ export class TestManageController {
 
       // config 객체 구조화 및 검증
       const structuredConfig = {
-        testType: 'e2e',
+        testType: config?.testType || 'e2e',
         settings: config?.settings || {},
         url,
         name: name || 'E2E 테스트',
         description: description || '',
-        timestamp: new Date().toISOString(),
-        ...config // 기존 config 데이터 유지
+        timestamp: new Date().toISOString()
       };
 
       console.log('📋 구조화된 config:', JSON.stringify(structuredConfig, null, 2));
 
       // 1. 테스트 결과 레코드 즉시 생성 (INSERT)
       const testResult = await this.testResultService.createInitialResult({
-        testType: 'e2e',
+        testType: config?.testType || 'e2e',
         url,
         name: name || 'E2E 테스트',
         description,
@@ -91,7 +90,7 @@ export class TestManageController {
         name,
         description,
         config
-      }).catch(async (error) => {
+      }, testResult.test_id).catch(async (error) => {
         console.error('E2E 테스트 실행 중 오류 발생:', error);
         
         // 에러 발생 시 상태를 failed로 업데이트
@@ -99,7 +98,7 @@ export class TestManageController {
           await this.testResultService.updateResult({
             id: testResult.id,
             testId: testResult.test_id,
-            testType: 'e2e',
+            testType: config?.testType || 'e2e',
             url,
             name,
             description,
@@ -135,7 +134,7 @@ export class TestManageController {
       await this.testResultService.updateResult({
         id: testResult.id,
         testId: testResult.test_id,
-        testType: 'e2e',
+        testType: config?.testType || 'e2e',
         url,
         name,
         description,

@@ -44,7 +44,17 @@ export default defineConfig({
     port: 3100,
     host: true,
     cors: true,
-    strictPort: false
+    strictPort: true,
+    hmr: {
+      overlay: true,
+      port: 3100,
+      host: 'localhost'
+    },
+    watch: {
+      usePolling: true,
+      interval: 100,
+      followSymlinks: false
+    }
   },
   preview: {
     port: 4173,

@@ -17,7 +17,7 @@ interface TestSettings {
 interface TestConfigurationProps {
   selectedTestType: string;
   testSettings: TestSettings;
-  updateTestSetting: (testType: keyof TestSettings, key: string, value: any) => void;
+  updateTestSetting: (testType: keyof TestSettings, key: string, value: any) => Promise<void>;
   testTypes: any[];
 }
 
@@ -78,13 +78,30 @@ export function TestConfiguration({
                   return (
                     <button
                       key={preset.id}
-                      onClick={() => {
-                        updateTestSetting('load', 'preset', preset.id);
-                        updateTestSetting('load', 'startRate', preset.startRate);
-                        updateTestSetting('load', 'timeUnit', preset.timeUnit);
-                        updateTestSetting('load', 'preAllocatedVUs', preset.preAllocatedVUs);
-                        updateTestSetting('load', 'maxVUs', preset.maxVUs);
-                        updateTestSetting('load', 'stages', preset.stages);
+                      onClick={async () => {
+                        // 프리셋 변경 시 모든 설정을 한 번에 업데이트
+                        const newLoadSettings = {
+                          ...testSettings.load,
+                          preset: preset.id,
+                          startRate: preset.startRate,
+                          timeUnit: preset.timeUnit,
+                          preAllocatedVUs: preset.preAllocatedVUs,
+                          maxVUs: preset.maxVUs,
+                          stages: preset.stages
+                        };
+                        
+                        // custom 모드가 아닌 경우 executor 제거
+                        if (preset.id !== 'custom') {
+                          delete newLoadSettings.executor;
+                        } else {
+                          // custom 모드인 경우 executor 기본값 설정
+                          if (!newLoadSettings.executor) {
+                            newLoadSettings.executor = 'ramping-arrival-rate';
+                          }
+                        }
+                        
+                        // 전체 load 설정을 한 번에 업데이트
+                        await updateTestSetting('load', 'fullSettings', newLoadSettings);
                       }}
                       className={`neu-button rounded-xl p-4 text-left transition-all duration-200 ${isSelected ? 'neu-button-active' : ''}`}
                     >
@@ -365,7 +382,7 @@ export function TestConfiguration({
             </div>
           </div>
         </div>
-      ) : selectedTestType === 'playwright' ? (
+      ) : selectedTestType === 'e2e' ? (
         // Playwright 상세 설정 복구
         <div className="space-y-6">
           {/* 설정 모드 탭 */}

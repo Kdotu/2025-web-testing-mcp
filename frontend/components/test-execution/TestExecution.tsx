@@ -410,14 +410,36 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
   };
 
   // 테스트 설정 업데이트 함수
-  const updateTestSetting = (testType: keyof any, key: string, value: any) => {
-    setTestSettings((prev: any) => ({
-      ...prev,
-      [testType]: {
-        ...prev[testType],
-        [key]: value,
-      },
-    }));
+  const updateTestSetting = async (testType: keyof any, key: string, value: any): Promise<void> => {
+    let newSettings;
+    
+    if (key === 'fullSettings') {
+      // 전체 설정을 한 번에 업데이트하는 경우
+      newSettings = {
+        ...testSettings,
+        [testType]: value,
+      };
+    } else {
+      // 개별 설정을 업데이트하는 경우
+      newSettings = {
+        ...testSettings,
+        [testType]: {
+          ...testSettings[testType],
+          [key]: value,
+        },
+      };
+    }
+    
+    // 로컬 상태 업데이트
+    setTestSettings(newSettings);
+    
+    // 설정을 백엔드에 저장 (비동기)
+    try {
+      await saveTestSettings(newSettings);
+    } catch (error) {
+      console.error('설정 저장 실패:', error);
+      // 에러가 발생해도 로컬 상태는 유지
+    }
   };
 
   // 테스트 시작 함수
@@ -515,7 +537,7 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
           currentStep,
           status: testStatus
         });
-      } else if (selectedTestType === 'playwright') {
+      } else if (selectedTestType === 'e2e') {
         const playwrightSettings = testSettings?.playwright || {};
         
         console.log('🔧 E2E 테스트 설정:', { playwrightSettings });
@@ -524,7 +546,7 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
           url: normalizedUrl,
           name: 'E2E 테스트',
           description: testDescription,
-          config: { testType: 'playwright', settings: playwrightSettings },
+          config: { testType: 'e2e', settings: playwrightSettings },
         });
         if (!res.success) throw new Error(res.error || 'E2E 테스트 시작 실패');
         
@@ -585,7 +607,7 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
         
         if (target.type === 'lighthouse') {
           backendTestType = 'lighthouse';
-        } else if (target.type === 'playwright' || target.type === 'e2e') {
+        } else if (target.type === 'e2e') {
           backendTestType = 'e2e';
         } else if (target.type === 'load' || target.type === 'k6') {
           backendTestType = 'load';

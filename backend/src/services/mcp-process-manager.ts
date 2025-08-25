@@ -41,7 +41,9 @@ export class MCPProcessManager extends EventEmitter {
    * MCP 서버 프로세스 시작
    */
   async startServer(config: MCPServerConfig): Promise<string> {
-    const processId = `${config.name}-${Date.now()}`;
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    const processId = `${config.name}-${timestamp}-${random}`;
     
     try {
       // 이미 실행 중인 동일한 서버가 있는지 확인
@@ -161,17 +163,27 @@ export class MCPProcessManager extends EventEmitter {
   }
 
   /**
-   * 서버가 실행 중인지 확인
+   * 서버가 실행 중인지 확인 (프로세스 상태도 검증)
    */
   isServerRunning(serverName: string): boolean {
-    return Array.from(this.processes.values()).some(info => info.name === serverName);
+    return Array.from(this.processes.values()).some(info => 
+      info.name === serverName && 
+      info.process && 
+      !info.process.killed && 
+      info.isHealthy
+    );
   }
 
   /**
-   * 실행 중인 서버 ID 가져오기
+   * 실행 중인 서버 ID 가져오기 (프로세스 상태도 검증)
    */
   getRunningServerId(serverName: string): string | null {
-    const processInfo = Array.from(this.processes.values()).find(info => info.name === serverName);
+    const processInfo = Array.from(this.processes.values()).find(info => 
+      info.name === serverName && 
+      info.process && 
+      !info.process.killed && 
+      info.isHealthy
+    );
     return processInfo?.id || null;
   }
 

@@ -321,7 +321,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
               <h3 className="text-3xl font-semibold text-primary">테스트 결과 상세</h3>
             </div>
             <p className="text-muted-foreground text-lg">
-              {result.url} - {result.testType || result.type || '부하테스트'}
+              {result.url} - {result.testType || result.type }
             </p>
           </div>
           <button 
@@ -346,6 +346,16 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                     </span>
                   </div>
                 )}
+              </div>
+              <div className="flex justify-between items-center py-4 px-6 neu-pressed rounded-xl mb-6">
+                <div className="flex items-center justify-between w-full">
+                <div className="text-start flex-1">
+                    <span className="text-sm text-muted-foreground">설명</span>
+                    <div className="font-semibold text-primary text-sm">
+                      {result.description || ''}
+                    </div>
+                </div>
+                </div>
               </div>
               <div className="flex justify-between items-center py-4 px-6 neu-pressed rounded-xl">
                 <div className="flex items-center justify-between w-full">
@@ -375,7 +385,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                 <div className="mt-6 neu-pressed rounded-xl px-6 py-6">
                   <h5 className="font-semibold mb-4 text-primary text-lg">테스트 설정</h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {result.testType === 'lighthouse' && result.config.categories && (
+                    {result.testType === 'lighthouse' && result.config?.categories && (
                       <div className="neu-flat rounded-lg px-4 py-3">
                         <span className="text-sm text-muted-foreground">검사 카테고리</span>
                         <div className="font-semibold text-primary text-sm mt-1">
@@ -386,7 +396,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                       </div>
                     )}
                     
-                    {result.testType === 'lighthouse' && result.config.device && (
+                    {result.testType === 'lighthouse' && result.config?.device && (
                       <div className="neu-flat rounded-lg px-4 py-3">
                         <span className="text-sm text-muted-foreground">디바이스</span>
                         <div className="font-semibold text-primary text-sm mt-1">
@@ -395,54 +405,56 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                       </div>
                     )}
                     
-                    {result.testType === 'load' && result.config.detailedConfig && (
+                    {result.testType === 'load' && result.config?.detailedConfig && (
                       <>
                         <div className="neu-flat rounded-lg px-4 py-3">
                           <span className="text-sm text-muted-foreground">실행 모드</span>
                           <div className="font-semibold text-primary text-sm mt-1">
-                            {result.config?.detailedConfig?.settings?.executor || 'N/A'}
+                            {result.config?.detailedConfig?.settings?.executor || ''}
                           </div>
                         </div>
                         
                         <div className="neu-flat rounded-lg px-4 py-3">
                           <span className="text-sm text-muted-foreground">최대 VU</span>
                           <div className="font-semibold text-primary text-sm mt-1">
-                            {result.config.detailedConfig.settings.maxVUs || result.config.vus || 'N/A'}
+                            {result.config?.detailedConfig?.maxVUs || result.config?.vus || 'N/A'}
                           </div>
                         </div>
                         
                         <div className="neu-flat rounded-lg px-4 py-3">
                           <span className="text-sm text-muted-foreground">지속 시간</span>
                           <div className="font-semibold text-primary text-sm mt-1">
-                            {result.config.duration || 'N/A'}
+                            {result.config?.duration || 'N/A'}
                           </div>
                         </div>
                         
-                        {result.config?.detailedConfig?.settings?.preset && (
-                          <div className="neu-flat rounded-lg px-4 py-3">
-                            <span className="text-sm text-muted-foreground">프리셋</span>
-                            <div className="font-semibold text-primary text-sm mt-1">
-                              {result.config?.detailedConfig?.settings?.preset === 'low' ? 'Low' :
-                               result.config?.detailedConfig?.settings?.preset === 'medium' ? 'Medium' :
-                               result.config?.detailedConfig?.settings?.preset === 'high' ? 'High' :
-                               result.config?.detailedConfig?.settings?.preset === 'custom' ? 'Custom' :
-                               result.config?.detailedConfig?.settings?.preset}
-                            </div>
+                                                  <div className="neu-flat rounded-lg px-4 py-3">
+                          <span className="text-sm text-muted-foreground">프리셋</span>
+                          <div className="font-semibold text-primary text-sm mt-1">
+                            {result.config?.detailedConfig?.preset === 'low' ? 'Low' :
+                             result.config?.detailedConfig?.preset === 'medium' ? 'Medium' :
+                             result.config?.detailedConfig?.preset === 'high' ? 'High' :
+                             result.config?.detailedConfig?.preset === 'custom' ? 'Custom' :
+                             result.config?.detailedConfig?.preset || 'N/A'}
                           </div>
-                        )}
+                        </div>
                         
-                        {result.config.detailedConfig.stages && Array.isArray(result.config.detailedConfig.stages) && (
+                        {result.config?.detailedConfig?.stages && Array.isArray(result.config.detailedConfig.stages) && (
                           <div className="neu-flat rounded-lg px-4 py-3">
                             <span className="text-sm text-muted-foreground">테스트 단계</span>
                             <div className="font-semibold text-primary text-sm mt-1">
-                              {result.config.detailedConfig.stages.length}개 단계
+                              {result.config?.detailedConfig?.stages?.map((stage: any, index: number) => (
+                                <div key={index} className="text-xs mb-1">
+                                 {index+1}) 목표 요청 수(per 30s) : {stage.target}  / 지속시간 : {stage.duration}
+                                </div>
+                              )) || 'N/A'}
                             </div>
                           </div>
                         )}
                       </>
                     )}
                     
-                    {result.testType === 'performance' && result.config.metrics && (
+                    {result.testType === 'performance' && result.config?.metrics && (
                       <div className="neu-flat rounded-lg px-4 py-3">
                         <span className="text-sm text-muted-foreground">측정 메트릭</span>
                         <div className="font-semibold text-primary text-sm mt-1">
@@ -453,7 +465,59 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                       </div>
                     )}
                     
-                    {result.config.timeout && (
+                    {/* Playwright E2E 테스트 설정 표시 */}
+                    {result.testType === 'e2e' && result.config && (
+                      <>
+                        {result.config?.settings && Object.keys(result.config.settings).length > 0 ? (
+                          <>
+                            {result.config.settings?.browser && (
+                              <div className="neu-flat rounded-lg px-4 py-3">
+                                <span className="text-sm text-muted-foreground">브라우저</span>
+                                <div className="font-semibold text-primary text-sm mt-1">
+                                  {result.config.settings.browser}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {result.config.settings?.viewport && (
+                              <div className="neu-flat rounded-lg px-4 py-3">
+                                <span className="text-sm text-muted-foreground">뷰포트</span>
+                                <div className="font-semibold text-primary text-sm mt-1">
+                                  {result.config.settings.viewport.width} × {result.config.settings.viewport.height}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {result.config.settings?.timeout && (
+                              <div className="neu-flat rounded-lg px-4 py-3">
+                                <span className="text-sm text-muted-foreground">타임아웃</span>
+                                <div className="font-semibold text-primary text-sm mt-1">
+                                  {result.config.settings.timeout}ms
+                                </div>
+                              </div>
+                            )}
+                            
+                            {result.config.settings?.headless !== undefined && (
+                              <div className="neu-flat rounded-lg px-4 py-3">
+                                <span className="text-sm text-muted-foreground">헤드리스 모드</span>
+                                <div className="font-semibold text-primary text-sm mt-1">
+                                  {result.config.settings.headless ? '활성화' : '비활성화'}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="neu-flat rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">설정</span>
+                            <div className="font-semibold text-primary text-sm mt-1">
+                              기본 설정 사용
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {result.config?.timeout && (
                       <div className="neu-flat rounded-lg px-4 py-3">
                         <span className="text-sm text-muted-foreground">타임아웃</span>
                         <div className="font-semibold text-primary text-sm mt-1">
@@ -462,7 +526,7 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                       </div>
                     )}
                     
-                    {result.config.retries && (
+                    {result.config?.retries && (
                       <div className="neu-flat rounded-lg px-4 py-3">
                         <span className="text-sm text-muted-foreground">재시도 횟수</span>
                         <div className="font-semibold text-primary text-sm mt-1">
@@ -474,8 +538,9 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                 </div>
               )}
               
-              {/* 다운로드 버튼 */}
-              <div className="mt-6 flex flex-wrap gap-4 justify-end">
+              {/* 다운로드 버튼 - 테스트 성공 시에만 표시 */}
+              {result.status === 'completed' && (
+                <div className="mt-6 flex flex-wrap gap-4 justify-end">
                 <div className="relative download-dropdown">
                   <button 
                     className="neu-accent rounded-xl px-6 py-4 font-semibold text-primary-foreground transition-all duration-200 hover:neu-accent flex items-center"
@@ -522,103 +587,150 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                   )}
                 </div>
                 
-                {/* Report 생성 버튼 */}
-                <div className="relative report-dropdown">
-                  <button 
-                    className="neu-button rounded-xl px-6 py-4 font-medium text-foreground hover:text-primary transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => setShowReportDropdown(!showReportDropdown)}
-                    disabled={reportGenerating}
-                  >
-                    {reportGenerating ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-3"></div>
-                        생성 중...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-5 w-5 mr-3" />
-                        Report 생성
-                        <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showReportDropdown ? 'rotate-180' : ''}`} />
-                      </>
-                    )}
-                  </button>
-                  
-                  {showReportDropdown && !reportGenerating && (
-                    <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[200px]">
-                      <button 
-                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-t-xl flex items-center"
-                        onClick={() => {
-                          handleReportGeneration('html');
-                          setShowReportDropdown(false);
-                        }}
-                      >
-                        <FileText className="h-4 w-4 mr-3" />
-                        HTML Report
-                      </button>
-                      <button 
-                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-b-xl flex items-center"
-                        onClick={() => {
-                          handleReportGeneration('pdf');
-                          setShowReportDropdown(false);
-                        }}
-                      >
-                        <FileText className="h-4 w-4 mr-3" />
-                        PDF Report
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
-                {/* 생성된 문서 다운로드 버튼 */}
-                {documentsLoading ? (
-                  <div className="neu-button rounded-xl px-6 py-4 font-medium text-foreground flex items-center opacity-50">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-3"></div>
-                    문서 목록 로딩 중...
-                  </div>
-                ) : availableDocuments.length > 0 ? (
-                  <div className="relative documents-dropdown">
+                  {/* Report 생성 버튼 */}
+                  <div className="relative report-dropdown">
                     <button 
-                      className="neu-accent rounded-xl px-6 py-4 font-semibold text-primary-foreground transition-all duration-200 hover:neu-accent flex items-center"
-                      onClick={() => setShowDocumentsDropdown(!showDocumentsDropdown)}
+                      className="neu-button rounded-xl px-6 py-4 font-medium text-foreground hover:text-primary transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => setShowReportDropdown(!showReportDropdown)}
+                      disabled={reportGenerating}
                     >
-                      <Download className="h-5 w-5 mr-3" />
-                      생성된 문서 다운로드 ({availableDocuments.length})
-                      <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showDocumentsDropdown ? 'rotate-180' : ''}`} />
+                      {reportGenerating ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-3"></div>
+                          생성 중...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-5 w-5 mr-3" />
+                          Report 생성
+                          <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showReportDropdown ? 'rotate-180' : ''}`} />
+                        </>
+                      )}
                     </button>
                     
-                    {showDocumentsDropdown && (
-                      <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[250px]">
-                        {availableDocuments.map((doc, index) => (
-                          <button 
-                            key={`${doc.id}-${doc.type}-${doc.createdAt}`}
-                            data-document-id={doc.id}
-                            className={`w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center ${
-                              index === 0 ? 'rounded-t-xl' : ''
-                            } ${
-                              index === availableDocuments.length - 1 ? 'rounded-b-xl' : ''
-                            }`}
-                            onClick={() => {
-                              handleDocumentDownload(doc);
-                              setShowDocumentsDropdown(false);
-                            }}
-                          >
-                            <FileText className="h-4 w-4 mr-3" />
-                            {doc.type === 'html' ? 'HTML' : 'PDF'} Report
-                            <span className="ml-auto text-xs text-muted-foreground">
-                              {new Date(doc.createdAt).toLocaleDateString()}
-                            </span>
-                          </button>
-                        ))}
+                    {showReportDropdown && !reportGenerating && (
+                      <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[200px]">
+                        <button 
+                          className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-t-xl flex items-center"
+                          onClick={() => {
+                            handleReportGeneration('html');
+                            setShowReportDropdown(false);
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-3" />
+                          HTML Report
+                        </button>
+                        <button 
+                          className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors rounded-b-xl flex items-center"
+                          onClick={() => {
+                            handleReportGeneration('pdf');
+                            setShowReportDropdown(false);
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-3" />
+                          PDF Report
+                        </button>
                       </div>
                     )}
                   </div>
-                ) : null}
-              </div>
+                
+                  {/* 생성된 문서 다운로드 버튼 */}
+                  {documentsLoading ? (
+                    <div className="neu-button rounded-xl px-6 py-4 font-medium text-foreground flex items-center opacity-50">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-3"></div>
+                      문서 목록 로딩 중...
+                    </div>
+                  ) : availableDocuments.length > 0 ? (
+                    <div className="relative documents-dropdown">
+                      <button 
+                        className="neu-accent rounded-xl px-6 py-4 font-semibold text-primary-foreground transition-all duration-200 hover:neu-accent flex items-center"
+                        onClick={() => setShowDocumentsDropdown(!showDocumentsDropdown)}
+                      >
+                        <Download className="h-5 w-5 mr-3" />
+                        생성된 문서 다운로드 ({availableDocuments.length})
+                        <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showDocumentsDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {showDocumentsDropdown && (
+                        <div className="absolute top-full right-0 mt-2 neu-flat rounded-xl shadow-lg z-10 min-w-[250px]">
+                          {availableDocuments.map((doc, index) => (
+                            <button 
+                              key={`${doc.id}-${doc.type}-${doc.createdAt}`}
+                              data-document-id={doc.id}
+                              className={`w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center ${
+                                index === 0 ? 'rounded-t-xl' : ''
+                              } ${
+                                index === availableDocuments.length - 1 ? 'rounded-b-xl' : ''
+                              }`}
+                              onClick={() => {
+                                handleDocumentDownload(doc);
+                                setShowDocumentsDropdown(false);
+                              }}
+                            >
+                              <FileText className="h-4 w-4 mr-3" />
+                              {doc.type === 'html' ? 'HTML' : 'PDF'} Report
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                {new Date(doc.createdAt).toLocaleDateString()}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {/* 성능 메트릭 */}
             <div className="neu-flat rounded-2xl px-6 py-8">
                 <h4 className="font-semibold mb-6 text-primary text-xl">성능 메트릭</h4>
+              
+              {/* Playwright E2E 테스트 성능 메트릭 직접 표시 */}
+              {result.testType === 'e2e' && result.metrics && (
+                <div className="mb-6 neu-pressed rounded-xl px-6 py-6">
+                  <h5 className="font-semibold mb-4 text-primary text-lg">Playwright 성능 메트릭</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {result.metrics?.loadTime !== undefined && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">페이지 로드 시간</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {(result.metrics.loadTime * 1000).toFixed(2)}ms
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.metrics?.domContentLoaded !== undefined && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">DOM 콘텐츠 로드</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {(result.metrics.domContentLoaded * 1000).toFixed(2)}ms
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.metrics?.firstPaint !== undefined && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">첫 번째 페인트</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {result.metrics.firstPaint}ms
+                        </div>
+                      </div>
+                    )}
+                    
+                    {result.metrics?.firstContentfulPaint !== undefined && (
+                      <div className="neu-flat rounded-lg px-4 py-3">
+                        <span className="text-sm text-muted-foreground">첫 번째 콘텐츠풀 페인트</span>
+                        <div className="font-semibold text-primary text-sm mt-1">
+                          {result.metrics.firstContentfulPaint}ms
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* 기존 백엔드 API 메트릭 */}
               {loading ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -669,10 +781,10 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
           </div>
 
           {/* 실행 로그 - 우측 */}
-          {result.raw_data && (
-            <div className="neu-flat rounded-2xl px-6 py-8">
-              <div className="flex items-center justify-between mb-6">
-                <h4 className="font-semibold text-primary text-xl">실행 로그</h4>
+          <div className="neu-flat rounded-2xl px-6 py-8">
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="font-semibold text-primary text-xl">실행 로그</h4>
+              {result.raw_data && (
                 <button
                   onClick={copyRawData}
                   className="neu-button rounded-lg px-4 py-2 flex items-center space-x-2 transition-all duration-200 hover:text-primary"
@@ -690,13 +802,31 @@ export function TestResultModal({ isOpen, onClose, result, onDownload, isInDemoM
                     </>
                   )}
                 </button>
-              </div>
-              <div className="p-4 rounded-xl font-mono text-sm overflow-x-auto overflow-y-auto" 
-                   style={{ backgroundColor: '#5d5d5f', color: '#a5b4fc', height: 'calc(65vh - 10px)' }}>
-                <pre className="whitespace-pre-wrap">{result.raw_data}</pre>
-              </div>
+              )}
             </div>
-          )}
+            <div className="p-4 rounded-xl font-mono text-sm overflow-x-auto overflow-y-auto" 
+                 style={{ backgroundColor: '#5d5d5f', color: '#a5b4fc', height: 'calc(65vh - 10px)' }}>
+              <pre className="whitespace-pre-wrap">
+                {result.raw_data ? (
+                  (() => {
+                    try {
+                      // raw_data가 JSON 문자열인 경우 파싱하여 가독성 개선
+                      if (typeof result.raw_data === 'string' && result.raw_data.startsWith('{')) {
+                        const parsed = JSON.parse(result.raw_data);
+                        return JSON.stringify(parsed, null, 2);
+                      }
+                      return result.raw_data;
+                    } catch (error) {
+                      // 파싱 실패 시 원본 데이터 반환
+                      return result.raw_data;
+                    }
+                  })()
+                ) : (
+                 '# 실행 로그 데이터가 없습니다'
+                )}
+              </pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>

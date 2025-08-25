@@ -4,7 +4,7 @@
   "description": "MCP 기반 웹사이트 테스트 플랫폼",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --force",
     "build": "vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",

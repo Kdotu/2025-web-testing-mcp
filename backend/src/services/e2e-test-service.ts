@@ -25,8 +25,8 @@ export class E2ETestService {
   /**
    * E2E 테스트 실행 (MCP 서버 방식)
    */
-  async executeE2ETest(config: E2ETestConfig): Promise<E2ETestLocalResult> {
-    const testId = uuidv4();
+  async executeE2ETest(config: E2ETestConfig, dbTestId?: string): Promise<E2ETestLocalResult> {
+    const testId = dbTestId || uuidv4();
     
     // 테스트 타입 잠금 시스템 제거로 인해 더 이상 사용하지 않음
     // const testTypeId = this.getTestTypeId();
@@ -44,8 +44,8 @@ export class E2ETestService {
     this.runningTests.set(testId, testResult);
 
     try {
-      // DB에 초기 결과 저장
-      await this.saveInitialResult(testId, config);
+      // DB에 초기 결과 저장 - TestManageController에서 이미 처리됨
+      // await this.saveInitialResult(testId, config);
 
       // Playwright MCP 서버를 사용하여 E2E 테스트 실행
       this.runPlaywrightViaMCP(testId, config);
@@ -189,7 +189,7 @@ export class E2ETestService {
   /**
    * Playwright 결과 파싱
    */
-  private async parsePlaywrightOutput(testId: string, output: any, config: E2ETestConfig): Promise<void> {
+  private async parsePlaywrightOutput(testId: string, result: any, config: E2ETestConfig): Promise<void> {
     try {
       console.log('Parsing Playwright output...');
       
@@ -197,35 +197,38 @@ export class E2ETestService {
       if (!testResult) return;
 
       // 결과에서 로그 추출
-      if (output.logs && Array.isArray(output.logs)) {
-        testResult.logs.push(...output.logs);
+      if (result.logs && Array.isArray(result.logs)) {
+        testResult.logs.push(...result.logs);
       }
 
       // 성공/실패 상태 확인
-      if (output.success === true) {
+      if (result.success === true) {
         testResult.status = 'completed';
         testResult.endTime = new Date().toISOString();
         testResult.logs.push('E2E 테스트가 성공적으로 완료되었습니다.');
       } else {
         testResult.status = 'failed';
         testResult.endTime = new Date().toISOString();
-        testResult.error = output.error || 'E2E 테스트가 실패했습니다.';
+        testResult.error = result.error || 'E2E 테스트가 실패했습니다.';
         testResult.logs.push(`E2E 테스트가 실패했습니다: ${testResult.error}`);
       }
 
+      // 성능 메트릭 추출
+      const performanceMetrics = result.data?.performanceMetrics || result.performanceMetrics || {};
+      
       // raw_data에 Playwright 결과 데이터 포함
       const rawData = {
         logs: testResult.logs,
         config: config,
-        playwrightResult: output,
-        performanceMetrics: output.performanceMetrics || {},
-        browser: output.browser || 'chromium',
-        url: output.url || config.url,
-        timestamp: output.timestamp || new Date().toISOString()
+        playwrightResult: result,
+        performanceMetrics: performanceMetrics,
+        browser: result.data?.browser || result.browser || 'chromium',
+        url: result.data?.url || result.url || config.url,
+        timestamp: result.data?.timestamp || result.timestamp || new Date().toISOString()
       };
 
-      // DB 업데이트
-      await this.updateTestResult(testId, testResult.status, testResult.logs, config, rawData);
+      // DB 업데이트 (성능 메트릭 포함)
+      await this.updateTestResult(testId, testResult.status, testResult.logs, config, rawData, performanceMetrics);
       console.log(`[E2E Test ${testId}] 테스트 완료 - DB 업데이트 완료`);
 
     } catch (error) {
@@ -253,8 +256,9 @@ export class E2ETestService {
   }
 
   /**
-   * 초기 결과 저장
+   * 초기 결과 저장 - TestManageController에서 이미 처리됨으로 주석 처리
    */
+  /*
   private async saveInitialResult(testId: string, config: E2ETestConfig): Promise<void> {
     const initialResult = {
       id: testId,
@@ -295,11 +299,12 @@ export class E2ETestService {
 
     await this.testResultService.saveResult(initialResult);
   }
+  */
 
   /**
    * 테스트 결과 업데이트
    */
-  private async updateTestResult(testId: string, status: 'running' | 'completed' | 'failed' | 'cancelled', logs: string[], config: E2ETestConfig, rawData?: any): Promise<void> {
+  private async updateTestResult(testId: string, status: 'running' | 'completed' | 'failed' | 'cancelled', logs: string[], config: E2ETestConfig, rawData?: any, metrics?: any): Promise<void> {
     const result = this.runningTests.get(testId);
     if (!result) return;
 
@@ -310,9 +315,21 @@ export class E2ETestService {
     // raw_data 구성
     const rawDataToSave = rawData || { logs, config };
 
+    // 성능 메트릭을 Playwright 형식에 맞게 변환
+    const playwrightMetrics = {
+      loadTime: metrics?.loadTime || 0,
+      domContentLoaded: metrics?.domContentLoaded || 0,
+      firstPaint: metrics?.firstPaint || 0,
+      firstContentfulPaint: metrics?.firstContentfulPaint || 0
+    };
+
     const updatedResult: LoadTestResult = {
       ...existingResult,
       status,
+      metrics: {
+        ...existingResult.metrics,
+        ...playwrightMetrics
+      },
       summary: {
         ...existingResult.summary,
         endTime: new Date().toISOString()

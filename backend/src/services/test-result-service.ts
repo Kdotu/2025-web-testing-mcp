@@ -130,7 +130,7 @@ export class TestResultService {
     config?: any;
   }): Promise<any> {
     try {
-      const testId = this.generateTestId();
+      const testId = this.generateTestId(data.testType);
       const now = new Date().toISOString();
       
       const initialResult = {
@@ -177,9 +177,12 @@ export class TestResultService {
   /**
    * 테스트 ID 생성 (타입별 고유 ID)
    */
-  private generateTestId(): string {
+  private generateTestId(testType?: string): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
+    if (testType) {
+      return `${testType}_${timestamp}_${random}`;
+    }
     return `${timestamp}_${random}`;
   }
 
@@ -327,11 +330,10 @@ export class TestResultService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
-      // 조건 쿼리 생성 - count를 제거하여 성능 향상
-      // 목록 화면에는 가벼운 컬럼만 조회 (raw_data, metrics 등 대용량 컬럼 제외)
+      // 조건 쿼리 생성 - 필요한 컬럼들 포함
       let query = this.supabaseClient
         .from('m2_test_results')
-        .select('id,test_id,test_type,url,name,description,status,current_step,created_at,updated_at');
+        .select('id,test_id,test_type,url,name,description,status,current_step,created_at,updated_at,config,metrics,raw_data');
 
       if (status) {
         query = query.eq('status', status);
