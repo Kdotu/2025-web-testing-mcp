@@ -444,42 +444,37 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
 
   // 테스트 시작 함수
   const handleStartTest = async () => {
+    // 이미 실행 중인 경우 중복 실행 방지
+    if (isExecuting) {
+      console.log('⚠️ 테스트가 이미 실행 중입니다.');
+      return;
+    }
+
     const normalizedUrl = normalizeUrl(testUrl);
-    if (!normalizedUrl || !selectedTestType || isExecuting || !validateLighthouseTest()) {
-      return;
-    }
 
-    if (!backendConnected) {
-      alert('백엔드 서버에 연결할 수 없습니다. 서버 상태를 확인해주세요.');
-      return;
-    }
-
-    setIsExecuting(true);
-
-    // 러닝 테스트 등록 (UI 즉시 반영)
-    const newTestId = Date.now();
-    const startTimeIso = new Date().toISOString();
-    const runningItem: RunningTest = {
-      id: newTestId,
-      url: normalizedUrl,
-      type: selectedTestType,
-      status: 'running',
-      startTime: startTimeIso,
-      currentStep: '테스트 시작',
-      estimatedTime: '',
-      logs: [],
-      settings: testSettings,
-      description: testDescription,
-      testStartTime: Date.now(),
-    };
-    setRunningTests((prev) => [runningItem, ...prev]);
-    
-
-
-    // k6 기본 스크립트 생성기
     const createBasicK6Script = (targetUrl: string) => `import http from 'k6/http';\nimport { check, sleep } from 'k6';\nexport default function () {\n  const res = http.get('${targetUrl}');\n  check(res, { 'status is 200': (r) => r.status === 200 });\n  sleep(1);\n}`;
 
     try {
+      setIsExecuting(true); // 실행 시작 시점에 상태 설정
+      
+      // 러닝 테스트 등록 (UI 즉시 반영)
+      const newTestId = Date.now();
+      const startTimeIso = new Date().toISOString();
+      const runningItem: RunningTest = {
+        id: newTestId,
+        url: normalizedUrl,
+        type: selectedTestType,
+        status: 'running',
+        startTime: startTimeIso,
+        currentStep: '테스트 시작',
+        estimatedTime: '',
+        logs: [],
+        settings: testSettings,
+        description: testDescription,
+        testStartTime: Date.now(),
+      };
+      setRunningTests((prev) => [runningItem, ...prev]);
+      
       if (selectedTestType === 'lighthouse') {
         const device = testSettings?.lighthouse?.device || 'desktop';
         const categories = testSettings?.lighthouse?.categories || ['performance', 'accessibility', 'best-practices', 'seo'];
@@ -493,14 +488,36 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
           name: 'Lighthouse 테스트',
           description: testDescription
         });
-        if (!res.success) throw new Error(res.error || 'Lighthouse 테스트 시작 실패');
         
-        // 백엔드 응답에서 testId와 상태 정보 추출
+        if (!res.success) {
+          // 중복 실행 오류인 경우 기존 테스트 정보 표시
+          if (res.error?.includes('already running')) {
+            const existingTestId = (res as any).data?.existingTestId;
+            const existingStatus = (res as any).data?.status;
+            const existingStep = (res as any).data?.currentStep;
+            
+            console.log(`⚠️ Lighthouse test already running for ${normalizedUrl} (ID: ${existingTestId})`);
+            
+            // 기존 테스트 정보로 상태 업데이트
+            updateTestStatus(newTestId, existingStatus || 'running', { 
+              backendTestId: existingTestId,
+              currentStep: existingStep || '이미 실행 중',
+              status: existingStatus || 'running',
+              isDuplicate: true
+            });
+            return;
+          }
+          
+          throw new Error(res.error || 'Lighthouse 테스트 시작 실패');
+        }
+        
+        // 백엔드 응답에서 testId와 상태 정보 추출 (중복 상태 업데이트 제거)
         const backendTestId = (res as any).data?.testId || (res as any).testId;
         const testStatus = (res as any).data?.status || 'running';
         const currentStep = (res as any).data?.currentStep || 'Lighthouse 실행 중';
         
-        updateTestStatus(newTestId, 'running', { 
+        // 백엔드 응답만 사용하여 테스트 상태 설정 (프론트엔드 중복 업데이트 제거)
+        updateTestStatus(newTestId, testStatus, { 
           backendTestId, 
           currentStep,
           status: testStatus
@@ -508,29 +525,25 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
       } else if (selectedTestType === 'load') {
         // k6 기본 프리셋 기반 구성
         const loadCfg = testSettings?.load || {};
-        const config = {
-          url: normalizedUrl,
-          testType: 'load',
-          duration: loadCfg.duration || '3m',
-          vus: loadCfg.preAllocatedVUs || 10,
-          detailedConfig: loadCfg,
-        } as any;
-        
-        console.log('🔧 Load 테스트 설정:', { loadCfg, config });
         const script = createBasicK6Script(normalizedUrl);
-        const res = await executeK6MCPTest({
+        
+        console.log('🔧 k6 Load 테스트 설정:', loadCfg);
+        
+        const res = await createLoadTest({
           url: normalizedUrl,
-          name: '웹 부하 테스트',
+          name: '부하 테스트',
           description: testDescription,
           script,
-          config,
+          duration: loadCfg.duration || '3m',
+          vus: loadCfg.vus || 10,
+          ...loadCfg
         });
+        
         if (!res.success) throw new Error(res.error || '부하 테스트 시작 실패');
         
-        // 백엔드 응답에서 testId와 상태 정보 추출
         const backendTestId = (res as any).data?.testId || (res as any).testId;
         const testStatus = (res as any).data?.status || 'running';
-        const currentStep = (res as any).data?.currentStep || 'k6 실행 중';
+        const currentStep = (res as any).data?.currentStep || '실행 중';
         
         updateTestStatus(newTestId, 'running', { 
           backendTestId, 
@@ -538,39 +551,23 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
           status: testStatus
         });
       } else if (selectedTestType === 'e2e') {
-        const playwrightSettings = testSettings?.playwright || {};
+        // Playwright E2E 테스트
+        const playwrightCfg = testSettings?.playwright || {};
         
-        console.log('🔧 E2E 테스트 설정:', { playwrightSettings });
+        console.log('🔧 Playwright E2E 테스트 설정:', playwrightCfg);
         
         const res = await executeE2ETest({
           url: normalizedUrl,
           name: 'E2E 테스트',
           description: testDescription,
-          config: { testType: 'e2e', settings: playwrightSettings },
+          config: {
+            testType: 'e2e',
+            settings: playwrightCfg
+          }
         });
+        
         if (!res.success) throw new Error(res.error || 'E2E 테스트 시작 실패');
         
-        // 백엔드 응답에서 testId와 상태 정보 추출
-        const backendTestId = (res as any).data?.testId || (res as any).testId;
-        const testStatus = (res as any).data?.status || 'running';
-        const currentStep = (res as any).data?.currentStep || 'Playwright 실행 중';
-        
-        updateTestStatus(newTestId, 'running', { 
-          backendTestId, 
-          currentStep,
-          status: testStatus
-        });
-      } else {
-        // 기본 실행 경로
-        const res = await executeDefaultTest({ 
-          url: normalizedUrl, 
-          name: '기본 테스트', 
-          description: testDescription, 
-          testType: selectedTestType 
-        });
-        if (!res.success) throw new Error(res.error || '테스트 시작 실패');
-        
-        // 백엔드 응답에서 testId와 상태 정보 추출
         const backendTestId = (res as any).data?.testId || (res as any).testId;
         const testStatus = (res as any).data?.status || 'running';
         const currentStep = (res as any).data?.currentStep || '실행 중';

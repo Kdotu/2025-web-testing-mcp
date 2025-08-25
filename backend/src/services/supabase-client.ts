@@ -28,6 +28,14 @@ export const supabase = createClient(
     auth: {
       autoRefreshToken: true,
       persistSession: false
+    },
+    db: {
+      schema: 'public'
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'mcp-web-testing'
+      }
     }
   }
 );
@@ -51,6 +59,14 @@ export const createServiceClient = () => {
           auth: {
             autoRefreshToken: true,
             persistSession: false
+          },
+          db: {
+            schema: 'public'
+          },
+          global: {
+            headers: {
+              'X-Client-Info': 'mcp-web-testing'
+            }
           }
         }
       );
@@ -67,6 +83,14 @@ export const createServiceClient = () => {
         auth: {
           autoRefreshToken: true,
           persistSession: false
+        },
+        db: {
+          schema: 'public'
+        },
+        global: {
+          headers: {
+            'X-Client-Info': 'mcp-web-testing'
+          }
         }
       }
     );
@@ -83,6 +107,14 @@ export const createServiceClient = () => {
           auth: {
             autoRefreshToken: true,
             persistSession: false
+          },
+          db: {
+            schema: 'public'
+          },
+          global: {
+            headers: {
+              'X-Client-Info': 'mcp-web-testing'
+            }
           }
         }
       );

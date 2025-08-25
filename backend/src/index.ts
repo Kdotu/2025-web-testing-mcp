@@ -10,6 +10,7 @@ import { dbStatusRoutes } from './routes/db-status';
 import { saveSettingsRoutes } from './routes/save-settings';
 import documentsRoutes from './routes/documents';
 import mcpStatusRoutes from './routes/mcp-status';
+import playwrightTestRoutes from './routes/playwright-test';
 import { debugEnvironmentVariables } from './services/supabase-client';
 import { TestResultService } from './services/test-result-service';
 
@@ -44,6 +45,7 @@ app.use('/api/test-metrics', testMetricRoutes);
 app.use('/api/test-manage', testManageRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api', mcpStatusRoutes);
+app.use('/api/playwright', playwrightTestRoutes);
 
 
 // 설정 라우트 (프론트엔드 호환성을 위해 루트 경로에 추가)
@@ -54,15 +56,40 @@ app.use('/db-status', dbStatusRoutes);
 app.use('/save-settings', saveSettingsRoutes);
 
 // 헬스 체크
-app.get('/health', (_req, res) => {
+app.get('/health', async (_req, res) => {
   const now = new Date();
   console.log(`Health check at ${now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
-  res.json({ 
-    success: true,
-    status: 'ok', 
-    timestamp: now.toISOString(),
-    timezone: 'Asia/Seoul'
-  });
+  
+  try {
+    // 데이터베이스 연결 상태 확인
+    const testResultService = new TestResultService();
+    const dbStatus = await testResultService.testDatabaseConnection();
+    
+    res.json({ 
+      success: true,
+      status: 'ok', 
+      timestamp: now.toISOString(),
+      timezone: 'Asia/Seoul',
+      database: {
+        connected: dbStatus.connected,
+        responseTime: dbStatus.responseTime,
+        lastError: dbStatus.lastError
+      }
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.json({ 
+      success: false,
+      status: 'error', 
+      timestamp: now.toISOString(),
+      timezone: 'Asia/Seoul',
+      database: {
+        connected: false,
+        responseTime: null,
+        lastError: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
 });
 
 /**

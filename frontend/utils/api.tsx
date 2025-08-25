@@ -216,7 +216,8 @@ export const checkDatabaseStatus = async () => {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    // 데이터베이스 상태 확인은 더 긴 타임아웃 설정 (10초)
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     
     const response = await fetch(`${API_BASE_URL}${getSupabaseApiPath('/db-status')}`, {
       method: 'GET',
@@ -245,7 +246,7 @@ export const checkDatabaseStatus = async () => {
         success: false, 
         error: 'Connection timeout',
         offline: true,
-        message: '연결 시간 초과'
+        message: '연결 시간 초과 (10초)'
       };
     }
     

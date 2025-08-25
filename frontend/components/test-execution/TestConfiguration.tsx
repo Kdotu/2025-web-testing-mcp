@@ -4,6 +4,7 @@ import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { AlertCircle, Settings, TrendingUp, BarChart3, Zap, Wrench } from "lucide-react";
+import { PlaywrightTestExecution } from "./PlaywrightTestExecution";
 
 interface TestSettings {
   performance: any;
@@ -28,7 +29,6 @@ export function TestConfiguration({
   testTypes
 }: TestConfigurationProps) {
   const [playwrightConfigMode, setPlaywrightConfigMode] = useState<'settings' | 'scenario'>('settings');
-  const [playwrightScenario, setPlaywrightScenario] = useState('');
 
   if (!selectedTestType) {
     return (
@@ -397,23 +397,7 @@ export function TestConfiguration({
           </div>
 
           {playwrightConfigMode === 'scenario' ? (
-            <div className="neu-subtle rounded-xl px-6 py-6">
-              <Label className="text-foreground font-semibold text-lg mb-4 block">Playwright 테스트 시나리오 <span className="text-xs text-muted-foreground ml-1">(Test Scenario)</span></Label>
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm text-muted-foreground mb-2 block">테스트 시나리오 코드</Label>
-                  <div className="neu-input rounded-xl px-4 py-3">
-                    <textarea value={playwrightScenario} onChange={(e) => setPlaywrightScenario(e.target.value)} placeholder={`// Playwright 테스트 시나리오를 입력하세요`} className="min-h-64 border-none bg-transparent resize-none text-foreground placeholder:text-muted-foreground font-mono text-sm w-full" />
-                  </div>
-                </div>
-                <div className="neu-pressed rounded-lg px-4 py-3">
-                  <div className="flex items-start space-x-2">
-                    <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-muted-foreground"><strong>시나리오 모드:</strong> 사용자가 직접 Playwright 테스트 코드를 작성하여 실행. 기본 설정(브라우저, 뷰포트 등)은 항목별 설정에서 구성한 값이 적용됩니다.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <PlaywrightTestExecution />
           ) : (
             <div className="space-y-6">
               {/* 브라우저 설정 */}

@@ -200,6 +200,26 @@ export class TestManageController {
 
       console.log('🚀 Lighthouse 테스트 시작:', { url, device, categories, name, description });
 
+      // 이미 실행 중인 동일한 URL의 Lighthouse 테스트가 있는지 확인
+      const runningTests = await this.testResultService.getRunningTests();
+      const existingLighthouseTest = runningTests.find(test => 
+        test.testType === 'lighthouse' && test.url === url
+      );
+
+      if (existingLighthouseTest) {
+        console.log(`⚠️ Lighthouse test for ${url} is already running (ID: ${existingLighthouseTest.testId})`);
+        res.status(409).json({
+          success: false,
+          error: 'Lighthouse test is already running for this URL',
+          data: {
+            existingTestId: existingLighthouseTest.testId,
+            status: existingLighthouseTest.status,
+            currentStep: existingLighthouseTest.currentStep
+          }
+        });
+        return;
+      }
+
       // config 객체 구조화 및 검증
       const structuredConfig = {
         testType: 'lighthouse',
@@ -217,13 +237,13 @@ export class TestManageController {
 
       console.log('📋 구조화된 Lighthouse config:', JSON.stringify(structuredConfig, null, 2));
 
-      // 1. 테스트 결과 레코드 즉시 생성 (INSERT)
+      // 1. 테스트 결과 레코드 즉시 생성 (INSERT) - running 상태로 시작
       const testResult = await this.testResultService.createInitialResult({
         testType: 'lighthouse',
         url,
         name: name || 'Lighthouse 테스트',
         description: description || '',
-        status: 'pending',
+        status: 'running', // pending 대신 running으로 시작
         config: structuredConfig
       });
 
@@ -285,40 +305,7 @@ export class TestManageController {
         }
       });
 
-      // 3. 실행 시작 후 즉시 상태를 running으로 업데이트
-      await this.testResultService.updateResult({
-        id: testResult.id,
-        testId: testResult.test_id,
-        testType: 'lighthouse',
-        url,
-        name: name || 'Lighthouse 테스트',
-        description: description || '',
-        status: 'running',
-        currentStep: 'Lighthouse 실행 중',
-        metrics: {
-          http_req_duration: { avg: 0, min: 0, max: 0, p95: 0 },
-          http_req_rate: 0,
-          http_req_failed: 0,
-          vus: 0,
-          vus_max: 0
-        },
-        summary: {
-          totalRequests: 0,
-          successfulRequests: 0,
-          failedRequests: 0,
-          duration: 0,
-          startTime: new Date().toISOString(),
-          endTime: new Date().toISOString()
-        },
-        details: {},
-        config: { device, categories, testType: 'lighthouse' },
-        raw_data: '',
-        createdAt: testResult.created_at,
-        updatedAt: new Date().toISOString()
-      });
-
-      console.log('✅ Lighthouse 테스트 상태 업데이트 완료');
-
+      // 3. 응답 즉시 반환 (중복 상태 업데이트 제거)
       res.status(200).json({
         success: true,
         data: {

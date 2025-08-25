@@ -330,24 +330,24 @@ export class TestResultService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
-      // 조건 쿼리 생성 - 필요한 컬럼들 포함
+      // 조건 쿼리 생성 - 필요한 컬럼들만 선택하여 성능 향상
       let query = this.supabaseClient
         .from('m2_test_results')
-        .select('id,test_id,test_type,url,name,description,status,current_step,created_at,updated_at,config,metrics,raw_data');
+        .select('id,test_id,test_type,url,name,description,status,current_step,created_at,updated_at,config,metrics,raw_data')
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (status) {
         query = query.eq('status', status);
       }
 
-      // 페이지네이션 적용
-      const { data, error } = await query
-        .order('created_at', { ascending: false })
-        .range(from, to);
+      // 쿼리 실행 시 타임아웃 설정
+      const { data, error } = await query;
 
       if (error) {
         console.error('Failed to get test results:', error);
         // 타임아웃이나 서버 과부하 시에는 빈 결과 반환하여 UI 지연 방지
-        if (error.code === '57014' || error.code === 'ETIMEDOUT') {
+        if (error.code === '57014' || error.code === 'ETIMEDOUT' || error.message?.includes('timeout')) {
           console.warn('⚠️ Returning empty page due to timeout');
           return { results: [], total: 0 };
         }
@@ -406,6 +406,52 @@ export class TestResultService {
       console.error('Error in getTotalCount:', error);
       // 예외 발생 시 기본값 반환
       return 0;
+    }
+  }
+
+  /**
+   * 데이터베이스 연결 상태 테스트
+   */
+  async testDatabaseConnection(): Promise<{
+    connected: boolean;
+    responseTime: number | null;
+    lastError: string | null;
+  }> {
+    const startTime = Date.now();
+    
+    try {
+      // 간단한 쿼리로 연결 상태 확인
+      const { error } = await this.supabaseClient
+        .from('m2_test_results')
+        .select('id')
+        .limit(1);
+      
+      const responseTime = Date.now() - startTime;
+      
+      if (error) {
+        console.error('Database connection test failed:', error);
+        return {
+          connected: false,
+          responseTime,
+          lastError: error.message
+        };
+      }
+      
+      return {
+        connected: true,
+        responseTime,
+        lastError: null
+      };
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      console.error('Database connection test exception:', error);
+      return {
+        connected: false,
+        responseTime,
+        lastError: errorMessage
+      };
     }
   }
 

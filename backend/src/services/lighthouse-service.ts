@@ -33,8 +33,16 @@ export class LighthouseService {
     // const testTypeId = this.getTestTypeId();
 
     try {
+      // 이미 실행 중인 테스트인지 확인
+      if (this.runningTests.has(testId)) {
+        console.log(`⚠️ Lighthouse test ${testId} is already running, skipping duplicate execution`);
+        return;
+      }
+
       // 테스트 시작 시 상태를 running으로 설정
       this.runningTests.set(testId, { status: 'running', startTime: new Date() });
+      
+      console.log(`🚀 Starting Lighthouse test ${testId} via MCP`);
       
       // Lighthouse MCP 서버를 통해 테스트 실행
       const result = await this.executeLighthouseViaMCP(config);
@@ -50,6 +58,9 @@ export class LighthouseService {
       console.error('Failed to execute Lighthouse test via MCP:', error);
       await this.handleTestCompletion(testId, 'failed');
       throw error;
+    } finally {
+      // 실행 완료 후 메모리에서 제거
+      this.runningTests.delete(testId);
     }
   }
 

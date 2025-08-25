@@ -112,7 +112,7 @@ export class MCPServiceWrapper {
   }
 
   /**
-   * Playwright 테스트 실행
+   * Playwright 테스트 실행 (기존 E2E 테스트)
    */
   async executePlaywrightTest(config: E2ETestConfig): Promise<MCPTestResult> {
     try {
@@ -134,6 +134,37 @@ export class MCPServiceWrapper {
       };
     } catch (error) {
       console.error('[MCP Wrapper] Playwright test execution error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Playwright 테스트 시나리오 실행 (사용자 정의 코드)
+   */
+  async executePlaywrightScenario(scenarioCode: string, config: any = {}): Promise<MCPTestResult> {
+    try {
+      console.log('[MCP Wrapper] Executing Playwright scenario via MCP');
+      console.log('[MCP Wrapper] Scenario code length:', scenarioCode.length);
+      console.log('[MCP Wrapper] Config:', config);
+
+      const result = await this.playwrightClient.callTool('execute_scenario', {
+        scenarioCode,
+        config
+      });
+
+      console.log('[MCP Wrapper] Playwright scenario result:', result);
+
+      return {
+        success: result.success !== false,
+        data: result,
+        output: result.output || result.logs?.join('\n'),
+        metrics: result.metrics
+      };
+    } catch (error) {
+      console.error('[MCP Wrapper] Playwright scenario execution error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
