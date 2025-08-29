@@ -36,4 +36,12 @@ router.post('/validate', async (req, res) => {
   await playwrightController.validateTestScenario(req, res);
 });
 
+/**
+ * GET /api/playwright/mcp/status
+ * MCP 서버 상태 확인
+ */
+router.get('/mcp/status', async (req, res) => {
+  await playwrightController.checkMCPStatus(req, res);
+});
+
 export default router;

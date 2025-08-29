@@ -45,17 +45,25 @@ export class PlaywrightTestService {
     try {
       console.log('[Playwright Service] Phase 1: Creating test execution record');
       
+      const testTypeId = await this.getPlaywrightTestTypeId();
+      const insertPayload: any = {
+        scenario_code: scenarioCode,
+        status: 'pending',
+        browser_type: config.browser || 'chromium',
+        viewport_width: config.viewport?.width || 1280,
+        viewport_height: config.viewport?.height || 720,
+        user_id: userId
+      };
+      if (testTypeId !== null && testTypeId !== undefined) {
+        insertPayload.test_type_id = testTypeId;
+      }
+
+      console.log('[Playwright Service] Insert payload:', JSON.stringify(insertPayload, null, 2));
+      console.log('[Playwright Service] Test type ID:', testTypeId);
+
       const { data, error } = await this.supabase
-        .from('playwright_test_results')
-        .insert({
-          scenario_code: scenarioCode,
-          status: 'pending',
-          browser_type: config.browser || 'chromium',
-          viewport_width: config.viewport?.width || 1280,
-          viewport_height: config.viewport?.height || 720,
-          user_id: userId,
-          test_type_id: await this.getPlaywrightTestTypeId()
-        })
+        .from('m2_playwright_test_results')
+        .insert(insertPayload)
         .select('execution_id')
         .single();
 
@@ -80,7 +88,7 @@ export class PlaywrightTestService {
       console.log('[Playwright Service] Phase 2: Starting test execution via MCP');
       
       // 상태를 running으로 업데이트
-      await this.updateTestStatus(executionId, 'running', 0, 'Starting test execution');
+      await this.updateTestStatus(executionId, 'running', 'Starting test execution');
       
       // MCP 서버로 시나리오 실행 요청
       const result = await this.mcpWrapper.executePlaywrightScenario(scenarioCode, config);
@@ -92,7 +100,7 @@ export class PlaywrightTestService {
       console.log('[Playwright Service] Phase 2: Test execution started successfully');
     } catch (error) {
       console.error('[Playwright Service] Phase 2 failed:', error);
-      await this.updateTestStatus(executionId, 'failed', 0, 'Test execution failed');
+      await this.updateTestStatus(executionId, 'failed', 'Test execution failed');
       throw error;
     }
   }
@@ -118,7 +126,7 @@ export class PlaywrightTestService {
 
       for (const step of progressSteps) {
         await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
-        await this.updateTestStatus(executionId, 'running', step.progress, step.step);
+        await this.updateTestStatus(executionId, 'running', step.step);
       }
 
       console.log('[Playwright Service] Phase 3: Test execution monitoring completed');
@@ -136,19 +144,17 @@ export class PlaywrightTestService {
       console.log('[Playwright Service] Phase 4: Completing test execution');
       
       const finalStatus = result.success ? 'success' : 'failed';
-      const executionTimeMs = result.executionTime ? this.calculateExecutionTime(result.executionTime) : null;
       
       // 최종 결과 저장
       const { error } = await this.supabase
-        .rpc('complete_playwright_test', {
-          p_execution_id: executionId,
-          p_final_status: finalStatus,
-          p_result_summary: result.output || result.logs?.join('\n'),
-          p_screenshots: result.screenshots || [],
-          p_videos: result.videos || [],
-          p_error_details: result.error,
-          p_execution_time_ms: executionTimeMs
-        });
+        .from('m2_playwright_test_results')
+        .update({
+          status: finalStatus,
+          result_summary: result.output || result.logs?.join('\n'),
+          error_details: result.error,
+          updated_at: new Date().toISOString()
+        })
+        .eq('execution_id', executionId);
 
       if (error) {
         console.error('[Playwright Service] Failed to complete test execution:', error);
@@ -203,7 +209,7 @@ export class PlaywrightTestService {
   async getTestExecutionStatus(executionId: string): Promise<any> {
     try {
       const { data, error } = await this.supabase
-        .from('playwright_test_results')
+        .from('m2_playwright_test_results')
         .select('*')
         .eq('execution_id', executionId)
         .single();
@@ -225,7 +231,7 @@ export class PlaywrightTestService {
   async getTestExecutionResult(executionId: string): Promise<any> {
     try {
       const { data, error } = await this.supabase
-        .from('playwright_test_results')
+        .from('m2_playwright_test_results')
         .select('*')
         .eq('execution_id', executionId)
         .eq('status', 'completed')
@@ -245,20 +251,21 @@ export class PlaywrightTestService {
   /**
    * 테스트 실행 상태 업데이트
    */
-  private async updateTestStatus(
+    private async updateTestStatus(
     executionId: string, 
     status: string, 
-    progressPercentage: number, 
     currentStep: string
   ): Promise<void> {
     try {
+      // RPC 함수 대신 직접 테이블 업데이트
       const { error } = await this.supabase
-        .rpc('update_playwright_test_status', {
-          p_execution_id: executionId,
-          p_status: status,
-          p_progress_percentage: progressPercentage,
-          p_current_step: currentStep
-        });
+        .from('m2_playwright_test_results')
+        .update({
+          status: status,
+          current_step: currentStep,
+          updated_at: new Date().toISOString()
+        })
+        .eq('execution_id', executionId);
 
       if (error) {
         console.error('[Playwright Service] Failed to update test status:', error);
@@ -274,16 +281,16 @@ export class PlaywrightTestService {
   private async getPlaywrightTestTypeId(): Promise<number | null> {
     try {
       const { data, error } = await this.supabase
-        .from('test_types')
+        .from('m2_test_types')
         .select('id')
-        .eq('name', 'playwright')
+        .eq('name', 'e2e')
         .single();
 
       if (error) {
         console.warn('[Playwright Service] Playwright test type not found, using null');
         return null;
       }
-
+      
       return data.id;
     } catch (error) {
       console.warn('[Playwright Service] Failed to get playwright test type ID, using null');
@@ -291,19 +298,7 @@ export class PlaywrightTestService {
     }
   }
 
-  /**
-   * 실행 시간 계산 (밀리초)
-   */
-  private calculateExecutionTime(executionTime: string): number {
-    try {
-      const startTime = new Date(executionTime);
-      const endTime = new Date();
-      return endTime.getTime() - startTime.getTime();
-    } catch (error) {
-      console.warn('[Playwright Service] Failed to calculate execution time');
-      return 0;
-    }
-  }
+
 
   /**
    * 리소스 정리
