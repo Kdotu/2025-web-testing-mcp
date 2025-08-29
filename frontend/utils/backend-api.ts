@@ -12,6 +12,18 @@ interface BackendApiResponse<T = any> {
   timestamp: string;
 }
 
+// MCP Playwright API 응답 타입
+interface MCPPlaywrightResponse {
+  success: boolean;
+  code?: string;
+  metadata?: {
+    stepsCount: number;
+    patterns: string[];
+    config: any;
+  };
+  error?: string;
+}
+
 // 문서 정보 타입
 export interface DocumentInfo {
   id: string;
@@ -94,6 +106,33 @@ class BackendApiClient {
       method: 'POST',
       body: JSON.stringify(config),
     });
+  }
+
+  /**
+   * MCP Playwright: 자연어를 Playwright 코드로 변환
+   */
+  async convertNaturalLanguageToPlaywright(
+    naturalLanguage: string, 
+    config: any = {}
+  ): Promise<MCPPlaywrightResponse> {
+    return this.request('/api/mcp/playwright/convert', {
+      method: 'POST',
+      body: JSON.stringify({ naturalLanguage, config }),
+    });
+  }
+
+  /**
+   * MCP Playwright: 서버 상태 확인
+   */
+  async checkMCPPlaywrightStatus(): Promise<MCPPlaywrightResponse> {
+    return this.request('/api/mcp/playwright/status');
+  }
+
+  /**
+   * MCP Playwright: 지원하는 패턴 정보 조회
+   */
+  async getMCPPlaywrightPatterns(): Promise<MCPPlaywrightResponse> {
+    return this.request('/api/mcp/playwright/patterns');
   }
 
   /**
@@ -512,6 +551,31 @@ class BackendApiClient {
   async getMCPConfig(): Promise<BackendApiResponse> {
     return this.request('/api/mcp-status/config');
   }
+
+  // ===== Playwright 단위테스트 엔드포인트 =====
+  /**
+   * 자연어/코드 기반 Playwright 시나리오 실행
+   */
+  async executePlaywrightScenario(params: {
+    scenarioCode: string;
+    config?: any;
+    userId?: string;
+  }): Promise<BackendApiResponse<{ executionId: string }>> {
+    return this.request('/api/playwright/execute', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  /** 실행 상태 조회 */
+  async getPlaywrightStatus(executionId: string): Promise<BackendApiResponse> {
+    return this.request(`/api/playwright/status/${executionId}`);
+  }
+
+  /** 실행 결과 조회 */
+  async getPlaywrightResult(executionId: string): Promise<BackendApiResponse> {
+    return this.request(`/api/playwright/results/${executionId}`);
+  }
 }
 
 const backendApi = new BackendApiClient();
@@ -665,3 +729,32 @@ export const getGroupedTestMetrics = async (testId: string): Promise<any> => {
 export const getMCPStatus = () => backendApi.getMCPStatus();
 export const testMCPServer = (serverType: 'k6' | 'lighthouse' | 'playwright') => backendApi.testMCPServer(serverType);
 export const getMCPConfig = () => backendApi.getMCPConfig(); 
+
+// ===== Playwright 단위테스트 전용 내보내기 =====
+export const executePlaywrightScenario = (params: {
+  scenarioCode: string;
+  config?: any;
+  userId?: string;
+}) => backendApi.executePlaywrightScenario(params);
+
+export const getPlaywrightStatus = (executionId: string) => backendApi.getPlaywrightStatus(executionId);
+export const getPlaywrightResult = (executionId: string) => backendApi.getPlaywrightResult(executionId);
+
+// ===== MCP Playwright 관련 함수들 =====
+export const convertNaturalLanguageToPlaywright = async (
+  naturalLanguage: string, 
+  config: any = {}
+): Promise<MCPPlaywrightResponse> => {
+  const client = new BackendApiClient();
+  return client.convertNaturalLanguageToPlaywright(naturalLanguage, config);
+};
+
+export const checkMCPPlaywrightStatus = async (): Promise<MCPPlaywrightResponse> => {
+  const client = new BackendApiClient();
+  return client.checkMCPPlaywrightStatus();
+};
+
+export const getMCPPlaywrightPatterns = async (): Promise<MCPPlaywrightResponse> => {
+  const client = new BackendApiClient();
+  return client.getMCPPlaywrightPatterns();
+};

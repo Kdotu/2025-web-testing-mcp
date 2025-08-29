@@ -11,6 +11,7 @@ import { saveSettingsRoutes } from './routes/save-settings';
 import documentsRoutes from './routes/documents';
 import mcpStatusRoutes from './routes/mcp-status';
 import playwrightTestRoutes from './routes/playwright-test';
+import mcpPlaywrightRoutes from './routes/mcp-playwright';
 import { debugEnvironmentVariables } from './services/supabase-client';
 import { TestResultService } from './services/test-result-service';
 
@@ -46,6 +47,7 @@ app.use('/api/test-manage', testManageRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api', mcpStatusRoutes);
 app.use('/api/playwright', playwrightTestRoutes);
+app.use('/api/mcp/playwright', mcpPlaywrightRoutes);
 
 
 // 설정 라우트 (프론트엔드 호환성을 위해 루트 경로에 추가)

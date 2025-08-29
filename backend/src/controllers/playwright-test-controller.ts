@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PlaywrightTestService, PlaywrightTestConfig } from '../services/playwright-test-service';
+import { MCPServiceWrapper } from '../services/mcp-service-wrapper';
 
 export class PlaywrightTestController {
   private playwrightService: PlaywrightTestService;
@@ -230,6 +231,30 @@ export class PlaywrightTestController {
       errors,
       warnings
     };
+  }
+
+  /**
+   * MCP 서버 상태 확인
+   */
+  async checkMCPStatus(_req: Request, res: Response): Promise<void> {
+    try {
+      const mcpWrapper = new MCPServiceWrapper();
+      const connections = await mcpWrapper.checkConnections();
+      
+      res.json({
+        success: true,
+        data: {
+          connections,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('[Playwright Controller] MCP status check failed:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Internal server error'
+      });
+    }
   }
 
   /**
