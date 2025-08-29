@@ -12,12 +12,12 @@
 
 ## 🌟 주요 기능
 
+- **🧪 Playwright E2E 테스트(자연어 → 코드 변환)**: MCP 기반으로 자연어 시나리오를 Playwright 코드로 자동 변환 및 실행
 - **⚡ (진행중) 부하 테스트**: k6 기반 고성능 부하 테스트
 - **💾 (진행중) 결과 저장**: Supabase 데이터베이스에 테스트 결과 저장
 - **📈 (진행중) 대시보드**: 테스트 통계 및 결과 시각화
-- **🚀 (구현 예정) 성능 테스트**: 웹페이지 로딩 속도 및 성능 지표 측정
 - **💡 (구현 예정) Lighthouse 분석**: 종합적인 웹사이트 품질 평가 
-- **UI/UX 개선**: 모달창(X 버튼 및 배경 클릭 시 닫힘), 테이블 스크롤, 폰트 크기 최적화 등 최신 개선사항 반영
+- **UI/UX 개선**: 뉴모피즘 스타일, 단계형 검증 워크플로우, 모달/테이블/폰트 최적화
 
 
 ## 🎨 디자인 시스템
@@ -38,9 +38,14 @@
 - **Lucide React** - 아이콘
 - **Recharts** - 데이터 시각화
 
+### Playwright (E2E)
+- **Playwright MCP Server (Node.js)** - 자연어를 Playwright 코드로 변환
+- **검증 워크플로우** - 단계별(UI)로 입력→변환→검증→실행 준비→실행
+
 ### Backend & Infrastructure
 - **k6** - 부하 테스트 엔진
 - **k6 MCP Server** - [QAInsights/k6-mcp-server](https://github.com/QAInsights/k6-mcp-server)
+- **Playwright MCP Server** - 자연어 → Playwright 코드 변환용 Node 서버
 - **Supabase** - 백엔드 서비스 (데이터베이스, 인증)
 - **Google Lighthouse** - 웹사이트 품질 분석
 
@@ -86,6 +91,10 @@
    ```
    http://localhost:3100
    ```
+
+### Playwright MCP 서버 실행 (선택)
+- 저장소에 포함된 Playwright MCP 서버를 사용하거나, 외부 MCP 서버를 연결할 수 있습니다.
+- 백엔드 API가 MCP 서버를 자동으로 구동/호출하므로 기본 설정으로도 동작합니다.
 
 ## ⚙️ 개발 모드
 
@@ -172,7 +181,7 @@ npm run analyze
 
 ### Frontend
 - **Dashboard** - 테스트 통계 및 개요
-- **TestExecution** - 부하 테스트 실행 및 설정
+- **TestExecution** - 부하 테스트 및 E2E 실행/설정
 - **TestResults** - 테스트 결과 표시 및 분석
 - **Settings** - 시스템 설정 및 MCP 도구 관리
 
@@ -198,6 +207,24 @@ npm run analyze
 - **지표**: TPS, 응답시간, 에러율
 - **도구**: k6 (ramping-arrival-rate executor)
 
+### 4. E2E (Playwright)
+- **목적**: 사용자 시나리오 기반 E2E 동작 검증
+- **입력**: 자연어 시나리오 (예: "1) https://example.com 에 접속한다 …")
+- **동작**: MCP 변환 → 코드 검증 → 실행 준비 → 실행
+- **도구**: Playwright
+
+## 🧭 Playwright 시나리오 실행 흐름
+
+- **검증 단계(UI) 순서**: `MCP 점검 → 입력 → 자연어 변환 → 코드 검증 → 실행 준비`
+- **자연어 변환**: 클릭 시 MCP 서버 호출 → 코드 수신 후 자동으로 코드 검증 실행
+- **코드 검증(정적 검사)**:
+  - `chromium.launch(`, `browser.newPage(` 또는 `page = await browser.newPage(`, `console.log(` 존재 확인(정규식 기반, 공백 허용)
+  - 괄호/따옴표 균형, 최소 길이(50자) 검사
+  - 실패 시 다음 단계 자동 차단 및 오류 메시지 표시
+- **입력 제어**: 변환 중에는 자연어 입력창 `disabled`; 완료/실패 시 자동 복원
+- **재시작**: "1단계부터 다시 시작" 버튼으로 전체 단계 초기화 + MCP 점검 즉시 재실행
+- **코드 정리 정책**: 현재는 원본 유지(불필요 변환으로 오류 유입 방지)
+
 ## 📊 부하 테스트 설정
 
 ### 프리셋 옵션
@@ -215,11 +242,17 @@ npm run analyze
 
 ## 🔄 버전 히스토리
 
+### v1.2.0 (2025-08-29)
+- Playwright MCP 자연어 변환 및 단계형 검증 워크플로우 추가
+- 자연어 변환 중 입력창 비활성화 및 재시작 시 MCP 점검 자동 재확인
+- 코드 검증 기준 정규식 기반으로 완화(구조적 정상성 우선)
+
 ### v1.1.0 (2025-07-29)
 - k6 MCP 서버 통합
 - 실시간 WebSocket 연결
 - Supabase 데이터베이스 연동
 - 프론트엔드-백엔드 분리 아키텍처
+
 
 ### v1.0.0 (2025-07-28)
 - 초기 릴리스
