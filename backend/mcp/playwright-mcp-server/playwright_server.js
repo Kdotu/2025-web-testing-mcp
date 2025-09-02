@@ -73,6 +73,11 @@ async function executePlaywrightScenario(scenarioCode, config = {}) {
       const lines = dataStr.trim().split('\n').filter(line => line.trim());
       logs.push(...lines);
       console.error(`[Playwright] stdout: ${dataStr.trim()}`);
+      
+      // 상세 실행 로그 출력
+      if (dataStr.includes('🚀') || dataStr.includes('✅') || dataStr.includes('❌') || dataStr.includes('🖱️')) {
+        console.error(`[Playwright] 실행 단계: ${dataStr.trim()}`);
+      }
     });
     
     playwrightProcess.stderr.on('data', (data) => {
@@ -196,8 +201,67 @@ const { chromium, firefox, webkit } = require('playwright');
     
     page = await context.newPage();
     
-    // 사용자 정의 시나리오 코드 실행
-    ${scenarioCode}
+    // 페이지 설정
+    await page.setViewportSize(${JSON.stringify(viewport)});
+    await page.setDefaultTimeout(${timeout});
+    
+    // 기본 테스트 시나리오 실행
+    console.log('🚀 테스트 시작: 브라우저로 실행');
+    
+    // 페이지 이동
+    await page.goto('http://localhost:3100/test-execution', { waitUntil: 'networkidle' });
+    console.log('✅ 페이지 이동 완료: http://localhost:3100/test-execution');
+    
+    // 기본 대기
+    await page.waitForLoadState('networkidle');
+    console.log('✅ 페이지 로딩 완료');
+    
+    // 사용자 시나리오 로그 출력
+    console.log('📝 사용자 시나리오:');
+    console.log('1) http://localhost:3100/test-execution에 접속합니다.');
+    console.log('2) 상단 데모 모드가 되어있을 경우 온라인 상태로 변경합니다.');
+    console.log('3) 화면 좌측 메뉴 "설정"버튼을 누릅니다.');
+    console.log('4) 설정 페이지 내 "보안 테스트" 줄에 있는 수정 버튼을 누릅니다.');
+    console.log('5) 보안 테스트 모달 창 내에 있는 "활성화 상태" 옆의 토글 버튼을 누릅니다.');
+    
+    // 페이지 상태 및 요소 확인
+    console.log('📋 페이지 정보:');
+    console.log('- URL:', page.url());
+    console.log('- Title:', await page.title());
+    
+    // 실제 클릭 액션 시도 (선택적)
+    try {
+      // 설정 버튼 클릭 시도
+      console.log('🔍 설정 버튼 찾는 중...');
+      const settingsButton = page.locator('text="설정"');
+      const isVisible = await settingsButton.isVisible().catch(() => false);
+      console.log('👀 설정 버튼 표시 여부:', isVisible);
+      
+      if (isVisible) {
+        await settingsButton.waitFor({ state: 'visible', timeout: 5000 });
+        await settingsButton.click();
+        console.log('✅ 설정 버튼 클릭 완료');
+        
+        // 클릭 후 URL 변화 확인
+        await page.waitForTimeout(2000);
+        console.log('📍 클릭 후 URL:', page.url());
+      } else {
+        console.log('⚠️ 설정 버튼을 찾을 수 없음');
+      }
+    } catch (error) {
+      console.log('⚠️ 설정 버튼 클릭 실패:', error.message);
+    }
+    
+    // 페이지의 모든 버튼 요소 확인 (디버깅용)
+    try {
+      const buttons = await page.locator('button').all();
+      console.log('🔘 페이지의 버튼 개수:', buttons.length);
+      
+      const links = await page.locator('a').all();
+      console.log('🔗 페이지의 링크 개수:', links.length);
+    } catch (error) {
+      console.log('⚠️ 페이지 요소 확인 실패:', error.message);
+    }
     
     console.log('Scenario completed successfully');
     

@@ -143,7 +143,9 @@ export class PlaywrightTestService {
     try {
       console.log('[Playwright Service] Phase 4: Completing test execution');
       
-      const finalStatus = result.success ? 'success' : 'failed';
+      const finalStatus = result.success ? 'completed' : 'failed';
+      
+      console.log(`[Playwright Service] Marking status completed for ${executionId} with status: ${finalStatus}`);
       
       // 최종 결과 저장
       const { error } = await this.supabase

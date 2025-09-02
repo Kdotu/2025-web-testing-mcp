@@ -11,6 +11,11 @@ interface MCPProcessInfo {
   isHealthy: boolean;
   restartCount: number;
   maxRestarts: number;
+  // 서버 재시작을 위한 설정 정보
+  command: string;
+  args: string[];
+  cwd: string;
+  env?: NodeJS.ProcessEnv | undefined;
 }
 
 // MCP 서버 설정 인터페이스
@@ -19,7 +24,7 @@ interface MCPServerConfig {
   command: string;
   args: string[];
   cwd: string;
-  env?: NodeJS.ProcessEnv;
+  env?: NodeJS.ProcessEnv | undefined;
   healthCheckInterval?: number;
   maxRestarts?: number;
   timeout?: number;
@@ -75,7 +80,12 @@ export class MCPProcessManager extends EventEmitter {
         lastActivity: new Date(),
         isHealthy: true,
         restartCount: 0,
-        maxRestarts: config.maxRestarts || this.DEFAULT_MAX_RESTARTS
+        maxRestarts: config.maxRestarts || this.DEFAULT_MAX_RESTARTS,
+        // 서버 재시작을 위한 설정 정보
+        command: config.command,
+        args: config.args,
+        cwd: config.cwd,
+        env: config.env
       };
 
       // 프로세스 이벤트 리스너 설정
@@ -146,6 +156,33 @@ export class MCPProcessManager extends EventEmitter {
     
     await Promise.allSettled(stopPromises);
     console.log(`[MCP Process Manager] All servers stopped`);
+  }
+
+  /**
+   * MCP 서버 재시작
+   */
+  async restartServer(processId: string): Promise<string> {
+    console.log(`[MCP Process Manager] Restarting server ${processId}`);
+    
+    const processInfo = this.processes.get(processId);
+    if (!processInfo) {
+      throw new Error(`Process ${processId} not found`);
+    }
+
+    // 기존 프로세스 정리
+    await this.stopServer(processId);
+    
+    // 새 프로세스 시작
+    const newProcessId = await this.startServer({
+      name: processInfo.name,
+      command: processInfo.command,
+      args: processInfo.args,
+      cwd: processInfo.cwd,
+      env: processInfo.env
+    });
+    
+    console.log(`[MCP Process Manager] Server ${processId} restarted with new ID: ${newProcessId}`);
+    return newProcessId;
   }
 
   /**
@@ -380,12 +417,29 @@ export class MCPProcessManager extends EventEmitter {
       throw new Error(`Process ${processId} not found`);
     }
 
-    return new Promise((resolve, reject) => {
-      const { process } = processInfo;
+    // 프로세스 상태 검증
+    const { process, name } = processInfo;
+    if (!process || process.exitCode !== null) {
+      console.log(`[MCP Process Manager] Process ${processId} is not running, attempting to restart...`);
       
+      // 프로세스 재시작 시도
+      try {
+        const newProcessId = await this.restartServer(processId);
+        return this.executeCommand(newProcessId, method, params);
+      } catch (restartError) {
+        const errorMessage = restartError instanceof Error ? restartError.message : String(restartError);
+        throw new Error(`Process ${processId} restart failed: ${errorMessage}`);
+      }
+    }
+
+    return new Promise((resolve, reject) => {
       let output = '';
       let errorOutput = '';
       let isCompleted = false;
+
+      // MCP 서버 유형에 따른 처리 로직 분기
+      const isK6Server = name.includes('k6') || name.includes('load-test');
+      const isPlaywrightServer = name.includes('playwright') || name.includes('browser');
 
       // 표준 출력 처리
       const onData = (data: Buffer) => {
@@ -394,26 +448,27 @@ export class MCPProcessManager extends EventEmitter {
         const dataStr = data.toString();
         output += dataStr;
         
-        // k6 실행 완료 신호 확인
-        if (dataStr.includes('█ TOTAL RESULTS') || 
-            dataStr.includes('http_req_duration') ||
-            dataStr.includes('iterations') ||
-            dataStr.includes('execution: local')) {
-          
-          // k6 실행이 완료되면 결과 반환
-          if (!isCompleted) {
-            isCompleted = true;
-            cleanup();
-            resolve({
-              success: true,
-              output: output,
-              // result 필드 제거하여 이전과 동일한 형태 유지
-              metrics: this.parseK6Metrics(output)
-            });
+        // k6 서버인 경우에만 k6 완료 신호 확인
+        if (isK6Server) {
+          if (dataStr.includes('█ TOTAL RESULTS') || 
+              dataStr.includes('http_req_duration') ||
+              dataStr.includes('iterations') ||
+              dataStr.includes('execution: local')) {
+            
+            // k6 실행이 완료되면 결과 반환
+            if (!isCompleted) {
+              isCompleted = true;
+              cleanup();
+              resolve({
+                success: true,
+                output: output,
+                metrics: this.parseK6Metrics(output)
+              });
+            }
           }
         }
         
-        // JSON 응답이 완성되었는지 확인 (기존 방식 유지)
+        // JSON 응답이 완성되었는지 확인 (모든 MCP 서버 공통)
         try {
           const response = JSON.parse(output);
           if (!isCompleted) {
@@ -431,12 +486,22 @@ export class MCPProcessManager extends EventEmitter {
         const dataStr = data.toString();
         errorOutput += dataStr;
         
-        // k6 에러 확인
+        // MCP 서버 유형에 따른 에러 메시지 생성
         if (dataStr.includes('Error:') || dataStr.includes('level=error')) {
           if (!isCompleted) {
             isCompleted = true;
             cleanup();
-            reject(new Error(`k6 execution error: ${dataStr}`));
+            
+            let errorMessage = '';
+            if (isK6Server) {
+              errorMessage = `k6 execution error: ${dataStr}`;
+            } else if (isPlaywrightServer) {
+              errorMessage = `Playwright execution error: ${dataStr}`;
+            } else {
+              errorMessage = `${name} execution error: ${dataStr}`;
+            }
+            
+            reject(new Error(errorMessage));
           }
         }
       };
@@ -456,14 +521,28 @@ export class MCPProcessManager extends EventEmitter {
           isCompleted = true;
           cleanup();
           if (code === 0) {
-            resolve({
+            // k6 서버인 경우에만 메트릭 파싱
+            const result: any = {
               success: true,
-              output: output,
-              // result 필드 제거하여 이전과 동일한 형태 유지
-              metrics: this.parseK6Metrics(output)
-            });
+              output: output
+            };
+            
+            if (isK6Server) {
+              result.metrics = this.parseK6Metrics(output);
+            }
+            
+            resolve(result);
           } else {
-            reject(new Error(`Process exited with code ${code}: ${errorOutput}`));
+            let errorMessage = '';
+            if (isK6Server) {
+              errorMessage = `k6 process exited with code ${code}: ${errorOutput}`;
+            } else if (isPlaywrightServer) {
+              errorMessage = `Playwright process exited with code ${code}: ${errorOutput}`;
+            } else {
+              errorMessage = `${name} process exited with code ${code}: ${errorOutput}`;
+            }
+            
+            reject(new Error(errorMessage));
           }
         }
       };
@@ -487,14 +566,25 @@ export class MCPProcessManager extends EventEmitter {
         return;
       }
 
-      // 타임아웃 설정
+      // MCP 서버 유형에 따른 타임아웃 설정
+      const timeoutDuration = isK6Server ? 600000 : 600000; // k6: 10분, Playwright: 10분
       const timeout = setTimeout(() => {
         if (!isCompleted) {
           isCompleted = true;
           cleanup();
-          reject(new Error('Command execution timeout'));
+          
+          let timeoutMessage = '';
+          if (isK6Server) {
+            timeoutMessage = 'k6 command execution timeout';
+          } else if (isPlaywrightServer) {
+            timeoutMessage = 'Playwright command execution timeout';
+          } else {
+            timeoutMessage = `${name} command execution timeout`;
+          }
+          
+          reject(new Error(timeoutMessage));
         }
-      }, 600000); // 10분 타임아웃 (k6 서비스와 일치)
+      }, timeoutDuration);
 
       // 정리 함수
       const cleanup = () => {
