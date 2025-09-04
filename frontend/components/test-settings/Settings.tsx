@@ -36,6 +36,46 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
   const [maxConcurrentTests, setMaxConcurrentTests] = useState(3);
   const [defaultTimeout, setDefaultTimeout] = useState(30);
 
+  // 데모 모드 기본 제공 테스트 타입 (폴백 데이터)
+  const demoBuiltinTestTypes: TestType[] = [
+    {
+      id: 'builtin_lighthouse',
+      name: 'Lighthouse 감사',
+      description: '성능/접근성/SEO 등 품질 지표 분석',
+      enabled: true,
+      category: 'builtin',
+      icon: 'CheckCircle',
+      color: '#6366f1',
+      mcp_tool: 'lighthouse',
+      is_locked: true,
+      lock_type: 'config'
+    },
+    {
+      id: 'builtin_load',
+      name: '부하 테스트 (k6)',
+      description: 'k6 기반 부하•스트레스 테스트',
+      enabled: false,
+      category: 'builtin',
+      icon: 'Database',
+      color: '#10b981',
+      mcp_tool: 'k6',
+      is_locked: false,
+      lock_type: 'config'
+    },
+    {
+      id: 'builtin_playwright',
+      name: 'Playwright E2E',
+      description: '브라우저 자동화 E2E 시나리오 실행',
+      enabled: true,
+      category: 'builtin',
+      icon: 'Settings',
+      color: '#f59e0b',
+      mcp_tool: 'playwright',
+      is_locked: true,
+      lock_type: 'config'
+    }
+  ];
+
   // props 변경 시 상태 업데이트
   useEffect(() => {
     if (isInDemoMode !== undefined) {
@@ -55,19 +95,31 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
       if (result.success && result.data) {
         // DB 데이터 우선으로 정렬 및 그룹화
         const sortedTestTypes = sortTestTypesByCategory(result.data);
-        setTestTypes(sortedTestTypes);
+        if (isDemoMode() && sortedTestTypes.length === 0) {
+          setTestTypes(sortTestTypesByCategory(demoBuiltinTestTypes));
+        } else {
+          setTestTypes(sortedTestTypes);
+        }
       } else {
         // API 실패 시에도 데이터가 있으면 사용 (오프라인 모드)
         if (result.data && result.data.length > 0) {
           const sortedTestTypes = sortTestTypesByCategory(result.data);
           setTestTypes(sortedTestTypes);
+        } else if (isDemoMode()) {
+          // 데모 모드 폴백 사용
+          setTestTypes(sortTestTypesByCategory(demoBuiltinTestTypes));
         } else {
           toast.error('테스트 타입을 불러오는데 실패했습니다.');
         }
       }
     } catch (error) {
       console.error('Error loading test types:', error);
-      toast.error('테스트 타입을 불러오는데 실패했습니다.');
+      if (isDemoMode()) {
+        // 에러 시에도 데모 모드 폴백 제공
+        setTestTypes(sortTestTypesByCategory(demoBuiltinTestTypes));
+      } else {
+        toast.error('테스트 타입을 불러오는데 실패했습니다.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -537,22 +589,15 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  className={`rounded-xl px-4 py-3 ${
-                                    isDemoModeActive 
-                                      ? 'neu-pressed text-muted-foreground cursor-not-allowed' 
-                                      : 'neu-button'
-                                  }`}
+                                  className={`rounded-xl px-4 py-3 neu-button`}
                                   onClick={() => {
-                                    if (!isDemoModeActive) {
-                                      setModalMode('edit');
-                                      setEditingTestType(testType);
-                                      setIsModalOpen(true);
-                                    }
+                                    setModalMode('edit');
+                                    setEditingTestType(testType);
+                                    setIsModalOpen(true);
                                   }}
-                                  disabled={isDemoModeActive}
                                 >
                                   <Edit className="h-4 w-4 mr-2" />
-                                  {isDemoModeActive ? '수정 불가' : '수정'}
+                                  수정
                                 </Button>
                                 <Button 
                                   variant="ghost" 

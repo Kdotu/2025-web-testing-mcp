@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { Input } from '../ui/input';
 import { AlertCircle, Play, CheckCircle, XCircle, Clock, FileText, Code, BookOpen, Zap, Monitor, Bug, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { executePlaywrightScenario, getPlaywrightStatus, getPlaywrightResult, convertNaturalLanguageToPlaywright, checkMCPPlaywrightStatus, getMCPPlaywrightPatterns } from '../../utils/backend-api';
@@ -18,6 +20,13 @@ interface ValidationStatus {
 export function PlaywrightTestExecution() {
   const [scenarioCode, setScenarioCode] = useState('');
   const [naturalScenario, setNaturalScenario] = useState('');
+  // 단계 빌더 상태 (액션 셀렉트 + 타깃 인풋)
+  type BuilderAction = '접속' | '클릭' | '입력' | '확인' | '스크린샷';
+  interface ScenarioStep { action: BuilderAction; target?: string }
+  const [steps, setSteps] = useState<ScenarioStep[]>([]);
+  const [newAction, setNewAction] = useState<BuilderAction>('접속');
+  const [newTarget, setNewTarget] = useState('');
+  const [builderError, setBuilderError] = useState<string | null>(null);
   const [config, setConfig] = useState({
     browser: 'chromium',
     headless: true,
@@ -31,6 +40,11 @@ export function PlaywrightTestExecution() {
   const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isConvertingNaturalLanguage, setIsConvertingNaturalLanguage] = useState(false);
+  // 좌/우 높이 동기화용 refs 및 상태
+  const leftBuilderContentRef = useRef<HTMLDivElement | null>(null);
+  const rightCodeBoxRef = useRef<HTMLDivElement | null>(null);
+  const rightCodeTextAreaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [syncedHeight, setSyncedHeight] = useState<number | null>(null);
 
   // 단계별 검증 상태 관리
   const [validationSteps, setValidationSteps] = useState<ValidationStatus[]>([
@@ -52,6 +66,77 @@ export function PlaywrightTestExecution() {
     // 자연어 시나리오 기본 예시만 설정 (코드는 자동 생성되도록)
     setNaturalScenario(``);
   }, []);
+
+  // 왼쪽 빌더 컨텐츠 높이에 맞춰 오른쪽 코드 박스 높이 동기화
+  useEffect(() => {
+    const syncHeights = () => {
+      const left = leftBuilderContentRef.current;
+      if (!left) return;
+      const height = left.getBoundingClientRect().height;
+      setSyncedHeight(height);
+      if (rightCodeBoxRef.current) {
+        rightCodeBoxRef.current.style.height = `${height}px`; // minHeight 대신 height로 고정
+        rightCodeBoxRef.current.style.maxHeight = `${height}px`; // 최대 높이도 제한
+      }
+      if (rightCodeTextAreaRef.current) {
+        rightCodeTextAreaRef.current.style.height = `${height - 32}px`; // 패딩 여유 조정 (py-2로 줄였으므로)
+        rightCodeTextAreaRef.current.style.maxHeight = `${height - 32}px`; // 최대 높이도 제한
+      }
+    };
+
+    // 최초 동기화
+    syncHeights();
+
+    // 리사이즈 옵저버로 동기화 유지
+    const ro = new ResizeObserver(() => syncHeights());
+    if (leftBuilderContentRef.current) {
+      ro.observe(leftBuilderContentRef.current);
+    }
+    window.addEventListener('resize', syncHeights);
+
+    return () => {
+      window.removeEventListener('resize', syncHeights);
+      ro.disconnect();
+    };
+  }, []);
+
+  // 단계 목록이 변경될 때마다 자연어 시나리오 문자열로 합성
+  useEffect(() => {
+    const lines = steps.map((s, idx) => {
+      const n = `${idx + 1})`;
+      if (s.action === '접속') return `${n} ${s.target || ''} 에 접속한다`;
+      if (s.action === '클릭') return `${n} "${(s.target || '').replace(/\"/g, '"')}" 버튼을 클릭한다`;
+      if (s.action === '입력') return `${n} "${(s.target || '').replace(/\"/g, '"')}" 에 "값" 을 입력한다`;
+      if (s.action === '확인') return `${n} "${(s.target || '').replace(/\"/g, '"')}" 이(가) 보이는지 확인한다`;
+      return `${n} 스크린샷을 찍는다`;
+    });
+    setNaturalScenario(lines.join('\n'));
+  }, [steps]);
+
+  const addStep = () => {
+    if (newAction !== '스크린샷' && !newTarget.trim()) return;
+    // 첫 단계 강제: 반드시 접속이어야 함
+    if (steps.length === 0 && newAction !== '접속') {
+      setBuilderError('첫 단계는 반드시 접속 URL을 입력해야 합니다.');
+      return;
+    }
+    // URL 유효성 검사 (접속 액션일 때만)
+    if (newAction === '접속') {
+      const url = newTarget.trim();
+      const isValidUrl = /^https?:\/\//i.test(url);
+      if (!isValidUrl) {
+        setBuilderError('접속 URL은 http:// 또는 https:// 로 시작해야 합니다.');
+        return;
+      }
+    }
+    setBuilderError(null);
+    setSteps(prev => [...prev, { action: newAction, target: newAction === '스크린샷' ? undefined : newTarget.trim() }]);
+    setNewTarget('');
+  };
+
+  const removeStep = (index: number) => {
+    setSteps(prev => prev.filter((_, i) => i !== index));
+  };
 
   // MCP 서버 상태 확인
   useEffect(() => {
@@ -89,6 +174,7 @@ export function PlaywrightTestExecution() {
      setCurrentValidationStep('input');
      setScenarioCode('');
      setNaturalScenario('');
+     setSteps([]);
      setError(null);
      setExecutionId(null);
      setExecutionStatus('idle');
@@ -192,14 +278,46 @@ export function PlaywrightTestExecution() {
   // 코드 정리 함수 - MCP 서버 생성 코드는 이미 정상이므로 최소한의 정리만 수행
   const sanitizeGeneratedCode = (code: string): string => {
     let sanitized = code;
-    
-    console.log('🔧 코드 정리 시작 - 원본 코드는 정상이므로 그대로 반환');
-    console.log('🔧 원본 코드 샘플:', code.substring(0, 200) + '...');
-    
-    // MCP 서버에서 받은 코드는 이미 정상이므로 그대로 반환
-    // 불필요한 정리 과정에서 오히려 문제가 발생하고 있었음
-    
-    console.log('🔧 코드 정리 완료 - 변경 없음');
+
+    // 1) 접속 스텝이 있고 코드에 page.goto 가 없으면 자동 주입
+    const firstVisitUrl = (() => {
+      const visit = steps.find(s => s.action === '접속' && s.target);
+      if (visit?.target && /^https?:\/\//i.test(visit.target)) return visit.target;
+      // 자연어에서도 URL 추출 시도
+      const m = naturalScenario.match(/https?:\/\/[\w\-._~:\/?#\[\]@!$&'()*+,;=%]+/i);
+      return m ? m[0] : null;
+    })();
+
+    if (firstVisitUrl && !/page\s*\.\s*goto\s*\(/.test(sanitized)) {
+      // newPage 다음에 삽입 시도
+      const gotoSnippet = `await page.goto('${firstVisitUrl}', { waitUntil: 'domcontentloaded', timeout: 60000 });\n\n    await page.waitForLoadState('domcontentloaded');`;
+      const newPagePattern = /(page\s*=\s*await\s*browser\s*\.\s*newPage\s*\(\)\s*;)/;
+      if (newPagePattern.test(sanitized)) {
+        sanitized = sanitized.replace(newPagePattern, `$1\n\n    ${gotoSnippet}`);
+      } else {
+        // 뷰포트 설정 다음에 삽입 시도
+        const viewportPattern = /(await\s*page\s*\.\s*setViewportSize\s*\([^)]*\)\s*;)/;
+        if (viewportPattern.test(sanitized)) {
+          sanitized = sanitized.replace(viewportPattern, `$1\n\n    ${gotoSnippet}`);
+        }
+      }
+    }
+
+    // 2) 흔한 오타 교정 사전
+    const typoFixes: Array<[RegExp, string]> = [
+      [/\bconsolle\b/g, 'console'],
+      [/clickEllement_/g, 'clickElement_'],
+      [/locatoor/g, 'locator'],
+      [/loccator/g, 'locator'],
+      [/texxt/g, 'text'],
+      [/text==/g, 'text='],
+      [/cconfig/g, 'config'],
+      [/page\.locator\(\(/g, 'page.locator(']
+    ];
+    for (const [pattern, replacement] of typoFixes) {
+      sanitized = sanitized.replace(pattern, replacement);
+    }
+
     return sanitized;
   };
 
@@ -581,25 +699,106 @@ test('자연어 기반 시나리오', async ({ page }) => {
         </Label>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 자연어 시나리오 입력 */}
+          {/* 시나리오 빌더 */}
           <div>
             <Label className="text-sm text-muted-foreground mb-2 block">
-              자연어 시나리오 <span className="text-xs text-muted-foreground">(Natural Language)</span>
+              시나리오 빌더 <span className="text-xs text-muted-foreground">(Action + Target)</span>
             </Label>
-            <div className="neu-input rounded-xl px-4 py-3">
-              <textarea
-                value={naturalScenario}
-                onChange={(e) => setNaturalScenario(e.target.value)}
-                disabled={isConvertingNaturalLanguage}
-                placeholder={`예)
-1) https://example.com 에 접속한다
-2) 페이지 제목에 "Example Domain" 이 포함되어야 한다
-3) "로그인" 버튼을 클릭한다
-4) 스크린샷을 찍는다
-`}
-                className="min-h-80 border-none bg-transparent resize-none text-foreground placeholder:text-muted-foreground font-mono text-sm w-full leading-relaxed"
-                spellCheck="false"
-              />
+            <div className="space-y-3" ref={leftBuilderContentRef}>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
+                <div className="md:col-span-2 neu-input rounded-xl px-3 py-2">
+                  <Select value={newAction} onValueChange={(v) => setNewAction(v as any)}>
+                    <SelectTrigger className="w-full min-h-10">
+                      <SelectValue placeholder="활동 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="접속">접속</SelectItem>
+                      <SelectItem value="클릭">클릭</SelectItem>
+                      <SelectItem value="입력">입력</SelectItem>
+                      <SelectItem value="확인">확인</SelectItem>
+                      <SelectItem value="스크린샷">스크린샷</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="md:col-span-2 neu-input rounded-xl px-3 py-2">
+                  <Input
+                    type={newAction === '접속' ? 'url' : 'text'}
+                    placeholder={
+                      newAction === '접속' ? 'https://example.com' :
+                      newAction === '클릭' ? '예: 설정' :
+                      newAction === '입력' ? '예: #email' :
+                      newAction === '확인' ? '예: 로그인' :
+                      '타깃 불필요'
+                    }
+                    value={newTarget}
+                    onChange={(e) => setNewTarget(e.target.value)}
+                    onBlur={() => {
+                      if (newAction === '접속' && newTarget && !/^https?:\/\//i.test(newTarget)) {
+                        setBuilderError('접속 URL은 http:// 또는 https:// 로 시작해야 합니다.');
+                      } else {
+                        setBuilderError(null);
+                      }
+                    }}
+                    disabled={newAction === '스크린샷'}
+                    className="border-none bg-transparent text-foreground placeholder:text-muted-foreground"
+                    pattern={newAction === '접속' ? 'https?://.*' : undefined}
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <Button
+                    onClick={addStep}
+                    className="w-full"
+                    disabled={
+                      isConvertingNaturalLanguage ||
+                      (steps.length === 0 && newAction !== '접속') ||
+                      (newAction !== '스크린샷' && !newTarget.trim())
+                    }
+                    variant="default"
+                    size="sm"
+                  >
+                    추가
+                  </Button>
+                </div>
+              </div>
+
+              {/* 단계 리스트 */}
+              <div className="neu-pressed rounded-lg px-3 py-3 space-y-2">
+                {steps.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">첫 단계로 접속 URL을 추가해 주세요.</div>
+                ) : (
+                  steps.map((s, idx) => (
+                    <div key={`${s.action}-${idx}`} className="flex items-center justify-between text-sm">
+                      <div className="text-foreground">
+                        <span className="text-muted-foreground mr-2">{idx + 1})</span>
+                        {s.action === '접속' && (<span>{s.target} 에 접속한다</span>)}
+                        {s.action === '클릭' && (<span>"{s.target}" 버튼을 클릭한다</span>)}
+                        {s.action === '입력' && (<span>"{s.target}" 에 "값" 을 입력한다</span>)}
+                        {s.action === '확인' && (<span>"{s.target}" 이(가) 보이는지 확인한다</span>)}
+                        {s.action === '스크린샷' && (<span>스크린샷을 찍는다</span>)}
+                      </div>
+                      <Button
+                        onClick={() => removeStep(idx)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600"
+                      >
+                        삭제
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* 자연어 프리뷰 (읽기전용) */}
+              <div className="neu-input rounded-xl px-4 py-3">
+                <textarea
+                  value={naturalScenario}
+                  readOnly
+                  className="min-h-80 border-none bg-transparent resize-none text-foreground placeholder:text-muted-foreground font-mono text-sm w-full leading-relaxed"
+                  spellCheck="false"
+                  placeholder="여기에 구성된 자연어 시나리오가 표시됩니다."
+                />
+              </div>
             </div>
           </div>
 
@@ -608,12 +807,14 @@ test('자연어 기반 시나리오', async ({ page }) => {
             <Label className="text-sm text-muted-foreground mb-2 block">
               생성 테스트 코드 <span className="text-xs text-muted-foreground">(Auto-generated Code)</span>
             </Label>
-            <div className="neu-input rounded-xl px-4 py-3">
+            <div className="neu-input rounded-xl px-4 py-2 overflow-hidden" ref={rightCodeBoxRef}>
               <textarea
                 value={scenarioCode}
                 onChange={(e) => setScenarioCode(e.target.value)}
                 placeholder="자연어 시나리오를 입력한 후 변환 버튼을 클릭하면 테스트 코드가 생성됩니다..."
-                className="min-h-80 border-none bg-transparent resize-none text-foreground placeholder:text-muted-foreground font-mono text-sm w-full leading-relaxed"
+                className="border-none bg-transparent resize-none text-foreground placeholder:text-muted-foreground font-mono text-sm w-full leading-tight h-full min-h-0 overflow-y-auto"
+                style={syncedHeight ? { height: `${Math.max(0, syncedHeight - 32)}px` } : undefined}
+                ref={rightCodeTextAreaRef}
                 spellCheck="false"
               />
             </div>
@@ -646,8 +847,8 @@ test('자연어 기반 시나리오', async ({ page }) => {
                        ? 'border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 opacity-50' // 비활성화된 단계
                        : 'border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900' // 기본 상태
                    }`}
-                                        onClick={(event) => {
-                                               if (isClickable) {
+              onClick={(event) => {
+                      if (isClickable) {
                           if (step.step === 'natural_conversion') {
                             // 자연어 변환 단계 클릭 시 MCP 변환 실행
                             handleMCPConversion();

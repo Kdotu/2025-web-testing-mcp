@@ -13,6 +13,7 @@ export interface MCPTestResult {
   data?: any;
   error?: string;
   output?: string;
+  logs?: string[];
   metrics?: any;
 }
 
@@ -155,17 +156,59 @@ export class MCPServiceWrapper {
         config
       });
 
-      console.log('[MCP Wrapper] Playwright scenario result:', result);
+      console.log('[MCP Wrapper] Playwright scenario result:', JSON.stringify(result, null, 2));
+      
+      // logs 내용 상세 로깅
+      if (result.logs && Array.isArray(result.logs)) {
+        console.log('[MCP Wrapper] Detailed logs:');
+        result.logs.forEach((log: any, index: number) => {
+          console.log(`[MCP Wrapper] Log ${index + 1}:`, log);
+        });
+      } else if (result.data?.logs && Array.isArray(result.data.logs)) {
+        console.log('[MCP Wrapper] Detailed data.logs:');
+        result.data.logs.forEach((log: any, index: number) => {
+          console.log(`[MCP Wrapper] Data Log ${index + 1}:`, log);
+        });
+      } else if (result.result?.data?.logs && Array.isArray(result.result.data.logs)) {
+        console.log('[MCP Wrapper] Detailed result.data.logs:');
+        result.result.data.logs.forEach((log: any, index: number) => {
+          console.log(`[MCP Wrapper] Result Data Log ${index + 1}:`, log);
+        });
+      } else {
+        console.log('[MCP Wrapper] No logs found in result');
+        console.log('[MCP Wrapper] Available keys:', Object.keys(result));
+        if (result.data) {
+          console.log('[MCP Wrapper] Data keys:', Object.keys(result.data));
+        }
+        if (result.result?.data) {
+          console.log('[MCP Wrapper] Result.data keys:', Object.keys(result.result.data));
+        }
+      }
 
-      // MCP 결과의 data.success를 우선적으로 확인
-      const isSuccess = result.data?.success !== false && result.success !== false;
+      // MCP 결과의 data.success를 우선적으로 확인하고, 에러/타임아웃 키워드가 있으면 실패로 간주
+      const errMsg = (result.data?.error || result.error || '').toString();
+      
+      // logs 추출 (여러 경로에서 시도)
+      let extractedLogs: string[] = [];
+      if (result.logs && Array.isArray(result.logs)) {
+        extractedLogs = result.logs;
+      } else if (result.data?.logs && Array.isArray(result.data.logs)) {
+        extractedLogs = result.data.logs;
+      } else if (result.result?.data?.logs && Array.isArray(result.result.data.logs)) {
+        extractedLogs = result.result.data.logs;
+      }
+      
+      const logsJoined = extractedLogs.length > 0 ? extractedLogs.join('\n') : (result.output || '');
+      const timeoutDetected = /Timeout\s*\d+ms\s*exceeded|ECONNREFUSED|net::ERR|navigation.*timeout/i.test(errMsg) || /Timeout\s*\d+ms\s*exceeded/i.test(logsJoined);
+      const isSuccess = result.data?.success !== false && result.success !== false && !timeoutDetected;
       
       return {
         success: isSuccess,
         data: result,
-        output: result.output || result.logs?.join('\n'),
+        output: result.output || logsJoined,
+        logs: extractedLogs,
         metrics: result.metrics,
-        error: result.data?.error || result.error
+        error: result.data?.error || result.error || (timeoutDetected ? 'Navigation timeout or network error detected' : undefined)
       };
     } catch (error) {
       console.error('[MCP Wrapper] Playwright scenario execution error:', error);

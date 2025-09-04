@@ -42,8 +42,20 @@ router.post('/convert', (req, res) => {
 
     console.log('[MCP API] 자연어 변환 요청:', { naturalLanguage, config });
 
-    // MCP 서버 프로세스 실행
+    // MCP 서버 프로세스 실행 (경로 고정 및 존재 여부 확인)
     const mcpServerPath = path.join(__dirname, '../../mcp/playwright-mcp-server/enhanced_mcp_server.js');
+    try {
+      const fs = require('fs');
+      const resolved = require('path').resolve(mcpServerPath);
+      if (!fs.existsSync(resolved)) {
+        console.error('[MCP API] Enhanced MCP server script not found at:', resolved);
+        res.status(500).json({ success: false, error: 'MCP converter script not found' });
+        return;
+      }
+      console.log('[MCP API] Using converter script:', resolved);
+    } catch (e) {
+      console.error('[MCP API] Failed to verify converter script path:', (e as Error).message);
+    }
     const mcpProcess = spawn('node', [mcpServerPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {

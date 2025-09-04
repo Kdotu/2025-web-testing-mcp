@@ -27,6 +27,7 @@ export interface PlaywrightTestResult {
   executionTime: string;
   screenshots?: string[];
   videos?: string[];
+  data?: any;
 }
 
 export class PlaywrightTestService {
@@ -83,7 +84,7 @@ export class PlaywrightTestService {
   /**
    * Phase 2: MCP 서버로 테스트 시나리오 실행 요청 전송
    */
-  async executeTestScenario(executionId: string, scenarioCode: string, config: PlaywrightTestConfig): Promise<void> {
+  async executeTestScenario(executionId: string, scenarioCode: string, config: PlaywrightTestConfig): Promise<PlaywrightTestResult> {
     try {
       console.log('[Playwright Service] Phase 2: Starting test execution via MCP');
       
@@ -91,13 +92,26 @@ export class PlaywrightTestService {
       await this.updateTestStatus(executionId, 'running', 'Starting test execution');
       
       // MCP 서버로 시나리오 실행 요청
-      const result = await this.mcpWrapper.executePlaywrightScenario(scenarioCode, config);
+      const mcpResult = await this.mcpWrapper.executePlaywrightScenario(scenarioCode, config);
       
-      if (!result.success) {
-        throw new Error(result.error || 'Test execution failed');
+      if (!mcpResult.success) {
+        throw new Error(mcpResult.error || 'Test execution failed');
       }
 
       console.log('[Playwright Service] Phase 2: Test execution started successfully');
+      
+      // MCP 결과를 PlaywrightTestResult로 변환
+      const result: PlaywrightTestResult = {
+        executionId,
+        success: mcpResult.success,
+        logs: mcpResult.logs || [],
+        executionTime: new Date().toISOString(),
+        data: mcpResult.data,
+        ...(mcpResult.output && { output: mcpResult.output }),
+        ...(mcpResult.error && { error: mcpResult.error })
+      };
+      
+      return result;
     } catch (error) {
       console.error('[Playwright Service] Phase 2 failed:', error);
       await this.updateTestStatus(executionId, 'failed', 'Test execution failed');
@@ -147,13 +161,26 @@ export class PlaywrightTestService {
       
       console.log(`[Playwright Service] Marking status completed for ${executionId} with status: ${finalStatus}`);
       
-      // 최종 결과 저장
+      // 최종 결과 저장 (raw_data 포함)
+      const rawData = JSON.stringify({
+        success: result.success,
+        logs: result.logs || [],
+        output: result.output,
+        error: result.error,
+        executionTime: result.executionTime,
+        screenshots: result.screenshots || [],
+        videos: result.videos || [],
+        mcpResult: result.data || null,
+        mcpLogs: result.data?.logs || []
+      }, null, 2);
+
       const { error } = await this.supabase
         .from('m2_playwright_test_results')
         .update({
           status: finalStatus,
           result_summary: result.output || result.logs?.join('\n'),
           error_details: result.error,
+          raw_data: rawData,
           updated_at: new Date().toISOString()
         })
         .eq('execution_id', executionId);
@@ -181,19 +208,12 @@ export class PlaywrightTestService {
       const executionId = await this.createTestExecution(scenarioCode, config, userId);
       
       // Phase 2: MCP 서버로 테스트 실행 요청 전송
-      await this.executeTestScenario(executionId, scenarioCode, config);
+      const result = await this.executeTestScenario(executionId, scenarioCode, config);
       
       // Phase 3: 실행 상태 모니터링 및 진행률 업데이트
       await this.monitorTestExecution(executionId);
       
       // Phase 4: 최종 결과 수집 및 DB 업데이트
-      const result: PlaywrightTestResult = {
-        executionId,
-        success: true,
-        logs: ['Test execution completed successfully'],
-        executionTime: new Date().toISOString()
-      };
-      
       await this.completeTestExecution(executionId, result);
       
       console.log('[Playwright Service] Complete test execution flow finished successfully');
@@ -206,19 +226,33 @@ export class PlaywrightTestService {
   }
 
   /**
-   * 테스트 실행 상태 조회
+   * 테스트 실행 상태 조회 (실행 중 상태만)
    */
   async getTestExecutionStatus(executionId: string): Promise<any> {
     try {
+      console.log('[Playwright Service] Getting test execution status for:', executionId);
+      
       const { data, error } = await this.supabase
         .from('m2_playwright_test_results')
-        .select('*')
+        .select('execution_id, status, progress_percentage, current_step, created_at, updated_at')
         .eq('execution_id', executionId)
         .single();
 
       if (error) {
+        console.error('[Playwright Service] Database query failed:', error);
         throw new Error(`Failed to get test execution status: ${error.message}`);
       }
+
+      if (!data) {
+        throw new Error(`Test execution not found: ${executionId}`);
+      }
+
+      console.log('[Playwright Service] Status query successful:', {
+        executionId: data.execution_id,
+        status: data.status,
+        progress: data.progress_percentage,
+        currentStep: data.current_step
+      });
 
       return data;
     } catch (error) {
@@ -228,20 +262,39 @@ export class PlaywrightTestService {
   }
 
   /**
-   * 테스트 실행 결과 조회
+   * 테스트 실행 결과 조회 (완료된 결과만)
    */
   async getTestExecutionResult(executionId: string): Promise<any> {
     try {
+      console.log('[Playwright Service] Getting test execution result for:', executionId);
+      
       const { data, error } = await this.supabase
         .from('m2_playwright_test_results')
-        .select('*')
+        .select('execution_id, status, result_summary, screenshots, videos, error_details, execution_time_ms, raw_data, created_at, updated_at')
         .eq('execution_id', executionId)
-        .eq('status', 'completed')
         .single();
 
       if (error) {
+        console.error('[Playwright Service] Database query failed:', error);
         throw new Error(`Failed to get test execution result: ${error.message}`);
       }
+
+      if (!data) {
+        throw new Error(`Test execution result not found: ${executionId}`);
+      }
+
+      // 완료되지 않은 테스트의 경우 경고
+      if (data.status !== 'completed' && data.status !== 'failed') {
+        console.warn('[Playwright Service] Test is not completed yet:', data.status);
+      }
+
+      console.log('[Playwright Service] Result query successful:', {
+        executionId: data.execution_id,
+        status: data.status,
+        hasResultSummary: !!data.result_summary,
+        hasError: !!data.error_details,
+        hasRawData: !!data.raw_data
+      });
 
       return data;
     } catch (error) {
