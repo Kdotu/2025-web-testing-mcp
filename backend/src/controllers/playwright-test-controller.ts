@@ -92,6 +92,8 @@ export class PlaywrightTestController {
       console.log('[Playwright Controller] Getting test execution status for:', executionId);
       
       const status = await this.playwrightService.getTestExecutionStatus(executionId);
+      
+      console.log('[Playwright Controller] Status response:', JSON.stringify(status, null, 2));
 
       res.status(200).json({
         success: true,

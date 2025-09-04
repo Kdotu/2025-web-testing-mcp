@@ -25,7 +25,7 @@ export function PlaywrightTestExecution() {
     timeout: 30000
   });
   const [executionId, setExecutionId] = useState<string | null>(null);
-  const [executionStatus, setExecutionStatus] = useState<'idle' | 'pending' | 'running' | 'completed' | 'failed'>('idle');
+  const [executionStatus, setExecutionStatus] = useState<'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'timeout'>('idle');
   const [progressPercentage, setProgressPercentage] = useState(0);
   const [currentStep, setCurrentStep] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
@@ -418,11 +418,25 @@ test('자연어 기반 시나리오', async ({ page }) => {
   };
 
   const startExecutionMonitoring = (executionId: string) => {
+    let pollCount = 0;
+    const maxPolls = 360; // 최대 6분간 폴링 (1초 * 360)
+    
     const interval = setInterval(async () => {
+      pollCount++;
+      
+      if (pollCount > maxPolls) {
+        clearInterval(interval);
+        setExecutionStatus('timeout');
+        setError('테스트 실행 타임아웃 (6분 초과)');
+        return;
+      }
+      
       try {
         const statusRes = await getPlaywrightStatus(executionId);
+        console.log('statusResp:', statusRes);
         if (!statusRes.success) throw new Error(statusRes.error || '상태 조회 실패');
         const statusData: any = statusRes.data || statusRes;
+        console.log('statusData:', statusData);
         setExecutionStatus(statusData.status);
         setProgressPercentage(statusData.progressPercentage || 0);
         setCurrentStep(statusData.currentStep || '');
@@ -439,7 +453,13 @@ test('자연어 기반 시나리오', async ({ page }) => {
         }
       } catch (err) {
         console.error('모니터링 오류:', err);
-        clearInterval(interval);
+        
+        // 타임아웃 에러인 경우 폴링 중단
+        if (err instanceof Error && err.message.includes('timeout')) {
+          clearInterval(interval);
+          setExecutionStatus('timeout');
+          setError('데이터베이스 타임아웃 오류: ' + err.message);
+        }
       }
     }, 1000);
   };
