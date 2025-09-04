@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -116,6 +116,7 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
   const [useBackendApi, setUseBackendApi] = useState(false);
   const [elapsedTime, setElapsedTime] = useState<{[key: number]: string}>({});
   const [recentResults, setRecentResults] = useState<any[]>([]);
+  const inFlightByKey = useRef<{[key: string]: boolean}>({});
   
 
 
@@ -451,14 +452,21 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
     }
 
     const normalizedUrl = normalizeUrl(testUrl);
+    const inFlightKey = `${selectedTestType}:${normalizedUrl}`;
+    if (inFlightByKey.current[inFlightKey]) {
+      console.log('⚠️ 동일 테스트가 진행 중입니다. 중복 실행을 건너뜁니다.');
+      return;
+    }
 
     const createBasicK6Script = (targetUrl: string) => `import http from 'k6/http';\nimport { check, sleep } from 'k6';\nexport default function () {\n  const res = http.get('${targetUrl}');\n  check(res, { 'status is 200': (r) => r.status === 200 });\n  sleep(1);\n}`;
 
+    let newTestId: number = 0;
     try {
       setIsExecuting(true); // 실행 시작 시점에 상태 설정
+      inFlightByKey.current[inFlightKey] = true;
       
       // 러닝 테스트 등록 (UI 즉시 반영)
-      const newTestId = Date.now();
+      newTestId = Date.now();
       const startTimeIso = new Date().toISOString();
       const runningItem: RunningTest = {
         id: newTestId,
@@ -484,9 +492,7 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
         const res = await runLighthouseTest({ 
           url: normalizedUrl, 
           device, 
-          categories,
-          name: 'Lighthouse 테스트',
-          description: testDescription
+          categories
         });
         
         if (!res.success) {
@@ -583,6 +589,9 @@ export function TestExecution({ onNavigate, isInDemoMode }: TestExecutionProps) 
       updateTestStatus(newTestId, 'failed', { currentStep: err?.message || '시작 실패' });
     } finally {
       setIsExecuting(false);
+      if (inFlightByKey.current[inFlightKey]) {
+        delete inFlightByKey.current[inFlightKey];
+      }
     }
   };
 
