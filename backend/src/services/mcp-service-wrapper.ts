@@ -157,11 +157,15 @@ export class MCPServiceWrapper {
 
       console.log('[MCP Wrapper] Playwright scenario result:', result);
 
+      // MCP 결과의 data.success를 우선적으로 확인
+      const isSuccess = result.data?.success !== false && result.success !== false;
+      
       return {
-        success: result.success !== false,
+        success: isSuccess,
         data: result,
         output: result.output || result.logs?.join('\n'),
-        metrics: result.metrics
+        metrics: result.metrics,
+        error: result.data?.error || result.error
       };
     } catch (error) {
       console.error('[MCP Wrapper] Playwright scenario execution error:', error);
