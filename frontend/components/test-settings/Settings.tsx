@@ -1,20 +1,25 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Switch } from "../ui/switch";
-import { Textarea } from "../ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Badge } from "../ui/badge";
-import { Alert, AlertDescription } from "../ui/alert";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Trash2, Edit, Save, Bell, Database, Settings as SettingsIcon, Cog, Activity, CheckCircle, Shield, AlertCircle, Lock, Unlock, Sparkles } from "lucide-react";
-import { isDemoMode } from "../../utils/api";
-import { getTestTypes, addTestType, updateTestType, deleteTestType, type TestType } from "../../utils/backend-api";
+import { isDemoMode } from "@/utils/api";
+import { getTestTypes, addTestType, updateTestType, deleteTestType, type TestType } from "@/utils/backend-api";
 import { toast } from "sonner";
-import { TestTypeModal } from "./TestTypeModal";
-import { SettingsHeader } from "./SettingsHeader";
+import { TestTypeModal } from "@/components/test-settings/TestTypeModal";
+import { SettingsHeader } from "@/components/test-settings/SettingsHeader";
+import { TestLayoutCustomizer } from "@/components/test-settings/TestLayoutCustomizer";
+import { TestSettingsWithLayout } from "@/components/test-settings/TestSettingsWithLayout";
+import { TestTypesTab } from "@/components/test-settings/tabs/TestTypesTab";
+import { LayoutSettingsTab } from "@/components/test-settings/tabs/LayoutSettingsTab";
 
 interface SettingsProps {
   onNavigate?: (tabId: string) => void;
@@ -29,6 +34,7 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [editingTestType, setEditingTestType] = useState<TestType | null>(null);
   const [isDemoModeActive, setIsDemoModeActive] = useState(isInDemoMode || false);
+  const [selectedTestType, setSelectedTestType] = useState<string>('lighthouse');
   
   // 일반 설정
   const [notifications, setNotifications] = useState(true);
@@ -453,7 +459,7 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
 
         <div className="neu-card rounded-3xl px-6 py-8">
           <Tabs defaultValue="test-types" className="space-y-8">
-            <TabsList className="grid w-full grid-cols-3 neu-flat rounded-xl p-1.5 gap-1.5 h-auto">
+            <TabsList className="grid w-full grid-cols-2 neu-flat rounded-xl p-1.5 gap-1.5 h-auto">
               <TabsTrigger 
                 value="test-types"
                 className="flex items-center justify-center rounded-lg px-4 py-4 font-semibold text-base transition-all duration-200 data-[state=active]:neu-button-active data-[state=active]:text-primary-foreground data-[state=active]:bg-primary h-14"
@@ -465,186 +471,17 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
                 value="test-settings"
                 className="flex items-center justify-center rounded-lg px-4 py-4 font-semibold text-base transition-all duration-200 data-[state=active]:neu-button-active data-[state=active]:text-primary-foreground data-[state=active]:bg-primary h-14"
               >
-                <Activity className="h-4 w-4 mr-2" />
-                테스트 설정
+                <SettingsIcon className="h-4 w-4 mr-2" />
+                레이아웃 설정
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="test-types" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-2xl font-semibold text-primary mb-2">테스트 타입 관리</h3>
-                  <p className="text-muted-foreground text-lg">사용 가능한 테스트 타입을 관리합니다</p>
-                  {/* 잠금 상태 안내 */}
-                  {testTypes.some(t => t.is_locked) && (
-                    <div className="mt-2 flex items-center space-x-2">
-                      <Lock className="h-4 w-4 text-orange-500" />
-                      <span className="text-sm text-orange-600">
-                        🔒 잠금된 테스트 타입은 수정/삭제가 제한됩니다
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <Button 
-                  className={`rounded-xl px-6 py-3 font-semibold ${
-                    isDemoModeActive 
-                      ? 'neu-pressed text-muted-foreground cursor-not-allowed' 
-                      : 'neu-accent text-primary-foreground'
-                  }`}
-                  onClick={() => {
-                    if (!isDemoModeActive) {
-                      setModalMode('add');
-                      setEditingTestType(null);
-                      setIsModalOpen(true);
-                    }
-                  }}
-                  disabled={isDemoModeActive}
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  {isDemoModeActive ? '데모 모드에서는 추가 불가' : '테스트 타입 추가'}
-                </Button>
-              </div>
-              
-              {isLoading ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Activity className="h-16 w-16 mx-auto mb-6 opacity-50 animate-spin" />
-                  <p className="font-semibold text-lg mb-2">테스트 타입을 불러오는 중..</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {groupTestTypesByCategory(testTypes).map((group) => (
-                    <div key={group.category} className="space-y-4">
-                      {group.category && (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 rounded-full bg-primary"></div>
-                          <h4 className="text-lg font-semibold text-primary capitalize">
-                            {group.category === 'builtin' ? '기본 제공' : 
-                             group.category === 'custom' ? '사용자 정의' :
-                             group.category}
-                          </h4>
-                        </div>
-                      )}
-                      
-                      <div className="space-y-4">
-                        {group.testTypes.map((testType) => (
-                          <div key={testType.id} className="neu-flat rounded-xl px-6 py-6">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-6">
-                                <Switch
-                                  checked={testType.enabled}
-                                  onCheckedChange={() => handleToggleTestType(testType)}
-                                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
-                                />
-                                <div>
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <div className="neu-pressed rounded-full p-2 mr-2">
-                                      {getTestTypeIcon(testType)}
-                                    </div>
-                                    <h4 className="font-semibold text-primary text-lg">{testType.name}</h4>
-                                  </div>
-                                  <p className="text-muted-foreground">{testType.description}</p>
-                                  <div className="flex items-center space-x-3 mt-3">
-                                    <div className="neu-pressed rounded-full px-3 py-1">
-                                      <span className="text-xs font-mono text-muted-foreground">ID: {testType.id}</span>
-                                    </div>
-                                    {testType.category && (
-                                      <div className="neu-pressed rounded-full px-3 py-1">
-                                        <span className="text-xs font-mono text-primary" style={{ color: testType.color }}>
-                                          {testType.category}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {testType.mcp_tool && (
-                                      <div className="neu-pressed rounded-full px-3 py-1">
-                                        <span className="text-xs font-mono text-primary">MCP: {testType.mcp_tool}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-3">
-                                <div className="flex flex-col items-center space-y-2">
-                                  <button
-                                    onClick={() => handleToggleLockStatus(testType)}
-                                    className="flex flex-col items-center hover:scale-105 transition-transform"
-                                    title={testType.is_locked ? `잠금 유형: ${testType.lock_type || 'config'}` : '편집 가능'}
-                                    disabled={isDemoModeActive}
-                                  >
-                                    {testType.is_locked ? (
-                                      <div className="flex flex-col items-center">
-                                        <Lock className="h-5 w-5 text-orange-500" />
-                                        <span className="text-xs text-orange-600 mt-1">잠금됨</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col items-center">
-                                        <Unlock className="h-5 w-5 text-green-500" />
-                                        <span className="text-xs text-green-600 mt-1">편집가능</span>
-                                      </div>
-                                    )}
-                                  </button>
-                                  {isDemoModeActive && (
-                                    <span className="text-xs text-muted-foreground">데모 모드</span>
-                                  )}
-                                </div>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className={`rounded-xl px-4 py-3 neu-button`}
-                                  onClick={() => {
-                                    setModalMode('edit');
-                                    setEditingTestType(testType);
-                                    setIsModalOpen(true);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  수정
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleDeleteTestType(testType)}
-                                  disabled={testType.is_locked || isDemoModeActive}
-                                  className={`rounded-xl px-4 py-3 text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                    isDemoModeActive ? 'neu-pressed' : 'neu-button'
-                                  }`}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  {isDemoModeActive ? '삭제 불가' : '삭제'}
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {testTypes.length === 0 && (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Activity className="h-16 w-16 mx-auto mb-6 opacity-50" />
-                      <p className="font-semibold text-lg mb-2">
-                        {isDemoMode() ? '데모 모드: 기본 제공 테스트 타입이 없습니다' : '등록된 테스트 타입이 없습니다'}
-                      </p>
-                      <p className="text-base">
-                        {isDemoMode() ? '데모 모드에서는 기본 제공 테스트 타입만 사용할 수 있습니다' : '새 테스트 타입을 추가해보세요'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+              <TestTypesTab />
             </TabsContent>
 
             <TabsContent value="test-settings" className="space-y-6">
-              <div>
-                <h3 className="text-2xl font-semibold text-primary mb-2">일반 설정</h3>
-                <p className="text-muted-foreground text-lg">기본 테스트 설정을 구성하세요</p>
-              </div>
-              <Alert className="neu-pressed rounded-xl border-none">
-                <Bell className="h-5 w-5" />
-                <AlertDescription className="text-muted-foreground">
-                  설정 변경사항은 즉시 적용됩니다. 하지만 설정이 실행중인 테스트에 즉시 반영되지 않을 수 있습니다.
-                </AlertDescription>
-              </Alert>
+              <LayoutSettingsTab isInDemoMode={isDemoModeActive} />
             </TabsContent>
 
             <TabsContent value="advanced" className="space-y-6">
@@ -716,6 +553,8 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
                 </Alert>
               </div>
             </TabsContent>
+
+            
           </Tabs>
         </div>
         

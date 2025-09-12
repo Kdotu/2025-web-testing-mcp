@@ -42,7 +42,7 @@ export class PlaywrightTestService {
   /**
    * Phase 1: 테스트 실행 정보 DB 저장 및 실행 ID 생성
    */
-  async createTestExecution(scenarioCode: string, config: PlaywrightTestConfig, userId?: string): Promise<string> {
+  async createTestExecution(scenarioCode: string, config: PlaywrightTestConfig, userId?: string, descriptionFromClient?: string): Promise<string> {
     try {
       console.log('[Playwright Service] Phase 1: Creating test execution record');
       
@@ -62,10 +62,32 @@ export class PlaywrightTestService {
       console.log('[Playwright Service] Insert payload:', JSON.stringify(insertPayload, null, 2));
       console.log('[Playwright Service] Test type ID:', testTypeId);
 
+      // 고유한 테스트 ID 생성
+      const testId = `playwright-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 사용자 친화적인 설명 생성
+      const description = (descriptionFromClient && descriptionFromClient.trim().length > 0)
+        ? descriptionFromClient.trim()
+        : this.generateTestDescription(scenarioCode);
+      
       const { data, error } = await this.supabase
-        .from('m2_playwright_test_results')
-        .insert(insertPayload)
-        .select('execution_id')
+        .from('m2_test_results')
+        .insert({
+          test_id: testId,
+          name: 'Playwright E2E Test',
+          description: description,
+          url: 'http://localhost:3100',
+          status: insertPayload.status,
+          test_type: 'playwright',
+          current_step: '테스트 준비 중...',
+          scenario_code: insertPayload.scenario_code,
+          browser_type: insertPayload.browser_type,
+          viewport_width: insertPayload.viewport_width,
+          viewport_height: insertPayload.viewport_height,
+          user_id: insertPayload.user_id,
+          test_type_id: insertPayload.test_type_id
+        })
+        .select('id')
         .single();
 
       if (error) {
@@ -73,8 +95,8 @@ export class PlaywrightTestService {
         throw new Error(`Failed to create test execution record: ${error.message}`);
       }
 
-      console.log('[Playwright Service] Phase 1: Test execution record created with ID:', data.execution_id);
-      return data.execution_id;
+      console.log('[Playwright Service] Phase 1: Test execution record created with ID:', data.id);
+      return data.id;
     } catch (error) {
       console.error('[Playwright Service] Phase 1 failed:', error);
       throw error;
@@ -94,22 +116,26 @@ export class PlaywrightTestService {
       // MCP 서버로 시나리오 실행 요청
       const mcpResult = await this.mcpWrapper.executePlaywrightScenario(scenarioCode, config);
       
-      if (!mcpResult.success) {
-        throw new Error(mcpResult.error || 'Test execution failed');
-      }
-
-      console.log('[Playwright Service] Phase 2: Test execution started successfully');
+      console.log('[Playwright Service] Phase 2: MCP result received');
       
-      // MCP 결과를 PlaywrightTestResult로 변환
+      // MCP 결과를 PlaywrightTestResult로 변환 (실패해도 결과 저장)
       const result: PlaywrightTestResult = {
         executionId,
-        success: mcpResult.success,
+        success: mcpResult.success && mcpResult.data?.success !== false,
         logs: mcpResult.logs || [],
         executionTime: new Date().toISOString(),
         data: mcpResult.data,
         ...(mcpResult.output && { output: mcpResult.output }),
         ...(mcpResult.error && { error: mcpResult.error })
       };
+      
+      // 테스트 실패 시에도 결과를 반환 (DB에 저장하기 위해)
+      if (!result.success) {
+        console.log('[Playwright Service] Phase 2: Test failed but result will be saved to DB');
+        await this.updateTestStatus(executionId, 'failed', 'Test execution failed');
+      } else {
+        console.log('[Playwright Service] Phase 2: Test execution completed successfully');
+      }
       
       return result;
     } catch (error) {
@@ -175,7 +201,7 @@ export class PlaywrightTestService {
       }, null, 2);
 
       const { error } = await this.supabase
-        .from('m2_playwright_test_results')
+        .from('m2_test_results')
         .update({
           status: finalStatus,
           result_summary: result.output || result.logs?.join('\n'),
@@ -183,7 +209,7 @@ export class PlaywrightTestService {
           raw_data: rawData,
           updated_at: new Date().toISOString()
         })
-        .eq('execution_id', executionId);
+        .eq('id', executionId);
 
       if (error) {
         console.error('[Playwright Service] Failed to complete test execution:', error);
@@ -200,12 +226,12 @@ export class PlaywrightTestService {
   /**
    * 전체 테스트 실행 플로우 (Phase 1-4)
    */
-  async executeTestScenarioFlow(scenarioCode: string, config: PlaywrightTestConfig, userId?: string): Promise<string> {
+  async executeTestScenarioFlow(scenarioCode: string, config: PlaywrightTestConfig, userId?: string, descriptionFromClient?: string): Promise<string> {
     try {
       console.log('[Playwright Service] Starting complete test execution flow');
       
       // Phase 1: 테스트 실행 정보 DB 저장 및 실행 ID 생성
-      const executionId = await this.createTestExecution(scenarioCode, config, userId);
+      const executionId = await this.createTestExecution(scenarioCode, config, userId, descriptionFromClient);
       
       // Phase 2: MCP 서버로 테스트 실행 요청 전송
       const result = await this.executeTestScenario(executionId, scenarioCode, config);
@@ -233,9 +259,10 @@ export class PlaywrightTestService {
       console.log('[Playwright Service] Getting test execution status for:', executionId);
       
       const { data, error } = await this.supabase
-        .from('m2_playwright_test_results')
-        .select('execution_id, status, progress_percentage, current_step, created_at, updated_at')
-        .eq('execution_id', executionId)
+        .from('m2_test_results')
+        .select('id, status, progress_percentage, current_step, created_at, updated_at')
+        .eq('id', executionId)
+        .eq('test_type', 'playwright')
         .single();
 
       if (error) {
@@ -248,7 +275,7 @@ export class PlaywrightTestService {
       }
 
       console.log('[Playwright Service] Status query successful:', {
-        executionId: data.execution_id,
+        executionId: data.id,
         status: data.status,
         progress: data.progress_percentage,
         currentStep: data.current_step
@@ -269,9 +296,10 @@ export class PlaywrightTestService {
       console.log('[Playwright Service] Getting test execution result for:', executionId);
       
       const { data, error } = await this.supabase
-        .from('m2_playwright_test_results')
-        .select('execution_id, status, result_summary, screenshots, videos, error_details, execution_time_ms, raw_data, created_at, updated_at')
-        .eq('execution_id', executionId)
+        .from('m2_test_results')
+        .select('id, status, result_summary, screenshots, videos, error_details, execution_time_ms, raw_data, created_at, updated_at')
+        .eq('id', executionId)
+        .eq('test_type', 'playwright')
         .single();
 
       if (error) {
@@ -289,7 +317,7 @@ export class PlaywrightTestService {
       }
 
       console.log('[Playwright Service] Result query successful:', {
-        executionId: data.execution_id,
+        executionId: data.id,
         status: data.status,
         hasResultSummary: !!data.result_summary,
         hasError: !!data.error_details,
@@ -314,19 +342,66 @@ export class PlaywrightTestService {
     try {
       // RPC 함수 대신 직접 테이블 업데이트
       const { error } = await this.supabase
-        .from('m2_playwright_test_results')
+        .from('m2_test_results')
         .update({
           status: status,
           current_step: currentStep,
           updated_at: new Date().toISOString()
         })
-        .eq('execution_id', executionId);
+        .eq('id', executionId);
 
       if (error) {
         console.error('[Playwright Service] Failed to update test status:', error);
       }
     } catch (error) {
       console.error('[Playwright Service] Failed to update test status:', error);
+    }
+  }
+
+  /**
+   * 테스트 설명 생성 (사용자 친화적)
+   */
+  private generateTestDescription(scenarioCode: string): string {
+    try {
+      // 스크립트에서 주요 액션들을 추출하여 설명 생성
+      const lines = scenarioCode.split('\n').filter(line => line.trim());
+      
+      // 주요 액션들 추출
+      const actions = [];
+      for (const line of lines) {
+        if (line.includes('goto(')) {
+          const urlMatch = line.match(/goto\(['"]([^'"]+)['"]/);
+          if (urlMatch) {
+            actions.push(`페이지 접속: ${urlMatch[1]}`);
+          }
+        } else if (line.includes('click(')) {
+          const clickMatch = line.match(/click\(['"]([^'"]+)['"]/);
+          if (clickMatch) {
+            actions.push(`클릭: ${clickMatch[1]}`);
+          }
+        } else if (line.includes('fill(')) {
+          const fillMatch = line.match(/fill\(['"]([^'"]+)['"]/);
+          if (fillMatch) {
+            actions.push(`입력: ${fillMatch[1]}`);
+          }
+        } else if (line.includes('toBeVisible()')) {
+          const visibleMatch = line.match(/toBeVisible\(\)/);
+          if (visibleMatch) {
+            actions.push('요소 존재 확인');
+          }
+        } else if (line.includes('screenshot(')) {
+          actions.push('스크린샷 촬영');
+        }
+      }
+      
+      if (actions.length > 0) {
+        return `Playwright E2E 테스트: ${actions.slice(0, 3).join(', ')}${actions.length > 3 ? '...' : ''}`;
+      } else {
+        return 'Playwright E2E 테스트: 사용자 정의 시나리오';
+      }
+    } catch (error) {
+      console.warn('[Playwright Service] Failed to generate test description:', error);
+      return 'Playwright E2E 테스트: 사용자 정의 시나리오';
     }
   }
 
@@ -338,7 +413,7 @@ export class PlaywrightTestService {
       const { data, error } = await this.supabase
         .from('m2_test_types')
         .select('id')
-        .eq('name', 'e2e')
+        .eq('name', 'playwright')
         .single();
 
       if (error) {

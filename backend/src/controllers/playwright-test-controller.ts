@@ -16,7 +16,7 @@ export class PlaywrightTestController {
     try {
       console.log('[Playwright Controller] Executing test scenario');
       
-      const { scenarioCode, config = {}, userId } = req.body;
+      const { scenarioCode, config = {}, userId, description } = req.body;
 
       // 입력 검증
       if (!scenarioCode || typeof scenarioCode !== 'string') {
@@ -50,7 +50,8 @@ export class PlaywrightTestController {
       const executionId = await this.playwrightService.executeTestScenarioFlow(
         scenarioCode,
         validatedConfig,
-        userId
+        userId,
+        description
       );
 
       console.log('[Playwright Controller] Test execution flow completed successfully');

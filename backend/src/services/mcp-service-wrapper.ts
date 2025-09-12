@@ -27,9 +27,24 @@ export class MCPServiceWrapper {
       this.k6Client = MCPClientFactory.createK6Client();
       this.lighthouseClient = MCPClientFactory.createLighthouseClient();
       this.playwrightClient = MCPClientFactory.createPlaywrightClient();
+      
+      // Playwright 클라이언트 초기화를 비동기로 수행
+      this.initializePlaywrightClient();
     } catch (error) {
       console.error('Failed to initialize MCP clients:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Playwright 클라이언트 초기화 (비동기)
+   */
+  private async initializePlaywrightClient(): Promise<void> {
+    try {
+      await this.playwrightClient.initialize();
+      console.log('[MCP Wrapper] Playwright client initialized successfully');
+    } catch (error) {
+      console.warn('[MCP Wrapper] Playwright client initialization failed:', error);
     }
   }
 
@@ -150,6 +165,14 @@ export class MCPServiceWrapper {
       console.log('[MCP Wrapper] Executing Playwright scenario via MCP');
       console.log('[MCP Wrapper] Scenario code length:', scenarioCode.length);
       console.log('[MCP Wrapper] Config:', config);
+
+      // Playwright 클라이언트 초기화 확인
+      try {
+        await this.playwrightClient.initialize();
+        console.log('[MCP Wrapper] Playwright client initialized successfully');
+      } catch (initError) {
+        console.warn('[MCP Wrapper] Playwright client initialization failed, continuing anyway:', initError);
+      }
 
       const result = await this.playwrightClient.callTool('execute_scenario', {
         scenarioCode,

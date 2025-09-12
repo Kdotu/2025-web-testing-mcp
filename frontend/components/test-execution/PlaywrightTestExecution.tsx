@@ -425,7 +425,9 @@ export function PlaywrightTestExecution() {
       const q = (text.match(/"([^"]+)"|'([^']+)'/) || [])[1] || text;
       if (/^#|\.|\[|\//.test(q)) return q; // selector로 보이면 그대로
       if (/\bh1|h2|h3|button|input|a\b/.test(q)) return q; // 태그명
-      return `text=${q}`; // 텍스트 매칭
+      
+      // 텍스트 기반 선택자 사용 (더 안전함)
+      return `locator('text="${q}"').first()`; // 중복 요소 문제 해결 + 타임아웃 방지
     };
 
     for (const raw of steps) {
@@ -444,7 +446,7 @@ export function PlaywrightTestExecution() {
       if (/(보이는지|존재|표시).*(확인|검증)/.test(l) || /보인다$/.test(l)) {
         const m = l.match(/["“”'']([^"”']+)["”'']/);
         if (m) {
-          add(`  await expect(page.locator('${selectorFrom(m[1])}')).toBeVisible();`);
+          add(`  await expect(page.${selectorFrom(m[1])}).toBeVisible({ timeout: 30000 });`);
         } else if (/h1|h2|h3|button|input|a/.test(l)) {
           const tag = l.match(/h1|h2|h3|button|input|a/)?.[0] || 'h1';
           add(`  await expect(page.locator('${tag}')).toBeVisible();`);
@@ -453,7 +455,7 @@ export function PlaywrightTestExecution() {
       }
       if (/(클릭|누른다)/.test(l)) {
         const m = l.match(/["“”'']([^"”']+)["”'']/);
-        if (m) add(`  await page.click('${selectorFrom(m[1])}');`);
+        if (m) add(`  await page.${selectorFrom(m[1])}.click();`);
         continue;
       }
       if (/(입력|채운다|타이핑)/.test(l)) {
@@ -515,7 +517,11 @@ test('자연어 기반 시나리오', async ({ page }) => {
       setProgressPercentage(0);
       setCurrentStep('테스트 실행 준비 중...');
 
-      const result = await executePlaywrightScenario({ scenarioCode, config });
+      const result = await executePlaywrightScenario({ 
+        scenarioCode, 
+        config,
+        description: naturalScenario && naturalScenario.trim().length > 0 ? naturalScenario.trim() : undefined
+      });
       if (!result.success) {
         throw new Error(result.error || '테스트 실행 실패');
       }

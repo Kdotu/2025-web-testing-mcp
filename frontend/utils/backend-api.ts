@@ -560,6 +560,7 @@ class BackendApiClient {
     scenarioCode: string;
     config?: any;
     userId?: string;
+    description?: string;
   }): Promise<BackendApiResponse<{ executionId: string }>> {
     return this.request('/api/playwright/execute', {
       method: 'POST',
@@ -575,6 +576,125 @@ class BackendApiClient {
   /** 실행 결과 조회 */
   async getPlaywrightResult(executionId: string): Promise<BackendApiResponse> {
     return this.request(`/api/playwright/results/${executionId}`);
+  }
+
+  // ===== 테스트 설정 관련 메서드들 =====
+
+  /** 모든 테스트 설정 조회 */
+  async getTestSettings(): Promise<TestSetting[]> {
+    const response = await this.request<TestSetting[]>('/api/test-settings');
+    return response.success ? response.data || [] : [];
+  }
+
+  /** 특정 테스트 설정 조회 */
+  async getTestSettingById(id: number): Promise<TestSetting | null> {
+    const response = await this.request<TestSetting>(`/api/test-settings/${id}`);
+    return response.success ? response.data || null : null;
+  }
+
+  /** 새 테스트 설정 생성 */
+  async createTestSetting(data: CreateTestSettingData): Promise<TestSetting> {
+    const response = await this.request<TestSetting>('/api/test-settings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to create test setting');
+    }
+    return response.data!;
+  }
+
+  /** 테스트 설정 업데이트 */
+  async updateTestSetting(id: number, data: UpdateTestSettingData): Promise<TestSetting> {
+    const response = await this.request<TestSetting>(`/api/test-settings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to update test setting');
+    }
+    return response.data!;
+  }
+
+  /** 테스트 설정 삭제 */
+  async deleteTestSetting(id: number): Promise<boolean> {
+    const response = await this.request(`/api/test-settings/${id}`, {
+      method: 'DELETE',
+    });
+    return response.success;
+  }
+
+  /** 카테고리별 테스트 설정 조회 */
+  async getTestSettingsByCategory(category: string): Promise<TestSetting[]> {
+    const response = await this.request<TestSetting[]>(`/api/test-settings/category/${category}`);
+    return response.success ? response.data || [] : [];
+  }
+
+  /** 테스트 설정 검색 */
+  async searchTestSettings(params: {
+    query?: string;
+    category?: string;
+    isActive?: boolean;
+  }): Promise<TestSetting[]> {
+    const searchParams = new URLSearchParams();
+    if (params.query) searchParams.append('q', params.query);
+    if (params.category) searchParams.append('category', params.category);
+    if (params.isActive !== undefined) searchParams.append('isActive', params.isActive.toString());
+    
+    const response = await this.request<TestSetting[]>(`/api/test-settings/search?${searchParams.toString()}`);
+    return response.success ? response.data || [] : [];
+  }
+
+  // ===== 테스트 레이아웃 관련 메서드들 =====
+
+  /** 모든 테스트 레이아웃 조회 */
+  async getTestLayouts(): Promise<TestLayout[]> {
+    const response = await this.request<TestLayout[]>('/api/test-layouts');
+    return response.success ? response.data || [] : [];
+  }
+
+  /** 테스트 타입별 레이아웃 조회 */
+  async getTestLayoutsByTestType(testType: string): Promise<TestLayout[]> {
+    const response = await this.request<TestLayout[]>(`/api/test-layouts/test-type/${testType}`);
+    return response.success ? response.data || [] : [];
+  }
+
+  /** 특정 레이아웃 조회 */
+  async getTestLayoutById(id: number): Promise<TestLayout | null> {
+    const response = await this.request<TestLayout>(`/api/test-layouts/${id}`);
+    return response.success ? response.data || null : null;
+  }
+
+  /** 새 레이아웃 생성 */
+  async createTestLayout(data: CreateLayoutData): Promise<TestLayout> {
+    const response = await this.request<TestLayout>('/api/test-layouts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to create test layout');
+    }
+    return response.data!;
+  }
+
+  /** 레이아웃 업데이트 */
+  async updateTestLayout(id: number, data: UpdateLayoutData): Promise<TestLayout> {
+    const response = await this.request<TestLayout>(`/api/test-layouts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to update test layout');
+    }
+    return response.data!;
+  }
+
+  /** 레이아웃 삭제 */
+  async deleteTestLayout(id: number): Promise<boolean> {
+    const response = await this.request(`/api/test-layouts/${id}`, {
+      method: 'DELETE',
+    });
+    return response.success;
   }
 }
 
@@ -739,6 +859,160 @@ export const executePlaywrightScenario = (params: {
 
 export const getPlaywrightStatus = (executionId: string) => backendApi.getPlaywrightStatus(executionId);
 export const getPlaywrightResult = (executionId: string) => backendApi.getPlaywrightResult(executionId);
+
+// ===== 테스트 설정 관련 함수들 =====
+
+export interface TestSetting {
+  id: number;
+  name: string;
+  category: string;
+  value: any;
+  description: string;
+  priority: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTestSettingData {
+  name: string;
+  category: string;
+  value: any;
+  description?: string;
+  priority?: number;
+  isActive?: boolean;
+}
+
+export interface UpdateTestSettingData {
+  name?: string;
+  category?: string;
+  value?: any;
+  description?: string;
+  priority?: number;
+  isActive?: boolean;
+}
+
+export const getTestSettings = async (): Promise<TestSetting[]> => {
+  return backendApi.getTestSettings();
+};
+
+export const getTestSettingById = async (id: number): Promise<TestSetting | null> => {
+  return backendApi.getTestSettingById(id);
+};
+
+export const createTestSetting = async (data: CreateTestSettingData): Promise<TestSetting> => {
+  return backendApi.createTestSetting(data);
+};
+
+export const updateTestSetting = async (id: number, data: UpdateTestSettingData): Promise<TestSetting> => {
+  return backendApi.updateTestSetting(id, data);
+};
+
+export const deleteTestSetting = async (id: number): Promise<boolean> => {
+  return backendApi.deleteTestSetting(id);
+};
+
+export const getTestSettingsByCategory = async (category: string): Promise<TestSetting[]> => {
+  return backendApi.getTestSettingsByCategory(category);
+};
+
+export const searchTestSettings = async (params: {
+  query?: string;
+  category?: string;
+  isActive?: boolean;
+}): Promise<TestSetting[]> => {
+  return backendApi.searchTestSettings(params);
+};
+
+// ===== 테스트 레이아웃 관련 함수들 =====
+
+export interface LayoutField {
+  id: number;
+  layoutId: number;
+  sectionId: number;
+  fieldName: string;
+  fieldType: string;
+  label: string;
+  placeholder?: string;
+  description?: string;
+  isRequired: boolean;
+  isVisible: boolean;
+  fieldOrder: number;
+  fieldWidth: string;
+  defaultValue?: string;
+  validationRules?: any;
+  options?: any;
+  conditionalLogic?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LayoutSection {
+  id: number;
+  layoutId: number;
+  sectionName: string;
+  sectionTitle: string;
+  sectionDescription?: string;
+  sectionOrder: number;
+  isCollapsible: boolean;
+  isExpanded: boolean;
+  createdAt: string;
+  updatedAt: string;
+  fields: LayoutField[];
+}
+
+export interface TestLayout {
+  id: number;
+  testType: string;
+  name: string;
+  description?: string;
+  isDefault: boolean;
+  isActive: boolean;
+  version: number;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  sections: LayoutSection[];
+}
+
+export interface CreateLayoutData {
+  testType: string;
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  createdBy?: string;
+}
+
+export interface UpdateLayoutData {
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+export const getTestLayouts = async (): Promise<TestLayout[]> => {
+  return backendApi.getTestLayouts();
+};
+
+export const getTestLayoutsByTestType = async (testType: string): Promise<TestLayout[]> => {
+  return backendApi.getTestLayoutsByTestType(testType);
+};
+
+export const getTestLayoutById = async (id: number): Promise<TestLayout | null> => {
+  return backendApi.getTestLayoutById(id);
+};
+
+export const createTestLayout = async (data: CreateLayoutData): Promise<TestLayout> => {
+  return backendApi.createTestLayout(data);
+};
+
+export const updateTestLayout = async (id: number, data: UpdateLayoutData): Promise<TestLayout> => {
+  return backendApi.updateTestLayout(id, data);
+};
+
+export const deleteTestLayout = async (id: number): Promise<boolean> => {
+  return backendApi.deleteTestLayout(id);
+};
 
 // ===== MCP Playwright 관련 함수들 =====
 export const convertNaturalLanguageToPlaywright = async (
