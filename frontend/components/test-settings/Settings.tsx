@@ -16,7 +16,7 @@ import { getTestTypes, addTestType, updateTestType, deleteTestType, type TestTyp
 import { toast } from "sonner";
 import { TestTypeModal } from "@/components/test-settings/TestTypeModal";
 import { SettingsHeader } from "@/components/test-settings/SettingsHeader";
-import { TestLayoutCustomizer } from "@/components/test-settings/TestLayoutCustomizer";
+import { TestLayoutCustomizer } from "@/components/test-settings/tabs/layout/TestLayoutCustomizer";
 import { TestSettingsWithLayout } from "@/components/test-settings/TestSettingsWithLayout";
 
 interface SettingsProps {
@@ -479,7 +479,7 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
             </TabsContent>
 
             <TabsContent value="test-settings" className="space-y-6">
-              <LayoutSettingsTab isInDemoMode={isDemoModeActive} />
+              <TestLayoutCustomizer isInDemoMode={isDemoModeActive} />
             </TabsContent>
 
             <TabsContent value="advanced" className="space-y-6">

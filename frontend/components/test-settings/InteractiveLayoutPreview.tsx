@@ -48,7 +48,7 @@ import { CSS } from '@dnd-kit/utilities';
 interface LayoutField {
   id: string;
   name: string;
-  type: 'input' | 'select' | 'switch' | 'textarea' | 'number' | 'range';
+  type: 'input' | 'select' | 'switch' | 'textarea' | 'number' | 'range' | 'checkbox' | 'radio';
   label: string;
   placeholder?: string;
   options?: { value: string; label: string }[];
@@ -57,6 +57,7 @@ interface LayoutField {
   visible: boolean;
   order: number;
   width?: 'full' | 'half' | 'third' | 'quarter';
+  height?: 'auto' | 'small' | 'medium' | 'large' | 'xlarge';
   description?: string;
   sectionId?: string;
 }
@@ -119,6 +120,16 @@ const SortableFieldItem = React.forwardRef<HTMLDivElement, {
     }
   };
 
+  const getHeightClass = (height?: string) => {
+    switch (height) {
+      case 'small': return 'h-8';
+      case 'medium': return 'h-10';
+      case 'large': return 'h-12';
+      case 'xlarge': return 'h-16';
+      default: return 'h-auto';
+    }
+  };
+
   const renderField = () => {
     switch (field.type) {
       case 'input':
@@ -128,14 +139,14 @@ const SortableFieldItem = React.forwardRef<HTMLDivElement, {
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
             required={field.required}
-            className="w-full"
+            className={`w-full ${getHeightClass(field.height)}`}
           />
         );
       
       case 'select':
         return (
           <Select value={value || ''} onValueChange={onChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className={`w-full ${getHeightClass(field.height)}`}>
               <SelectValue placeholder={field.placeholder || '선택하세요'} />
             </SelectTrigger>
             <SelectContent>
@@ -168,8 +179,8 @@ const SortableFieldItem = React.forwardRef<HTMLDivElement, {
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
             required={field.required}
-            className="w-full"
-            rows={3}
+            className={`w-full ${getHeightClass(field.height)}`}
+            rows={field.height === 'small' ? 2 : field.height === 'large' ? 6 : field.height === 'xlarge' ? 8 : 3}
           />
         );
       
@@ -181,7 +192,7 @@ const SortableFieldItem = React.forwardRef<HTMLDivElement, {
             onChange={(e) => onChange(Number(e.target.value))}
             placeholder={field.placeholder}
             required={field.required}
-            className="w-full"
+            className={`w-full ${getHeightClass(field.height)}`}
           />
         );
       
@@ -192,11 +203,43 @@ const SortableFieldItem = React.forwardRef<HTMLDivElement, {
               type="range"
               value={value || 0}
               onChange={(e) => onChange(Number(e.target.value))}
-              className="w-full"
+              className={`w-full ${getHeightClass(field.height)}`}
             />
             <div className="text-sm text-muted-foreground text-center">
               {value || 0}
             </div>
+          </div>
+        );
+
+      case 'checkbox':
+        return (
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={value || false}
+              onChange={(e) => onChange(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <Label className="text-sm">{field.label}</Label>
+          </div>
+        );
+
+      case 'radio':
+        return (
+          <div className="space-y-2">
+            {field.options?.map((option) => (
+              <div key={option.value} className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name={field.name}
+                  value={option.value}
+                  checked={value === option.value}
+                  onChange={(e) => onChange(e.target.value)}
+                  className="h-4 w-4"
+                />
+                <Label className="text-sm">{option.label}</Label>
+              </div>
+            ))}
           </div>
         );
       
@@ -207,7 +250,7 @@ const SortableFieldItem = React.forwardRef<HTMLDivElement, {
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
             required={field.required}
-            className="w-full"
+            className={`w-full ${getHeightClass(field.height)}`}
           />
         );
     }
@@ -342,7 +385,7 @@ function FieldEditModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="fieldType">타입</Label>
               <Select 
@@ -359,6 +402,8 @@ function FieldEditModal({
                   <SelectItem value="textarea">여러줄 텍스트</SelectItem>
                   <SelectItem value="number">숫자</SelectItem>
                   <SelectItem value="range">범위</SelectItem>
+                  <SelectItem value="checkbox">체크박스</SelectItem>
+                  <SelectItem value="radio">라디오 버튼</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -376,6 +421,24 @@ function FieldEditModal({
                   <SelectItem value="half">절반</SelectItem>
                   <SelectItem value="third">1/3</SelectItem>
                   <SelectItem value="quarter">1/4</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="fieldHeight">높이</Label>
+              <Select 
+                value={editedField.height || 'auto'} 
+                onValueChange={(value: any) => setEditedField({ ...editedField, height: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">자동</SelectItem>
+                  <SelectItem value="small">작음 (h-8)</SelectItem>
+                  <SelectItem value="medium">보통 (h-10)</SelectItem>
+                  <SelectItem value="large">큼 (h-12)</SelectItem>
+                  <SelectItem value="xlarge">매우 큼 (h-16)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
