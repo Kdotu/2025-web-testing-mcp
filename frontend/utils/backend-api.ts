@@ -1032,3 +1032,116 @@ export const getMCPPlaywrightPatterns = async (): Promise<MCPPlaywrightResponse>
   const client = new BackendApiClient();
   return client.getMCPPlaywrightPatterns();
 };
+
+// ===== 동적 설정 관련 함수들 =====
+
+export interface DynamicSettingsForm {
+  testType: string;
+  layoutId: number;
+  sections: {
+    id: string;
+    title: string;
+    description?: string;
+    isCollapsible: boolean;
+    isExpanded: boolean;
+    fields: {
+      id: string;
+      name: string;
+      type: string;
+      label: string;
+      placeholder?: string;
+      description?: string;
+      required: boolean;
+      visible: boolean;
+      width?: string;
+      height?: string;
+      defaultValue?: any;
+      options?: { value: string; label: string }[];
+      validationRules?: any[];
+    }[];
+  }[];
+}
+
+export interface FieldValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface SettingsValidationResult {
+  isValid: boolean;
+  errors: { [fieldName: string]: string[] };
+}
+
+export interface TestConfig {
+  [key: string]: any;
+}
+
+// 동적 설정 폼 생성
+export const generateDynamicSettingsForm = async (testType: string, layoutId?: string): Promise<{ success: boolean; data?: DynamicSettingsForm; error?: string }> => {
+  const client = new BackendApiClient();
+  const response = await client.request<DynamicSettingsForm>(`/api/dynamic-settings/form/${testType}${layoutId ? `?layoutId=${layoutId}` : ''}`);
+  return {
+    success: response.success,
+    data: response.data,
+    error: response.error
+  };
+};
+
+// 필드 유효성 검사
+export const validateField = async (fieldId: string, value: any): Promise<FieldValidationResult> => {
+  const client = new BackendApiClient();
+  const response = await client.request<FieldValidationResult>(`/api/dynamic-settings/validate/field/${fieldId}`, {
+    method: 'POST',
+    body: JSON.stringify({ value })
+  });
+  return response.success ? response.data! : { isValid: false, errors: [response.error || '유효성 검사 실패'] };
+};
+
+// 설정값 저장
+export const saveDynamicSettings = async (testType: string, settings: Record<string, any>, layoutId?: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+  const client = new BackendApiClient();
+  const response = await client.request(`/api/dynamic-settings/save/${testType}`, {
+    method: 'POST',
+    body: JSON.stringify({ settings, layoutId })
+  });
+  return {
+    success: response.success,
+    data: response.data,
+    error: response.error
+  };
+};
+
+// 설정값 로드
+export const loadDynamicSettings = async (testType: string, layoutId?: string): Promise<{ success: boolean; data?: Record<string, any>; error?: string }> => {
+  const client = new BackendApiClient();
+  const response = await client.request<Record<string, any>>(`/api/dynamic-settings/load/${testType}${layoutId ? `?layoutId=${layoutId}` : ''}`);
+  return {
+    success: response.success,
+    data: response.data,
+    error: response.error
+  };
+};
+
+// 설정값 검증 (전체 폼)
+export const validateDynamicSettings = async (testType: string, settings: Record<string, any>, layoutId?: string): Promise<SettingsValidationResult> => {
+  const client = new BackendApiClient();
+  const response = await client.request<SettingsValidationResult>(`/api/dynamic-settings/validate/${testType}`, {
+    method: 'POST',
+    body: JSON.stringify({ settings, layoutId })
+  });
+  return response.success ? response.data! : { isValid: false, errors: { general: [response.error || '설정값 검증 실패'] } };
+};
+
+// 테스트 실행을 위한 설정값 변환
+export const convertToTestConfig = async (testType: string, settings: Record<string, any>, layoutId?: string): Promise<{ success: boolean; data?: TestConfig; error?: string }> => {
+  const client = new BackendApiClient();
+  const response = await client.request<TestConfig>(`/api/dynamic-settings/convert/${testType}`, {
+    method: 'POST',
+    body: JSON.stringify({ settings, layoutId })
+  });
+  return {
+    success: response.success,
+    data: response.data,
+    error: response.error
+  };
+};

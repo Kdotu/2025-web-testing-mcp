@@ -1,53 +1,57 @@
 ## 📋 **테스트 설정 레이아웃 동적 적용 시스템 구현 작업 목록**
 
-### **Phase 1: 인터랙티브 레이아웃 편집기 구현**
-- [ ] **1.1** 실시간 드래그 앤 드롭 편집기
-  - [ ] `@dnd-kit` 라이브러리 통합
-  - [ ] 필드 순서 변경 드래그 앤 드롭
-  - [ ] 필드 그룹화 및 섹션 분리
-  - [ ] 시각적 피드백 및 애니메이션
-  - [ ] 실시간 편집 모드 토글
+### **Phase 1: 인터랙티브 레이아웃 편집기 구현** ✅ **완료**
+- [x] **1.1** 실시간 드래그 앤 드롭 편집기
+  - [x] `@dnd-kit` 라이브러리 통합
+  - [x] 필드 순서 변경 드래그 앤 드롭
+  - [x] 필드 그룹화 및 섹션 분리
+  - [x] 시각적 피드백 및 애니메이션
+  - [x] 실시간 편집 모드 토글
 
-- [ ] **1.2** 인터랙티브 미리보기 시스템
-  - [ ] 하단 중심 미리보기 레이아웃
-  - [ ] 실시간 레이아웃 변경 반영
-  - [ ] 반응형 디바이스 뷰 (데스크톱/태블릿/모바일)
-  - [ ] 필드 간격 및 정렬 실시간 미리보기
+- [x] **1.2** 인터랙티브 미리보기 시스템
+  - [x] 하단 중심 미리보기 레이아웃
+  - [x] 실시간 레이아웃 변경 반영
+  - [x] 반응형 디바이스 뷰 (데스크톱/태블릿/모바일)
+  - [x] 필드 간격 및 정렬 실시간 미리보기
 
-### **Phase 2: 데이터베이스 스키마 설계 및 구현**
-- [ ] **2.1** 테스트 레이아웃 테이블 생성
-  - [ ] `m2_test_layouts` 테이블 생성
-  - [ ] `m2_test_layout_fields` 테이블 생성
-  - [ ] 관계형 데이터베이스 설계
+### **Phase 2: 데이터베이스 스키마 설계 및 구현** 🔄 **진행중**
+- [x] **2.1** 테스트 레이아웃 테이블 생성
+  - [x] `m2_test_layouts` 테이블 생성
+  - [x] `m2_test_layout_fields` 테이블 생성
+  - [x] `m2_test_layout_sections` 테이블 생성
+  - [x] `m2_test_layout_field_sections` 테이블 생성
+  - [x] 관계형 데이터베이스 설계
 
 - [ ] **2.2** 레이아웃 버전 관리
   - [ ] 레이아웃 히스토리 테이블
   - [ ] 버전 관리 시스템
   - [ ] 롤백 기능
 
-### **Phase 3: 백엔드 API 구현**
-- [ ] **3.1** 레이아웃 관리 API
-  - [ ] 레이아웃 CRUD API
-  - [ ] 필드 관리 API
-  - [ ] 레이아웃 적용 API
+### **Phase 3: 백엔드 API 구현** 🔄 **진행중**
+- [x] **3.1** 레이아웃 관리 API
+  - [x] 레이아웃 CRUD API
+  - [x] 필드 관리 API
+  - [x] 레이아웃 적용 API
 
 - [ ] **3.2** 동적 설정 렌더링 API
   - [ ] 레이아웃 기반 설정 폼 생성
   - [ ] 필드 유효성 검사 API
   - [ ] 설정값 저장/로드 API
 
-### **Phase 4: 프론트엔드 동적 렌더링 시스템**
-- [ ] **4.1** 동적 폼 렌더러 구현
-  - [ ] 레이아웃 기반 폼 컴포넌트
-  - [ ] 필드 타입별 렌더링
-  - [ ] 실시간 유효성 검사
-  - [ ] 빈 상태 처리 (기어 아이콘 및 안내 메시지)
+### **Phase 4: 프론트엔드 동적 렌더링 시스템** ✅ **완료**
+- [x] **4.1** 동적 폼 렌더러 구현
+  - [x] 레이아웃 기반 폼 컴포넌트
+  - [x] 필드 타입별 렌더링 (input, select, switch, textarea, number, range, checkbox, radio)
+  - [x] 실시간 유효성 검사
+  - [x] 빈 상태 처리 (기어 아이콘 및 안내 메시지)
+  - [x] 높이 설정 지원 (auto, small, medium, large, xlarge)
 
-- [ ] **4.2** 테스트 설정 화면 통합
-  - [ ] 기존 테스트 설정 화면 수정
-  - [ ] 동적 레이아웃 적용
-  - [ ] 설정값 저장/로드
-  - [ ] 섹션 추가 기능 구현
+- [x] **4.2** 테스트 설정 화면 통합
+  - [x] 기존 테스트 설정 화면 수정
+  - [x] 동적 레이아웃 적용
+  - [x] 설정값 저장/로드 (로컬 스토리지)
+  - [x] 섹션 추가 기능 구현
+  - [x] 폴더 구조 정리 (tabs/layout/)
 
 ### **Phase 5: 사용자 경험 개선**
 - [ ] **5.1** 레이아웃 템플릿 시스템
@@ -84,7 +88,7 @@ CREATE TABLE m2_test_layout_fields (
   id SERIAL PRIMARY KEY,
   layout_id INTEGER REFERENCES m2_test_layouts(id) ON DELETE CASCADE,
   field_name VARCHAR(100) NOT NULL,
-  field_type VARCHAR(50) NOT NULL, -- 'input', 'select', 'switch', 'textarea', 'number', 'range'
+  field_type VARCHAR(50) NOT NULL, -- 'input', 'select', 'switch', 'textarea', 'number', 'range', 'checkbox', 'radio'
   label VARCHAR(255) NOT NULL,
   placeholder TEXT,
   description TEXT,
@@ -92,6 +96,7 @@ CREATE TABLE m2_test_layout_fields (
   is_visible BOOLEAN DEFAULT TRUE,
   field_order INTEGER NOT NULL,
   field_width VARCHAR(20) DEFAULT 'full', -- 'full', 'half', 'third', 'quarter'
+  field_height VARCHAR(20) DEFAULT 'auto', -- 'auto', 'small', 'medium', 'large', 'xlarge'
   default_value TEXT,
   validation_rules JSONB, -- 유효성 검사 규칙
   options JSONB, -- select, radio 등의 옵션
