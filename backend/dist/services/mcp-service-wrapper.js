@@ -1,0 +1,234 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MCPServiceWrapper = void 0;
+const mcp_client_factory_1 = require("./mcp-client-factory");
+class MCPServiceWrapper {
+    constructor() {
+        try {
+            this.k6Client = mcp_client_factory_1.MCPClientFactory.createK6Client();
+            this.lighthouseClient = mcp_client_factory_1.MCPClientFactory.createLighthouseClient();
+            this.playwrightClient = mcp_client_factory_1.MCPClientFactory.createPlaywrightClient();
+            this.initializePlaywrightClient();
+        }
+        catch (error) {
+            console.error('Failed to initialize MCP clients:', error);
+            throw error;
+        }
+    }
+    async initializePlaywrightClient() {
+        try {
+            await this.playwrightClient.initialize();
+            console.log('[MCP Wrapper] Playwright client initialized successfully');
+        }
+        catch (error) {
+            console.warn('[MCP Wrapper] Playwright client initialization failed:', error);
+        }
+    }
+    async executeK6Test(config) {
+        try {
+            console.log('[MCP Wrapper] Executing k6 test via MCP');
+            console.log('[MCP Wrapper] Config:', config);
+            const result = await this.k6Client.callTool('execute_k6_test', {
+                script_file: config.scriptPath,
+                duration: config.duration || '30s',
+                vus: config.vus || 10
+            });
+            console.log('[MCP Wrapper] k6 test result:', result);
+            const k6Output = result.output || result.result || '';
+            const hasNetworkError = k6Output.includes('Error executing k6 test:') ||
+                k6Output.includes('Request Failed') ||
+                k6Output.includes('connectex: A connection attempt failed');
+            const hasThresholdError = k6Output.includes('thresholds on metrics') ||
+                k6Output.includes('level=error');
+            const hasError = hasNetworkError || hasThresholdError;
+            let errorMessage = '';
+            if (hasNetworkError) {
+                errorMessage = 'k6 test failed: Network connection error';
+            }
+            else if (hasThresholdError) {
+                errorMessage = 'k6 test failed: Performance thresholds exceeded';
+            }
+            return {
+                success: !hasError,
+                data: result,
+                output: k6Output,
+                metrics: result.metrics,
+                ...(hasError && { error: errorMessage })
+            };
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] k6 test execution error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+    async executeLighthouseTest(config) {
+        try {
+            console.log('[MCP Wrapper] Executing Lighthouse test via MCP');
+            console.log('[MCP Wrapper] Config:', config);
+            const result = await this.lighthouseClient.callTool('run_audit', {
+                url: config.url,
+                device: config.device || 'desktop',
+                categories: config.categories || ['performance']
+            });
+            console.log('[MCP Wrapper] Lighthouse test result:', result);
+            return {
+                success: true,
+                data: result,
+                output: result.output,
+                metrics: result.metrics
+            };
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] Lighthouse test execution error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+    async executePlaywrightTest(config) {
+        try {
+            console.log('[MCP Wrapper] Executing Playwright test via MCP');
+            console.log('[MCP Wrapper] Config:', config);
+            const result = await this.playwrightClient.callTool('run_test', {
+                url: config.url,
+                config: config.config || {}
+            });
+            console.log('[MCP Wrapper] Playwright test result:', result);
+            return {
+                success: true,
+                data: result,
+                output: result.output,
+                metrics: result.metrics
+            };
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] Playwright test execution error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+    async executePlaywrightScenario(scenarioCode, config = {}) {
+        try {
+            console.log('[MCP Wrapper] Executing Playwright scenario via MCP');
+            console.log('[MCP Wrapper] Scenario code length:', scenarioCode.length);
+            console.log('[MCP Wrapper] Config:', config);
+            try {
+                await this.playwrightClient.initialize();
+                console.log('[MCP Wrapper] Playwright client initialized successfully');
+            }
+            catch (initError) {
+                console.warn('[MCP Wrapper] Playwright client initialization failed, continuing anyway:', initError);
+            }
+            const result = await this.playwrightClient.callTool('execute_scenario', {
+                scenarioCode,
+                config
+            });
+            console.log('[MCP Wrapper] Playwright scenario result:', JSON.stringify(result, null, 2));
+            if (result.logs && Array.isArray(result.logs)) {
+                console.log('[MCP Wrapper] Detailed logs:');
+                result.logs.forEach((log, index) => {
+                    console.log(`[MCP Wrapper] Log ${index + 1}:`, log);
+                });
+            }
+            else if (result.data?.logs && Array.isArray(result.data.logs)) {
+                console.log('[MCP Wrapper] Detailed data.logs:');
+                result.data.logs.forEach((log, index) => {
+                    console.log(`[MCP Wrapper] Data Log ${index + 1}:`, log);
+                });
+            }
+            else if (result.result?.data?.logs && Array.isArray(result.result.data.logs)) {
+                console.log('[MCP Wrapper] Detailed result.data.logs:');
+                result.result.data.logs.forEach((log, index) => {
+                    console.log(`[MCP Wrapper] Result Data Log ${index + 1}:`, log);
+                });
+            }
+            else {
+                console.log('[MCP Wrapper] No logs found in result');
+                console.log('[MCP Wrapper] Available keys:', Object.keys(result));
+                if (result.data) {
+                    console.log('[MCP Wrapper] Data keys:', Object.keys(result.data));
+                }
+                if (result.result?.data) {
+                    console.log('[MCP Wrapper] Result.data keys:', Object.keys(result.result.data));
+                }
+            }
+            const errMsg = (result.data?.error || result.error || '').toString();
+            let extractedLogs = [];
+            if (result.logs && Array.isArray(result.logs)) {
+                extractedLogs = result.logs;
+            }
+            else if (result.data?.logs && Array.isArray(result.data.logs)) {
+                extractedLogs = result.data.logs;
+            }
+            else if (result.result?.data?.logs && Array.isArray(result.result.data.logs)) {
+                extractedLogs = result.result.data.logs;
+            }
+            const logsJoined = extractedLogs.length > 0 ? extractedLogs.join('\n') : (result.output || '');
+            const timeoutDetected = /Timeout\s*\d+ms\s*exceeded|ECONNREFUSED|net::ERR|navigation.*timeout/i.test(errMsg) || /Timeout\s*\d+ms\s*exceeded/i.test(logsJoined);
+            const isSuccess = result.data?.success !== false && result.success !== false && !timeoutDetected;
+            return {
+                success: isSuccess,
+                data: result,
+                output: result.output || logsJoined,
+                logs: extractedLogs,
+                metrics: result.metrics,
+                error: result.data?.error || result.error || (timeoutDetected ? 'Navigation timeout or network error detected' : undefined)
+            };
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] Playwright scenario execution error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+    async checkConnections() {
+        const results = {
+            k6: false,
+            lighthouse: false,
+            playwright: false
+        };
+        try {
+            await this.k6Client.initialize();
+            results.k6 = true;
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] k6 client connection failed:', error);
+        }
+        try {
+            await this.lighthouseClient.initialize();
+            results.lighthouse = true;
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] Lighthouse client connection failed:', error);
+        }
+        try {
+            await this.playwrightClient.initialize();
+            results.playwright = true;
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] Playwright client connection failed:', error);
+        }
+        return results;
+    }
+    async cleanup() {
+        try {
+            await this.k6Client.close();
+            await this.lighthouseClient.close();
+            await this.playwrightClient.close();
+            console.log('[MCP Wrapper] All MCP clients closed successfully');
+        }
+        catch (error) {
+            console.error('[MCP Wrapper] Error during cleanup:', error);
+        }
+    }
+}
+exports.MCPServiceWrapper = MCPServiceWrapper;
+//# sourceMappingURL=mcp-service-wrapper.js.map

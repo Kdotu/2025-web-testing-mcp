@@ -16,6 +16,9 @@ export declare class TestResultController {
     }>;
     getResultById(id: string): Promise<LoadTestResult>;
     deleteResult(id: string): Promise<void>;
+    getTotalCount(): Promise<{
+        total: number;
+    }>;
     getStatistics(): Promise<{
         totalTests: number;
         completedTests: number;

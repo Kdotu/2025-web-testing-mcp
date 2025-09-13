@@ -8,12 +8,29 @@ exports.testResultRoutes = router;
 const testResultController = new test_result_controller_1.TestResultController();
 router.get('/', async (req, res, next) => {
     try {
-        const { page = '1', limit = '10', status } = req.query;
+        const { page = '1', limit = '100', status } = req.query;
         const result = await testResultController.getAllResults({
             page: parseInt(page),
             limit: parseInt(limit),
             status: status
         });
+        res.json({
+            success: true,
+            data: result.results,
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
+            totalPages: result.totalPages,
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.get('/count', async (_req, res, next) => {
+    try {
+        const result = await testResultController.getTotalCount();
         res.json({
             success: true,
             data: result,

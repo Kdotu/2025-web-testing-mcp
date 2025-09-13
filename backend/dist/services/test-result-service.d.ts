@@ -9,6 +9,17 @@ export declare class TestResultService {
     private serviceClient;
     constructor();
     private testConnection;
+    private parseResultFromRow;
+    private calculateDuration;
+    createInitialResult(data: {
+        testType: string;
+        url: string;
+        name: string;
+        description?: string;
+        status: string;
+        config?: any;
+    }): Promise<any>;
+    private generateTestId;
     saveResult(result: LoadTestResult): Promise<void>;
     updateResult(result: LoadTestResult): Promise<void>;
     getResultById(id: string): Promise<LoadTestResult | null>;
@@ -17,7 +28,14 @@ export declare class TestResultService {
         results: LoadTestResult[];
         total: number;
     }>;
+    getTotalCount(): Promise<number>;
+    testDatabaseConnection(): Promise<{
+        connected: boolean;
+        responseTime: number | null;
+        lastError: string | null;
+    }>;
     deleteResult(id: string): Promise<void>;
+    getRunningTests(): Promise<LoadTestResult[]>;
     getStatistics(): Promise<{
         totalTests: number;
         completedTests: number;
@@ -25,7 +43,6 @@ export declare class TestResultService {
         averageResponseTime: number;
         averageErrorRate: number;
     }>;
-    private parseResultFromRow;
 }
 export {};
 //# sourceMappingURL=test-result-service.d.ts.map

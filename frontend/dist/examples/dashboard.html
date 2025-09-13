@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 웹사이트 테스터 - 대시보드 (예시)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../static/common.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237886C7'><path d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'/></svg>">
+    <style>
+        @keyframes pulse { 
+            0%, 100% { opacity: 1; } 
+            50% { opacity: 0.5; } 
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 사이드바 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="neu-flat rounded-xl px-4 py-3">
+                    <h1 class="text-lg font-bold text-primary truncate">MCP 테스터</h1>
+                    <p class="text-xs text-muted-foreground mt-1">웹사이트 성능 분석 도구</p>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="sidebar-menu-btn active" data-page="dashboard">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h2a2 2 0 012 2v2H8V5z"/>
+                    </svg>
+                    <span>메인</span>
+                </button>
+                
+                <button class="sidebar-menu-btn" data-page="test-execution">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1a4 4 0 014 4v2m-6-6V9a2 2 0 012-2h2a2 2 0 012 2v1"/>
+                    </svg>
+                    <span>테스트 실행</span>
+                </button>
+                
+                <button class="sidebar-menu-btn" data-page="test-results">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <span>테스트 결과</span>
+                </button>
+                
+                <button class="sidebar-menu-btn" data-page="settings">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span>설정</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- 메인 콘텐츠 -->
+        <div class="main-layout">
+            <!-- 헤더 -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="neu-button mobile-menu-btn" id="mobile-menu-btn">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+                    <h2 class="page-title">메인</h2>
+                </div>
+                
+                <div class="header-right">
+                    <div class="connection-status">
+                        <div class="status-indicator connected"></div>
+                        <span class="status-text">연결됨</span>
+                        <span class="version">v1.0.0</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 메인 콘텐츠 영역 -->
+            <main class="content animate-fade-in">
+                <div class="content-wrapper">
+                    <!-- 대시보드 헤더 -->
+                    <div class="neu-card welcome-card">
+                        <div class="welcome-content">
+                            <h1 class="welcome-title">대시보드</h1>
+                            <p class="welcome-subtitle">MCP 기반 웹사이트 테스트 결과를 한눈에 확인하세요</p>
+                        </div>
+                        <div class="welcome-icon">
+                            <svg class="icon-xl" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 통계 카드들 -->
+                    <div class="stats-grid">
+                        <div class="neu-card stat-card">
+                            <div class="stat-value">12</div>
+                            <div class="stat-label">총 테스트 수</div>
+                            <div class="stat-icon">
+                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <div class="neu-card stat-card">
+                            <div class="stat-value">3</div>
+                            <div class="stat-label">실행중</div>
+                            <div class="stat-icon">
+                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <div class="neu-card stat-card">
+                            <div class="stat-value">89.5</div>
+                            <div class="stat-label">평균 점수</div>
+                            <div class="stat-icon">
+                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 최근 테스트 결과 -->
+                    <div class="neu-card section-card">
+                        <div class="section-header">
+                            <div class="section-header-content">
+                                <svg class="icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <div>
+                                    <h3 class="section-title">최근 테스트 활동</h3>
+                                    <p class="section-subtitle">오늘 실행된 테스트들의 결과입니다</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="activity-list">
+                            <div class="activity-item clickable">
+                                <div class="activity-left">
+                                    <div class="activity-status completed"></div>
+                                    <div class="activity-info">
+                                        <div class="activity-url">https://example.com</div>
+                                        <div class="activity-meta">
+                                            <span class="activity-type">성능 테스트</span>
+                                            <span class="activity-time">15:30</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="activity-right">
+                                    <div class="neu-pressed activity-badge">
+                                        <span>완료</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="activity-item clickable">
+                                <div class="activity-left">
+                                    <div class="activity-status completed"></div>
+                                    <div class="activity-info">
+                                        <div class="activity-url">https://testsite.org</div>
+                                        <div class="activity-meta">
+                                            <span class="activity-type">Lighthouse</span>
+                                            <span class="activity-time">14:45</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="activity-right">
+                                    <div class="neu-pressed activity-badge">
+                                        <span>완료</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="activity-item clickable">
+                                <div class="activity-left">
+                                    <div class="activity-status running"></div>
+                                    <div class="activity-info">
+                                        <div class="activity-url">https://mywebsite.com</div>
+                                        <div class="activity-meta">
+                                            <span class="activity-type">부하 테스트</span>
+                                            <span class="activity-time">15:42</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="activity-right">
+                                    <div class="neu-pressed activity-badge">
+                                        <span>실행중</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 빠른 실행 -->
+                    <div class="neu-card section-card">
+                        <div class="section-header">
+                            <div class="section-header-content">
+                                <svg class="icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <div>
+                                    <h3 class="section-title">빠른 테스트 실행</h3>
+                                    <p class="section-subtitle">자주 사용하는 테스트를 빠르게 시작하세요</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="quick-actions">
+                            <button class="neu-button quick-action-btn">
+                                <div class="quick-action-content">
+                                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    <div>
+                                        <h4 class="quick-action-title">성능 테스트</h4>
+                                        <p class="quick-action-desc">웹페이지 로딩 속도와 성능 지표를 측정합니다</p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button class="neu-button quick-action-btn">
+                                <div class="quick-action-content">
+                                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                    </svg>
+                                    <div>
+                                        <h4 class="quick-action-title">Lighthouse</h4>
+                                        <p class="quick-action-desc">종합적인 웹사이트 품질 평가를 수행합니다</p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button class="neu-button quick-action-btn">
+                                <div class="quick-action-content">
+                                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                                    </svg>
+                                    <div>
+                                        <h4 class="quick-action-title">부하 테스트</h4>
+                                        <p class="quick-action-desc">높은 트래픽 상황에서의 웹사이트 안정성을 확인합니다</p>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- 푸터 -->
+            <footer class="footer">
+                <div class="footer-content">
+                    <span>© 2025 MCP 웹사이트 테스터 (예시)</span>
+                    <div class="footer-right">
+                        <span>버전 1.0.0</span>
+                        <div class="status-indicator connected"></div>
+                        <span>연결됨</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="../static/common.js"></script>
+</body>
+</html>

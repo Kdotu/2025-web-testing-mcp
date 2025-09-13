@@ -32,6 +32,10 @@ class TestResultController {
         }
         await this.testResultService.deleteResult(id);
     }
+    async getTotalCount() {
+        const total = await this.testResultService.getTotalCount();
+        return { total };
+    }
     async getStatistics() {
         const stats = await this.testResultService.getStatistics();
         return stats;

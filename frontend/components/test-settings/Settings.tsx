@@ -18,8 +18,6 @@ import { TestTypeModal } from "@/components/test-settings/TestTypeModal";
 import { SettingsHeader } from "@/components/test-settings/SettingsHeader";
 import { TestLayoutCustomizer } from "@/components/test-settings/TestLayoutCustomizer";
 import { TestSettingsWithLayout } from "@/components/test-settings/TestSettingsWithLayout";
-import { TestTypesTab } from "@/components/test-settings/tabs/TestTypesTab";
-import { LayoutSettingsTab } from "@/components/test-settings/tabs/LayoutSettingsTab";
 
 interface SettingsProps {
   onNavigate?: (tabId: string) => void;
@@ -573,6 +571,181 @@ export function Settings({ onNavigate, isInDemoMode, connectionStatus: propConne
         onSave={handleSaveTestType}
         onSwitchChange={handleModalSwitchChange}
       />
+    </div>
+  );
+}
+
+// Define components directly to avoid build issues
+function TestTypesTab() {
+  const [testTypes, setTestTypes] = useState<TestType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [editingTestType, setEditingTestType] = useState<TestType | null>(null);
+
+  useEffect(() => {
+    loadTestTypes();
+  }, []);
+
+  const loadTestTypes = async () => {
+    try {
+      setIsLoading(true);
+      const response = await getTestTypes();
+      if (response.success && response.data) {
+        setTestTypes(response.data);
+      } else {
+        setTestTypes([]);
+      }
+    } catch (error) {
+      console.error('Failed to load test types:', error);
+      toast.error('테스트 타입을 불러오는데 실패했습니다.');
+      setTestTypes([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddTestType = () => {
+    setModalMode('add');
+    setEditingTestType(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditTestType = (testType: TestType) => {
+    setModalMode('edit');
+    setEditingTestType(testType);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveTestType = async (testTypeData: Partial<TestType>) => {
+    try {
+      if (modalMode === 'add') {
+        await addTestType(testTypeData as any);
+        toast.success('테스트 타입이 추가되었습니다.');
+      } else {
+        await updateTestType(editingTestType!.id, testTypeData as any);
+        toast.success('테스트 타입이 수정되었습니다.');
+      }
+      await loadTestTypes();
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Failed to save test type:', error);
+      toast.error('테스트 타입 저장에 실패했습니다.');
+    }
+  };
+
+  const handleDeleteTestType = async (id: string) => {
+    if (!confirm('이 테스트 타입을 삭제하시겠습니까?')) return;
+
+    try {
+      await deleteTestType(id);
+      toast.success('테스트 타입이 삭제되었습니다.');
+      await loadTestTypes();
+    } catch (error) {
+      console.error('Failed to delete test type:', error);
+      toast.error('테스트 타입 삭제에 실패했습니다.');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>테스트 타입을 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-semibold text-primary mb-2">테스트 타입 관리</h3>
+        <p className="text-muted-foreground text-lg">사용 가능한 테스트 타입을 관리하세요</p>
+      </div>
+
+      <div className="grid gap-4">
+        {testTypes.map((testType) => (
+          <Card key={testType.id} className="neu-pressed rounded-xl border-none">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-lg font-semibold">{testType.name}</h4>
+                    <Badge variant={testType.enabled ? "default" : "secondary"}>
+                      {testType.enabled ? "활성" : "비활성"}
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground">{testType.description}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {testType.category}
+                    </Badge>
+                    {testType.mcp_tool && (
+                      <Badge variant="secondary" className="text-xs">
+                        {testType.mcp_tool}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditTestType(testType)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteTestType(testType.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Button onClick={handleAddTestType} className="neu-pressed rounded-xl border-none">
+        <Plus className="h-4 w-4 mr-2" />
+        테스트 타입 추가
+      </Button>
+
+      <TestTypeModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTestType(null);
+        }}
+        mode={modalMode}
+        testType={editingTestType}
+        onSave={handleSaveTestType}
+        onSwitchChange={async () => {}}
+      />
+    </div>
+  );
+}
+
+function LayoutSettingsTab({ isInDemoMode }: { isInDemoMode?: boolean }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-2xl font-semibold text-primary mb-2">레이아웃 설정</h3>
+        <p className="text-muted-foreground text-lg">레이아웃을 구성하세요</p>
+      </div>
+      <Alert className="neu-pressed rounded-xl border-none">
+        <Bell className="h-5 w-5" />
+        <AlertDescription className="text-muted-foreground">
+          설정 변경사항은 즉시 적용됩니다. 하지만 실행중인 테스트에 즉시 반영되지 않을 수 있습니다.
+        </AlertDescription>
+      </Alert>
+      <TestLayoutCustomizer isInDemoMode={isInDemoMode} />
     </div>
   );
 }

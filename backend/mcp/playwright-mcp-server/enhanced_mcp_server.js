@@ -264,7 +264,7 @@ class PlaywrightCodeGenerator {
   }
 
   /**
-   * 셀렉터 생성 로직
+   * 셀렉터 생성 로직 (중복 요소 문제 해결)
    */
   generateSelector(text) {
     if (!text) return 'body';
@@ -279,11 +279,11 @@ class PlaywrightCodeGenerator {
     if (text.includes('"') || text.includes("'")) {
       // 따옴표가 포함된 텍스트는 올바른 text 셀렉터로 변환
       const cleanText = text.replace(/["']/g, ''); // 따옴표 제거
-      return `text="${cleanText}"`;
+      return `getByRole('button', { name: '${cleanText}' }).first()`;
     }
     
-    // 일반 텍스트는 text 셀렉터 사용
-    return `text="${text}"`;
+    // 일반 텍스트는 role 기반 셀렉터 사용 (중복 요소 문제 해결)
+    return `getByRole('button', { name: '${text}' }).first()`;
   }
 
   /**
@@ -403,6 +403,8 @@ class PlaywrightCodeGenerator {
       .replace(/loccator/g, 'locator')  // loccator -> locator
       .replace(/cconfig/g, 'config')    // cconfig -> config
       .replace(/ccchromium/g, 'chromium') // cchromium -> chromium
+      .replace(/clickEleement_/g, 'clickElement_') // 변수명 오타 교정
+      .replace(/paage\./g, 'page.')              // page 오타 교정
       .replace(/&&&/g, '&&')            // &&& -> &&
       .replace(/texxt/g, 'text')        // texxt -> text
       .replace(/text==/g, 'text=')      // text== -> text=
@@ -414,6 +416,21 @@ class PlaywrightCodeGenerator {
       .replace(/단계:  /g, '단계: ')                  // 공백 중복 수정
       .replace(/page\.locator\(\(/g, 'page.locator(') // 괄호 오류 수정
       .replace(/n  await/g, '\n  await')              // 줄바꿈 오류 수정
+
+    // 2.1 스크린샷 timestamp 중복 선언 제거 및 Date.now()로 통일 (더 강력한 치환)
+    // 다양한 문자열/공백 패턴을 허용하여 timestamp 사용을 모두 Date.now()로 치환
+    correctedCode = correctedCode
+      // 'screenshot-' + timestamp + '.png' 형태
+      .replace(/(['"])screenshot-\1\s*\+\s*timestamp\s*\+\s*(['"])\.png\2/g, `'screenshot-' + Date.now() + '.png'`)
+      // "screenshot-" + timestamp + ".png" 형태
+      .replace(/"screenshot-"\s*\+\s*timestamp\s*\+\s*"\.png"/g, `'screenshot-' + Date.now() + '.png'`)
+      // 'screenshot-' + (timestamp) + '.png' 형태
+      .replace(/(['"])screenshot-\1\s*\+\s*\(?\s*timestamp\s*\)?\s*\+\s*(['"])\.png\2/g, `'screenshot-' + Date.now() + '.png'`)
+      // 객체 리터럴 path: 'screenshot-' + timestamp + '.png'
+      .replace(/path:\s*(['"])screenshot-\1\s*\+\s*timestamp\s*\+\s*(['"])\.png\2/g, `path: 'screenshot-' + Date.now() + '.png'`);
+
+    // 별도의 timestamp 변수 선언 라인 제거 (어떤 형태든 const timestamp = ... 제거)
+    correctedCode = correctedCode.replace(/\n\s*const\s+timestamp\s*=\s*[^;]+;?/g, '');
     
     // 3. 괄호 균형 수정
     const openParens = (correctedCode.match(/\(/g) || []).length;
@@ -473,10 +490,9 @@ class PlaywrightCodeGenerator {
            
         case 'click':
           const safeTarget = this.createSafeString(step.target);
-          const safeSelector = this.createSafeString(this.generateSelector(step.target));
           const clickVarName = this.createSafeVariableName('clickElement', index);
           return `  console.log('🖱️ 단계: ' + ${safeOriginalText});
-  const ${clickVarName} = page.locator(${safeSelector});
+  const ${clickVarName} = page.getByRole('button', { name: ${safeTarget} }).first();
   await ${clickVarName}.waitFor({ state: 'visible', timeout: 10000 });
   await ${clickVarName}.click();
   console.log('✅ 클릭 완료: ' + ${safeTarget});`;
@@ -496,10 +512,9 @@ class PlaywrightCodeGenerator {
            
         case 'verification':
           const safeVerifyTarget = this.createSafeString(step.target);
-          const safeVerifySelector = this.createSafeString(this.generateSelector(step.target));
           const verifyVarName = this.createSafeVariableName('verifyElement', index);
           return `  console.log('✅ 단계: ' + ${safeOriginalText});
-  const ${verifyVarName} = page.locator(${safeVerifySelector});
+  const ${verifyVarName} = page.getByRole('button', { name: ${safeVerifyTarget} }).first();
   await ${verifyVarName}.waitFor({ state: 'visible', timeout: 10000 });
   console.log('✅ 검증 완료: ' + ${safeVerifyTarget} + ' 요소가 표시됨');`;
            
@@ -510,9 +525,8 @@ class PlaywrightCodeGenerator {
            
         case 'screenshot':
           return `  console.log('📸 단계: ' + ${safeOriginalText});
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   await page.screenshot({ 
-    path: 'screenshot-' + timestamp + '.png', 
+    path: 'screenshot-' + Date.now() + '.png', 
     fullPage: true 
   });
   console.log('✅ 스크린샷 촬영 완료');`;
@@ -528,8 +542,13 @@ class PlaywrightCodeGenerator {
     });
 
     // 전체 코드 조합
+    // URL 이동 단계가 있다면 헤더 직후에 배치하도록 보정
+    const navigationCode = stepCodes.find(code => code.includes('page.goto('));
+    const nonNavigationCodes = stepCodes.filter(code => !code.includes('page.goto('));
+    const orderedBody = navigationCode ? [navigationCode, ...nonNavigationCodes] : stepCodes;
+
     const generatedCode = `${header}
-${stepCodes.join('\n\n')}
+${orderedBody.join('\n\n')}
 ${footer}`;
 
     // 코드 품질 검증 및 자동 수정
